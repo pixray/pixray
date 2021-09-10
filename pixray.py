@@ -43,16 +43,14 @@ global_aspect_width = 1
 global_spot_file = None
 
 from vqgan import VqganDrawer
+
 try:
     from clipdrawer import ClipDrawer
-except ImportError:
-    pass
-    # print('clipdrawer not imported')
-try:
     from pixeldrawer import PixelDrawer
+    from linedrawer import LineDrawer
 except ImportError:
+    # diffvg is not strictly required
     pass
-    # print('pixeldrawer not imported')
 
 try:
     import matplotlib.colors
@@ -423,15 +421,21 @@ def do_init(args):
     # Do it (init that is)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    if args.use_clipdraw:
-        drawer = ClipDrawer(args.size[0], args.size[1], args.strokes)
-    elif args.use_pixeldraw:
-        if args.pixel_size is not None:
-            drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, args.pixel_size, scale=args.pixel_scale)
-        elif global_aspect_width == 1:
-            drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, [40, 40], scale=args.pixel_scale)
+    if args.drawer is not None:
+        if args.drawer == "clipdraw":
+            drawer = ClipDrawer(args.size[0], args.size[1], args.strokes)
+        elif args.drawer == "pixeldraw":
+            if args.pixel_size is not None:
+                drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, args.pixel_size, scale=args.pixel_scale)
+            elif global_aspect_width == 1:
+                drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, [40, 40], scale=args.pixel_scale)
+            else:
+                drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, scale=args.pixel_scale)
+        elif args.drawer == "linedraw":
+            drawer = LineDrawer(args.size[0], args.size[1], args.strokes)            
         else:
-            drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, scale=args.pixel_scale)
+            print(f"Unknown drawer {args.drawer}, aborting")
+            sys.exit(1)
     else:
         drawer = VqganDrawer(args.vqgan_model)
     drawer.load_model(args.vqgan_config, args.vqgan_checkpoint, device)
@@ -1192,9 +1196,8 @@ def setup_parser():
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
-    vq_parser.add_argument("-cd",   "--use_clipdraw", type=bool, help="Use clipdraw", default=False, dest='use_clipdraw')
+    vq_parser.add_argument("-dr",   "--drawer", type=str, help="clipdraw, pixeldraw, etc", default=None, dest='drawer')
     vq_parser.add_argument("-st",   "--strokes", type=int, help="clipdraw strokes", default=1024, dest='strokes')
-    vq_parser.add_argument("-pd",   "--use_pixeldraw", type=bool, help="Use pixeldraw", default=False, dest='use_pixeldraw')
     vq_parser.add_argument("-mo",   "--do_mono", type=bool, help="Monochromatic", default=False, dest='do_mono')
     # vq_parser.add_argument("-lc",   "--lock_colors", type=bool, help="Lock Colors (if Color Mapping)", default=False, dest='lock_colors')
     vq_parser.add_argument("-epw",  "--enforce_palette_annealing", type=int, help="enforce palette annealing, 0 -- skip", default=5000, dest='enforce_palette_annealing')

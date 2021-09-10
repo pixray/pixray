@@ -18,9 +18,11 @@ import torchvision.transforms as transforms
 import numpy as np
 import PIL.Image
 
-class ClipDrawer(DrawingInterface):
-    num_paths = 256
-    max_width = 50
+def bound(value, low, high):
+    return max(low, min(high, value))
+
+class LineDrawer(DrawingInterface):
+    num_paths = 72
 
     def __init__(self, width, height, num_paths):
        super(DrawingInterface, self).__init__()
@@ -39,16 +41,16 @@ class ClipDrawer(DrawingInterface):
 
         canvas_width, canvas_height = self.canvas_width, self.canvas_height
         num_paths = self.num_paths
-        max_width = canvas_height / 10
+        max_width = canvas_height / 30
 
         # Initialize Random Curves
         shapes = []
         shape_groups = []
-        for i in range(num_paths):
-            num_segments = random.randint(1, 3)
+        for i in range(1):
+            num_segments = num_paths
             num_control_points = torch.zeros(num_segments, dtype = torch.int32) + 2
             points = []
-            p0 = (random.random(), random.random())
+            p0 = (0.5, 0.5)
             points.append(p0)
             for j in range(num_segments):
                 radius = 0.1
@@ -58,13 +60,14 @@ class ClipDrawer(DrawingInterface):
                 points.append(p1)
                 points.append(p2)
                 points.append(p3)
-                p0 = p3
+                p0 = (bound(p3[0],0,1), bound(p3[1],0,1))
             points = torch.tensor(points)
             points[:, 0] *= canvas_width
             points[:, 1] *= canvas_height
             path = pydiffvg.Path(num_control_points = num_control_points, points = points, stroke_width = torch.tensor(max_width/10), is_closed = False)
             shapes.append(path)
-            path_group = pydiffvg.ShapeGroup(shape_ids = torch.tensor([len(shapes) - 1]), fill_color = None, stroke_color = torch.tensor([random.random(), random.random(), random.random(), random.random()]))
+            s_col = [0, 0, 0, 1]
+            path_group = pydiffvg.ShapeGroup(shape_ids = torch.tensor([len(shapes) - 1]), fill_color = None, stroke_color = torch.tensor(s_col))
             shape_groups.append(path_group)
 
         # Just some diffvg setup
@@ -81,9 +84,9 @@ class ClipDrawer(DrawingInterface):
             points_vars.append(path.points)
             path.stroke_width.requires_grad = True
             stroke_width_vars.append(path.stroke_width)
-        for group in shape_groups:
-            group.stroke_color.requires_grad = True
-            color_vars.append(group.stroke_color)
+        # for group in shape_groups:
+        #     group.stroke_color.requires_grad = True
+        #     color_vars.append(group.stroke_color)
 
         self.points_vars = points_vars
         self.stroke_width_vars = stroke_width_vars
@@ -99,8 +102,8 @@ class ClipDrawer(DrawingInterface):
         # Optimizers
         points_optim = torch.optim.Adam(self.points_vars, lr=1.0/decay_divisor)
         width_optim = torch.optim.Adam(self.stroke_width_vars, lr=0.1/decay_divisor)
-        color_optim = torch.optim.Adam(self.color_vars, lr=0.01/decay_divisor)
-        opts = [points_optim, width_optim, color_optim]
+        # color_optim = torch.optim.Adam(self.color_vars, lr=0.01/decay_divisor)
+        opts = [points_optim, width_optim]
         return opts
 
     def rand_init(self, toksX, toksY):

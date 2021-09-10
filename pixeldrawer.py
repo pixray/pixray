@@ -14,8 +14,6 @@ import torchvision.transforms as transforms
 import numpy as np
 import PIL.Image
 
-pydiffvg.set_print_timing(False)
-
 class PixelDrawer(DrawingInterface):
     num_rows = 45
     num_cols = 80
