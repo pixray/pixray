@@ -733,7 +733,6 @@ def checkin(args, iter, losses):
     writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str} (-{num_cycles_not_best}=>{best_loss:2.4g})'
     if args.animation_dir is not None:
         writestr = f'anim: {cur_anim_index}/{len(anim_output_files)} {writestr}'
-    tqdm.write(writestr)
     info = PngImagePlugin.PngInfo()
     info.add_text('comment', f'{args.prompts}')
     timg = drawer.synth(cur_iteration)
@@ -755,6 +754,7 @@ def checkin(args, iter, losses):
             if args.display_clear:
                 clear_output()
             display.display(display.Image(outfile))
+    tqdm.write(writestr)
 
 def ascend_txt(args):
     global cur_iteration, cur_anim_index, perceptors, normalize, cutoutsTable, cutoutSizeTable
