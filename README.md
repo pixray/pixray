@@ -4,7 +4,7 @@
 
 Pixray is an image generation system. It combines previous ideas including:
 
- * [Perception Engines](https://github.com/dribnet/perceptionengines) on iteratively optimising graphics against on an ensemble of classifiers
+ * [Perception Engines](https://github.com/dribnet/perceptionengines) on iteratively optimising graphics against an ensemble of classifiers
  * [CLIP guided GAN imagery](https://alexasteinbruck.medium.com/vqgan-clip-how-does-it-work-210a5dca5e52) from [Ryan Murdoch](https://twitter.com/advadnoun) and [Katherine Crowson](https://github.com/crowsonkb) as well as modifictions such as [CLIPDraw](https://twitter.com/kvfrans/status/1409933704856674304) from Kevin Frans
  * [Sampling Generative Networks](https://github.com/dribnet/plat) on useful ways of navigating latent space
  * (more to come)
