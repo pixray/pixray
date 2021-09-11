@@ -752,6 +752,8 @@ def checkin(args, iter, losses):
             display.display(display.Image(open(gif_output,'rb').read()))
     if IS_NOTEBOOK and iter % args.display_every == 0:
         if cur_anim_index is None or iter == 0:
+            if args.display_clear:
+                clear_output()
             display.display(display.Image(outfile))
 
 def ascend_txt(args):
@@ -851,7 +853,7 @@ def ascend_txt(args):
 
         result.append( sharpness*args.smoothness )
 
-    if args.enforce_saturation:
+    if args.saturation:
         # based on the old "percepted colourfulness" heuristic from Hasler and Süsstrunk’s 2003 paper
         # https://www.researchgate.net/publication/243135534_Measuring_Colourfulness_in_Natural_Images
         _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
@@ -863,7 +865,7 @@ def ascend_txt(args):
         mean_rggb = torch.sqrt(rg_mean**2 + yb_mean**2)
         colorfullness = std_rggb+.3*mean_rggb
 
-        result.append( -colorfullness*cur_iteration/args.enforce_saturation )
+        result.append( -colorfullness*args.saturation/5.0 )
 
     for cutoutSize in cutoutsTable:
         # clear the transform "cache"
@@ -1153,6 +1155,7 @@ def setup_parser():
     vq_parser.add_argument("-i",    "--iterations", type=int, help="Number of iterations", default=None, dest='iterations')
     vq_parser.add_argument("-se",   "--save_every", type=int, help="Save image iterations", default=10, dest='save_every')
     vq_parser.add_argument("-de",   "--display_every", type=int, help="Display image iterations", default=20, dest='display_every')
+    vq_parser.add_argument("-dc",   "--display_clear", type=bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=None, dest='overlay_every')
     vq_parser.add_argument("-ovo",  "--overlay_offset", type=int, help="Overlay image iteration offset", default=0, dest='overlay_offset')
     vq_parser.add_argument("-ovi",  "--overlay_image", type=str, help="Overlay image (if not init)", default=None, dest='overlay_image')
@@ -1199,9 +1202,9 @@ def setup_parser():
     vq_parser.add_argument("-epw",  "--enforce_palette_annealing", type=int, help="enforce palette annealing, 0 -- skip", default=5000, dest='enforce_palette_annealing')
     vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
     vq_parser.add_argument("-tpl",  "--target_palette_length", type=int, help="target palette length", default=16, dest='target_palette_length')
-    vq_parser.add_argument("-esw",  "--smoothness", type=float, help="enforce smoothness, 0 -- skip", default=0, dest='smoothness')
+    vq_parser.add_argument("-smo",  "--smoothness", type=float, help="encourage smoothness, 0 -- skip", default=0, dest='smoothness')
     vq_parser.add_argument("-est",  "--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
-    vq_parser.add_argument("-ecw",  "--enforce_saturation", type=int, help="enforce saturation, 0 -- skip", default=0, dest='enforce_saturation')
+    vq_parser.add_argument("-sat",  "--saturation", type=float, help="encourage saturation, 0 -- skip", default=0, dest='saturation')
 
     return vq_parser
 
