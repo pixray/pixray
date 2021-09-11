@@ -1357,8 +1357,8 @@ def process_args(vq_parser, namespace=None, do_both=False):
     }
     quality_to_iterations_table = {
         'draft': 200,
-        'normal': 350,
-        'better': 500,
+        'normal': 300,
+        'better': 400,
         'best': 500
     }
     quality_to_scale_table = {
