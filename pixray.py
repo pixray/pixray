@@ -58,7 +58,8 @@ except ImportError:
     # only needed for palette stuff
     pass
 
-print("warning: running unreleased future version")
+# this is enabled when not in the master branch
+# print("warning: running unreleased future version")
 
 # https://stackoverflow.com/a/39662359
 def isnotebook():
