@@ -1,6 +1,6 @@
 # pixray
 
--![Alt text](https://user-images.githubusercontent.com/945979/132935558-1e03178a-7e45-4dde-8e5d-f9b7b9d60d74.png "pixray banner")
+![Alt text](https://user-images.githubusercontent.com/945979/132935558-1e03178a-7e45-4dde-8e5d-f9b7b9d60d74.png "pixray banner")
 
 Pixray is an image generation system. It combines previous ideas including:
 
