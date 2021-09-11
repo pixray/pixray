@@ -1136,7 +1136,7 @@ def do_video(args):
     p.wait()
 
 # this dictionary is used for settings in the notebook
-global_clipit_settings = {}
+global_pixray_settings = {}
 
 def setup_parser():
     # Create the parser
@@ -1490,44 +1490,44 @@ def process_args(vq_parser, namespace=None, do_both=False):
     return args
 
 def reset_settings():
-    global global_clipit_settings
-    global_clipit_settings = {}
+    global global_pixray_settings
+    global_pixray_settings = {}
 
 def add_settings(**kwargs):
-    global global_clipit_settings
+    global global_pixray_settings
     for k, v in kwargs.items():
         if v is None:
             # just remove the key if it is there
-            global_clipit_settings.pop(k, None)
+            global_pixray_settings.pop(k, None)
         else:
-            global_clipit_settings[k] = v
+            global_pixray_settings[k] = v
 
 def get_settings():
-    global global_clipit_settings
-    return global_clipit_settings.copy()
+    global global_pixray_settings
+    return global_pixray_settings.copy()
 
 def apply_settings(do_both=False):
-    global global_clipit_settings
+    global global_pixray_settings
     settingsDict = None
     vq_parser = setup_parser()
 
-    if len(global_clipit_settings) > 0:
+    if len(global_pixray_settings) > 0:
         # check for any bogus entries in the settings
         dests = [d.dest for d in vq_parser._actions]
-        for k in global_clipit_settings:
+        for k in global_pixray_settings:
             if not k in dests:
-                raise ValueError(f"Requested setting not found, aborting: {k}={global_clipit_settings[k]}")
+                raise ValueError(f"Requested setting not found, aborting: {k}={global_pixray_settings[k]}")
 
         # convert dictionary to easyDict
         # which can be used as an argparse namespace instead
-        # settingsDict = easydict.EasyDict(global_clipit_settings)
-        settingsDict = SimpleNamespace(**global_clipit_settings)
+        # settingsDict = easydict.EasyDict(global_pixray_settings)
+        settingsDict = SimpleNamespace(**global_pixray_settings)
 
     settings = process_args(vq_parser, settingsDict, do_both)
     return settings
 
 def command_line_override():
-    global global_clipit_settings
+    global global_pixray_settings
     settingsDict = None
     vq_parser = setup_parser()
     settings = process_args(vq_parser)
