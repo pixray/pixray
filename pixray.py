@@ -990,17 +990,20 @@ def train(args, cur_it):
 
     drawer.clip_z()
     if cur_iteration == args.iterations:
-        drawer.set_z(best_z)
+        # this resetting to best is currently disabled
+        # drawer.set_z(best_z)
         checkin(args, cur_it, lossAll)
         return False
     if rebuild_opts_when_done:
         num_loss_drop = num_loss_drop + 1
-        drawer.set_z(best_z)
+        # this resetting to best is currently disabled
+        # drawer.set_z(best_z)
         # always checkin (and save) after resetting z
-        checkin(args, cur_it, lossAll)
+        # checkin(args, cur_it, lossAll)
         if num_loss_drop > max_loss_drops:
             return False
         best_iter = cur_it
+        best_loss = 1e20
         opts = rebuild_optimisers(args)
     return True
 
