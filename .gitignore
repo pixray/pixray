@@ -12,6 +12,7 @@ checkpoints/
 
 # Operations
 outputs/
+inputs/
 steps/
 
 # local place dependencies
