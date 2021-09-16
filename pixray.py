@@ -730,9 +730,12 @@ def checkin(args, iter, losses):
     num_cycles_not_best = iter - best_iter
     losses_str = ', '.join(f'{loss.item():2.3g}' for loss in losses)
 
-    writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str} (-{num_cycles_not_best}=>{best_loss:2.4g})'
+    # writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str} (-{num_cycles_not_best}=>{best_loss:2.4g})'
+    writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str}'
     if args.animation_dir is not None:
         writestr = f'anim: {cur_anim_index}/{len(anim_output_files)} {writestr}'
+    else:
+        writestr = f'{writestr} (-{num_cycles_not_best}=>{best_loss:2.4g})'
     info = PngImagePlugin.PngInfo()
     info.add_text('comment', f'{args.prompts}')
     timg = drawer.synth(cur_iteration)
