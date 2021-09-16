@@ -419,6 +419,17 @@ def do_init(args):
     global pmsTable, pmsImageTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer
 
+    # do seed first!
+    if args.seed is None:
+        seed = torch.seed()
+    else:
+        seed = args.seed
+    int_seed = int(seed)%(2**30)
+    print('Using seed:', seed)
+    torch.manual_seed(seed)
+    np.random.seed(int_seed)
+    random.seed(int_seed)
+
     # Do it (init that is)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -637,17 +648,6 @@ def do_init(args):
         print('Using initial image:', args.init_image)
     if args.noise_prompt_weights:
         print('Noise prompt weights:', args.noise_prompt_weights)
-
-
-    if args.seed is None:
-        seed = torch.seed()
-    else:
-        seed = args.seed
-    int_seed = int(seed)%(2**30)
-    print('Using seed:', seed, int_seed)
-    torch.manual_seed(seed)
-    np.random.seed(int_seed)
-    random.seed(int_seed)
 
 
 # dreaded globals (for now)
