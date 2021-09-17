@@ -618,8 +618,7 @@ def do_init(args):
 
     for clip_model in args.clip_models:
         pImages = pmsImageTable[clip_model]
-        for prompt in args.image_prompts:
-            path, weight, stop = parse_prompt(prompt)
+        for path in args.image_prompts:
             img = Image.open(path)
             pil_image = img.convert('RGB')
             img = resize_image(pil_image, (sideX, sideY))
@@ -643,7 +642,7 @@ def do_init(args):
     if args.spot_prompts_off:
         print('Using spot off prompts:', args.spot_prompts_off)
     if args.image_prompts:
-        print('Using image prompts:', args.image_prompts)
+        print('Using #image prompts:', len(args.image_prompts))
     if args.init_image:
         print('Using initial image:', args.init_image)
     if args.noise_prompt_weights:
@@ -813,7 +812,13 @@ def ascend_txt(args):
         # If there are image prompts we make cutouts for those each time
         # so that they line up with the current cutouts from augmentation
         make_cutouts = cutoutsTable[cutoutSize]
-        pImages = pmsImageTable[clip_model]
+
+        # if animating select one pImage, otherwise use them all
+        if cur_anim_index is None:
+            pImages = pmsImageTable[clip_model]
+        else:
+            pImages = [ pmsImageTable[clip_model][cur_anim_index] ]
+        
         for timg in pImages:
             # note: this caches and reuses the transforms - a bit of a hack but it works
 
@@ -1034,7 +1039,10 @@ def do_run(args):
         #
         if not os.path.exists(args.animation_dir):
             os.mkdir(args.animation_dir)
-        filelist = real_glob(args.target_images)
+        if args.target_images is not None:
+            filelist = real_glob(args.target_images)
+        else:
+            filelist = args.image_prompts
         num_anim_frames = len(filelist)
         for target_image in filelist:
             basename = os.path.basename(target_image)
@@ -1192,7 +1200,7 @@ def setup_parser():
     vq_parser.add_argument("-nps",  "--noise_prompt_seeds", nargs="*", type=int, help="Noise prompt seeds", default=[], dest='noise_prompt_seeds')
     vq_parser.add_argument("-npw",  "--noise_prompt_weights", nargs="*", type=float, help="Noise prompt weights", default=[], dest='noise_prompt_weights')
     vq_parser.add_argument("-lr",   "--learning_rate", type=float, help="Learning rate", default=0.2, dest='learning_rate')
-    vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=float, help="When to drop learning rate (relative to iterations)", default=[80, 90], dest='learning_rate_drops')
+    vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=float, help="When to drop learning rate (relative to iterations)", default=[75], dest='learning_rate_drops')
     vq_parser.add_argument("-as",   "--auto_stop", type=bool, help="Auto stopping", default=False, dest='auto_stop')
     vq_parser.add_argument("-cuts", "--num_cuts", type=int, help="Number of cuts", default=None, dest='num_cuts')
     vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=1, dest='batches')
@@ -1454,8 +1462,7 @@ def process_args(vq_parser, namespace=None, do_both=False):
 
     # Split target images using the pipe character
     if args.image_prompts:
-        args.image_prompts = args.image_prompts.split("|")
-        args.image_prompts = [image.strip() for image in args.image_prompts]
+        args.image_prompts = real_glob(args.image_prompts)
 
     if args.target_palette is not None:
         args.target_palette = palette_from_string(args.target_palette)
