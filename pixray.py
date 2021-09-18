@@ -415,7 +415,7 @@ def rebuild_optimisers(args):
 def do_init(args):
     global opts, perceptors, normalize, cutoutsTable, cutoutSizeTable
     global z_orig, z_targets, z_labels, init_image_tensor, target_image_tensor
-    global gside_X, gside_Y, overlay_image_rgba
+    global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list
     global pmsTable, pmsImageTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer
 
@@ -518,18 +518,20 @@ def do_init(args):
         drawer.rand_init(toksX, toksY)
 
     if args.overlay_every:
+        overlay_image_rgba_list = []
         if args.overlay_image:
-            if 'http' in args.overlay_image:
-              overlay_image = Image.open(urlopen(args.overlay_image))
-            else:
-              overlay_image = Image.open(args.overlay_image)
-            overlay_image_rgba = overlay_image.convert('RGBA')
-            overlay_image_rgba = overlay_image_rgba.resize((sideX, sideY), Image.LANCZOS)
+            filelist = real_glob(args.overlay_image)
+            for target_image in filelist:
+                overlay_image = Image.open(target_image)
+                overlay_image_rgba = overlay_image.convert('RGBA')
+                overlay_image_rgba = overlay_image_rgba.resize((sideX, sideY), Image.LANCZOS)
+                if args.overlay_alpha:
+                    overlay_image_rgba.putalpha(args.overlay_alpha)
+                overlay_image_rgba_list.append(overlay_image_rgba)
         else:
-            overlay_image_rgba = init_image_rgba
-        if args.overlay_alpha:
-            overlay_image_rgba.putalpha(args.overlay_alpha)
-        overlay_image_rgba.save('overlay_image.png')
+            print("Overlay images missing")
+            sys.exit(1)
+        overlay_image_rgba_list[0].save('overlay_image0.png')
 
     if args.target_images is not None:
         z_targets = []
@@ -667,6 +669,7 @@ spotOffPmsTable = None
 pmsImageTable = None
 gside_X=None
 gside_Y=None
+overlay_image_rgba_list=None
 overlay_image_rgba=None
 device=None
 cur_iteration=None
@@ -814,10 +817,10 @@ def ascend_txt(args):
         make_cutouts = cutoutsTable[cutoutSize]
 
         # if animating select one pImage, otherwise use them all
-        if cur_anim_index is None:
-            pImages = pmsImageTable[clip_model]
-        else:
+        if cur_anim_index is not None and len(pmsImageTable[clip_model]) > 0:
             pImages = [ pmsImageTable[clip_model][cur_anim_index] ]
+        else:
+            pImages = pmsImageTable[clip_model]
         
         for timg in pImages:
             # note: this caches and reuses the transforms - a bit of a hack but it works
@@ -951,7 +954,7 @@ def re_average_z(args):
     if overlay_image_rgba:
         # print("applying overlay image")
         cur_z_image.paste(overlay_image_rgba, (0, 0), overlay_image_rgba)
-        cur_z_image.save("overlaid.png")
+        # cur_z_image.save("overlaid.png")
     cur_z_image = cur_z_image.resize((gside_X, gside_Y), Image.LANCZOS)
     drawer.reapply_from_tensor(TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1)
 
@@ -960,6 +963,7 @@ def re_average_z(args):
 def train(args, cur_it):
     global drawer, opts
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
+    global overlay_image_rgba, overlay_image_rgba_list, cur_anim_index
     
     rebuild_opts_when_done = False
 
@@ -968,6 +972,14 @@ def train(args, cur_it):
         opt.zero_grad()
 
     # print("drops at ", args.learning_rate_drops)
+
+    # if args.overlay_every and cur_it != 0 and \
+    #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
+    if args.overlay_every and  \
+        (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
+        if cur_anim_index is not None:
+            overlay_image_rgba = overlay_image_rgba_list[cur_anim_index]
+        re_average_z(args)
 
     # num_batches = args.batches * (num_loss_drop + 1)
     num_batches = args.batches
@@ -991,10 +1003,6 @@ def train(args, cur_it):
 
     for opt in opts:
         opt.step()
-
-    if args.overlay_every and cur_it != 0 and \
-        (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
-        re_average_z(args)
 
     drawer.clip_z()
     if cur_iteration == args.iterations:
@@ -1039,7 +1047,9 @@ def do_run(args):
         #
         if not os.path.exists(args.animation_dir):
             os.mkdir(args.animation_dir)
-        if args.target_images is not None:
+        if args.overlay_image is not None:
+            filelist = real_glob(args.overlay_image)
+        elif args.target_images is not None:
             filelist = real_glob(args.target_images)
         else:
             filelist = args.image_prompts
