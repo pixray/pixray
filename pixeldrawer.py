@@ -15,24 +15,32 @@ import numpy as np
 import PIL.Image
 
 class PixelDrawer(DrawingInterface):
-    num_rows = 45
-    num_cols = 80
-    do_mono = False
-    pixels = []
+    @staticmethod
+    def add_settings(parser):
+        parser.add_argument("--pixel_size", nargs=2, type=int, help="Pixel size (width height)", default=None, dest='pixel_size')
+        parser.add_argument("--pixel_scale", type=float, help="Pixel scale", default=None, dest='pixel_scale')
+        return parser
 
-    def __init__(self, width, height, do_mono, shape=None, scale=None):
+    def __init__(self, settings):
         super(DrawingInterface, self).__init__()
 
-        self.canvas_width = width
-        self.canvas_height = height
-        self.do_mono = do_mono
-        if shape is not None:
-            self.num_cols, self.num_rows = shape
-        if scale is not None and scale > 0:
-            self.num_cols = int(self.num_cols / scale)
-            self.num_rows = int(self.num_rows / scale)
+        self.canvas_width = settings.size[0]
+        self.canvas_height = settings.size[1]
 
-    def load_model(self, config_path, checkpoint_path, device):
+        # current logic: assume 16x9, but check for 1x1 (all others must be provided explicitly)
+        if settings.pixel_size is not None:
+            self.num_cols, self.num_rows = settings.pixel_size
+        elif self.canvas_width == self.canvas_height:
+            self.num_cols, self.num_rows = [40, 40]
+        else:
+            self.num_cols, self.num_rows = [80, 45]
+
+        # we can also "scale" pixels -- scaling "up" meaning fewer rows/cols, etc.
+        if settings.pixel_scale is not None and settings.pixel_scale > 0:
+            self.num_cols = int(self.num_cols / settings.pixel_scale)
+            self.num_rows = int(self.num_rows / settings.pixel_scale)
+
+    def load_model(self, settings, device):
         # gamma = 1.0
 
         # Use GPU if available
@@ -137,32 +145,6 @@ class PixelDrawer(DrawingInterface):
         img_h, img_w = img.shape[0], img.shape[1]
         img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(img.shape[0], img.shape[1], 3, device = self.device) * (1 - img[:, :, 3:4])
         img = img[:, :, :3]
-
-        if self.do_mono:
-            # transform this to mono-ish image (I made this up!)
-            darkness = img[:,:,1] - img[:,:,0]
-            darkness = darkness + torch.normal(0.0, 0.5, size=(img_h, img_w), device = self.device)
-            # sig_scale = torch.randn(size=(1,))[0]
-            # sig_scale = torch.rand(size=(img_h, img_w), device = self.device)
-            # img = torch.sigmoid(40 * sig_scale * darkness)
-            img = torch.sigmoid(40 * darkness)
-
-            # img = img[:,:,1] # use the green channel for now
-            # if cur_iteration > 0:
-            #     # gumbel time - add some gaussian noise to img
-            #     black = black + torch.normal(0.5, 0.1, size=(img_h, img_w), device = self.device)
-            # if cur_iteration == 0:
-            #     # threshold is 0.5 in "canonical" case
-            #     random_threshold = 0.5 * torch.ones(size=(img_h, img_w), device = self.device, requires_grad=True)
-            # else:
-            #     # threshold when training is a pixelwise approximate gaussian from [0,1]
-            #     random_threshold = torch.mean(torch.rand(size=(5, img_h, img_w), device = self.device, requires_grad=True), axis=0)
-            # pimg = PIL.Image.fromarray(np.uint8(random_bates*255), mode="L")
-            # pimg.save("bates_debug.png")
-            # img = torch.where(img > random_threshold, 1.0, 0.0, requires_grad=True)
-            img = torch.stack([img, img, img])
-            img = img.permute(1, 2, 0)
-            img.requres_grad = True
 
         img = img.unsqueeze(0)
         img = img.permute(0, 3, 1, 2) # NHWC -> NCHW
