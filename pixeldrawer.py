@@ -78,7 +78,7 @@ class PixelDrawer(DrawingInterface):
     def add_settings(parser):
         parser.add_argument("--pixel_size", nargs=2, type=int, help="Pixel size (width height)", default=None, dest='pixel_size')
         parser.add_argument("--pixel_scale", type=float, help="Pixel scale", default=None, dest='pixel_scale')
-        parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri", default="rect", dest='pixel_type')
+        parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri, diamond", default="rect", dest='pixel_type')
         parser.add_argument("--pixel_edge_check", type=str2bool, help="ensure grid is symmetric", default=True, dest='pixel_edge_check')
         parser.add_argument("--pixel_iso_check", type=str2bool, help="ensure tri and hex shapes are w/h scaled", default=True, dest='pixel_iso_check')
         return parser
@@ -149,18 +149,33 @@ class PixelDrawer(DrawingInterface):
 
         tensor_cell_height = 0
         tensor_cell_width = 0
+        max_tensor_num_subsamples = 4
+        tensor_subsamples_x = []
+        tensor_subsamples_y = []
         if init_tensor is not None:
             tensor_shape = init_tensor.shape
             tensor_cell_width = tensor_shape[3] / num_cols
             tensor_cell_height = tensor_shape[2] / num_rows
-            # print(tensor_shape, tensor_cell_width, tensor_cell_height)
+            if int(tensor_cell_width) < max_tensor_num_subsamples:
+                tensor_subsamples_x = [i for i in range(int(tensor_cell_width))]
+            else:
+                step_size_x = tensor_cell_width / max_tensor_num_subsamples
+                tensor_subsamples_x = [int(i*step_size_x) for i in range(max_tensor_num_subsamples)]
+            if int(tensor_cell_height) < max_tensor_num_subsamples:
+                tensor_subsamples_y = [i for i in range(int(tensor_cell_height))]
+            else:
+                step_size_y = tensor_cell_height / max_tensor_num_subsamples
+                tensor_subsamples_y = [int(i*step_size_y) for i in range(max_tensor_num_subsamples)]
+
+            print(tensor_shape, tensor_cell_width, tensor_cell_height,tensor_subsamples_x,tensor_subsamples_y)
 
         # Initialize Random Pixels
         shapes = []
         shape_groups = []
         colors = []
+        scaled_init_tensor = (init_tensor[0] + 1.0) / 2.0
         for r in range(num_rows):
-            tensor_cur_y = int(0.5 + r * tensor_cell_height)
+            tensor_cur_y = int(r * tensor_cell_height)
             cur_y = r * cell_height
             num_cols_this_row = num_cols
             col_offset = 0
@@ -168,15 +183,29 @@ class PixelDrawer(DrawingInterface):
                 num_cols_this_row = num_cols - 1
                 col_offset = 0.5
             for c in range(num_cols_this_row):
-                tensor_cur_x =  (0.5 + (col_offset + c) * tensor_cell_width)
+                tensor_cur_x =  (col_offset + c) * tensor_cell_width
                 cur_x = (col_offset + c) * cell_width
                 if init_tensor is None:
                     cell_color = torch.tensor([random.random(), random.random(), random.random(), 1.0])
                 else:
                     try:
-                        t = (init_tensor[0] + 1.0) / 2.0
-                        # t = init_tensor[0]
-                        cell_color = torch.tensor([t[0][int(tensor_cur_y)][int(tensor_cur_x)], t[1][int(tensor_cur_y)][int(tensor_cur_x)], t[2][int(tensor_cur_y)][int(tensor_cur_x)], 1.0])
+                        rgb_sum = [0, 0, 0]
+                        rgb_count = 0
+                        for t_x in tensor_subsamples_x:
+                            cur_subsample_x = tensor_cur_x + t_x
+                            for t_y in tensor_subsamples_y:
+                                cur_subsample_y = tensor_cur_y + t_y
+                                if(cur_subsample_x < tensor_shape[3] and cur_subsample_y < tensor_shape[2]):
+                                    rgb_count += 1;
+                                    rgb_sum[0] += scaled_init_tensor[0][int(cur_subsample_y)][int(cur_subsample_x)]
+                                    rgb_sum[1] += scaled_init_tensor[1][int(cur_subsample_y)][int(cur_subsample_x)]
+                                    rgb_sum[2] += scaled_init_tensor[2][int(cur_subsample_y)][int(cur_subsample_x)]
+                                else:
+                                    print(f"Ignoring out of bounds entry: {cur_subsample_x},{cur_subsample_y}")
+                        if rgb_count == 0:
+                            print("init cell count is 0, this shouldn't happen. but it did?")
+                            rgb_count = 1
+                        cell_color = torch.tensor([rgb_sum[0]/rgb_count, rgb_sum[1]/rgb_count, rgb_sum[2]/rgb_count, 1.0])
                     except BaseException as error:
                         print("WTF", error)
                         mono_color = random.random()

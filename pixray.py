@@ -725,10 +725,13 @@ def checkin(args, iter, losses):
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
     num_cycles_not_best = iter - best_iter
-    losses_str = ', '.join(f'{loss.item():2.3g}' for loss in losses)
 
-    # writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str} (-{num_cycles_not_best}=>{best_loss:2.4g})'
-    writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str}'
+    if losses is not None:
+        losses_str = ', '.join(f'{loss.item():2.3g}' for loss in losses)
+        writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str}'
+    else:
+        writestr = f'iter: {iter}, finished'
+
     if args.animation_dir is not None:
         writestr = f'anim: {cur_anim_index}/{len(anim_output_files)} {writestr}'
     else:
@@ -958,44 +961,48 @@ def re_average_z(args):
 def train(args, cur_it):
     global drawer, opts
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
-    
-    rebuild_opts_when_done = False
 
-    for opt in opts:
-        # opt.zero_grad(set_to_none=True)
-        opt.zero_grad()
+    lossAll = None
+    if cur_it < args.iterations:
+        # this is awkward, but train is in also in charge of saving, so...
+        rebuild_opts_when_done = False
 
-    # print("drops at ", args.learning_rate_drops)
+        for opt in opts:
+            # opt.zero_grad(set_to_none=True)
+            opt.zero_grad()
 
-    # num_batches = args.batches * (num_loss_drop + 1)
-    num_batches = args.batches
-    for i in range(num_batches):
-        lossAll = ascend_txt(args)
+        # print("drops at ", args.learning_rate_drops)
 
-        if i == 0:
-            if cur_it in args.learning_rate_drops:
-                print("Dropping learning rate")
-                rebuild_opts_when_done = True
-            else:
-                did_drop = checkdrop(args, cur_it, lossAll)
-                if args.auto_stop is True:
-                    rebuild_opts_when_done = disabl
+        # num_batches = args.batches * (num_loss_drop + 1)
+        num_batches = args.batches
+        for i in range(num_batches):
+            lossAll = ascend_txt(args)
 
-        if i == 0 and cur_it % args.save_every == 0:
-            checkin(args, cur_it, lossAll)
+            if i == 0:
+                if cur_it in args.learning_rate_drops:
+                    print("Dropping learning rate")
+                    rebuild_opts_when_done = True
+                else:
+                    did_drop = checkdrop(args, cur_it, lossAll)
+                    if args.auto_stop is True:
+                        rebuild_opts_when_done = disabl
 
-        loss = sum(lossAll)
-        loss.backward()
+            if i == 0 and cur_it % args.save_every == 0:
+                checkin(args, cur_it, lossAll)
 
-    for opt in opts:
-        opt.step()
+            loss = sum(lossAll)
+            loss.backward()
 
-    if args.overlay_every and cur_it != 0 and \
-        (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
-        re_average_z(args)
+        for opt in opts:
+            opt.step()
 
-    drawer.clip_z()
-    if cur_iteration == args.iterations:
+        if args.overlay_every and cur_it != 0 and \
+            (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
+            re_average_z(args)
+
+        drawer.clip_z()
+
+    if cur_it == args.iterations:
         # this resetting to best is currently disabled
         # drawer.set_z(best_z)
         checkin(args, cur_it, lossAll)
