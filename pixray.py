@@ -1354,6 +1354,8 @@ def process_args(vq_parser, namespace=None):
     if namespace == None:
       # command line: use ARGV to get args
       args = vq_parser.parse_args()
+    elif isnotebook():
+      args = vq_parser.parse_args(args=[], namespace=namespace)
     else:
       # sometimes there are both settings and cmd line
       args = vq_parser.parse_args(namespace=namespace)        
@@ -1513,7 +1515,7 @@ def get_settings():
     global global_pixray_settings
     return global_pixray_settings.copy()
 
-def apply_settings(do_both=False):
+def apply_settings():
     global global_pixray_settings
     settingsDict = None
 
