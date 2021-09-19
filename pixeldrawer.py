@@ -167,7 +167,7 @@ class PixelDrawer(DrawingInterface):
                 step_size_y = tensor_cell_height / max_tensor_num_subsamples
                 tensor_subsamples_y = [int(i*step_size_y) for i in range(max_tensor_num_subsamples)]
 
-            print(tensor_shape, tensor_cell_width, tensor_cell_height,tensor_subsamples_x,tensor_subsamples_y)
+            # print(tensor_shape, tensor_cell_width, tensor_cell_height,tensor_subsamples_x,tensor_subsamples_y)
 
         # Initialize Random Pixels
         shapes = []
