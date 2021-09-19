@@ -44,10 +44,19 @@ global_spot_file = None
 
 from vqgan import VqganDrawer
 
+class_table = {
+    "vqgan": VqganDrawer
+}
+
 try:
     from clipdrawer import ClipDrawer
     from pixeldrawer import PixelDrawer
-    from linedrawer import LineDrawer
+    # from linedrawer import LineDrawer
+    # update class_table if these import OK
+    class_table.update({
+        "pixel": PixelDrawer,
+        "clipdraw": ClipDrawer
+    })
 except ImportError:
     # diffvg is not strictly required
     pass
@@ -58,11 +67,6 @@ except ImportError:
     # only needed for palette stuff
     pass
 
-class_table = {
-    "vqgan": VqganDrawer,
-    "pixel": PixelDrawer,
-    "clipdraw": ClipDrawer
-}
 
 # this is enabled when not in the master branch
 # print("warning: running unreleased future version")
