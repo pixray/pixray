@@ -24,16 +24,34 @@ def rect_from_corners(p0, p1):
 def map_number(n, start1, stop1, start2, stop2):
   return ((n-start1)/(stop1-start1))*(stop2-start2)+start2;
 
+def diamond_from_corners(p0, p1):
+    x1, y1 = p0
+    x2, y2 = p1
+    n = 1
+    hyA = map_number(-2, -n, n, y1, y2)
+    hyB = map_number( 2, -n, n, y1, y2)
+    hyH = map_number(     0, -n, n, y1, y2)
+    hxH = map_number(     0, -n, n, x1, x2)
+    pts = [[hxH, hyA], [x1, hyH], [hxH, hyB], [x2, hyH]]
+    return pts
+
+def tri_from_corners(p0, p1, is_up):
+    x1, y1 = p0
+    x2, y2 = p1
+    n = 1
+    hxA = map_number( 2, -n, n, x1, x2)
+    hxB = map_number(-2, -n, n, x1, x2)
+    hxH = map_number(     0, -n, n, x1, x2)
+    if is_up:
+        pts = [[hxH, y1], [hxB, y2], [hxA, y2]]
+    else:
+        pts = [[hxH, y2], [hxA, y1], [hxB, y1]]
+    return pts
+
 def hex_from_corners(p0, p1):
     x1, y1 = p0
     x2, y2 = p1
-    n  = 3.0
-    # hxA = map_number(4, -n, n, x1, x2)
-    # hxB = map_number(2, -n, n, x1, x2)
-    # hxC = map_number(-2, -n, n, x1, x2)
-    # hxD = map_number(-4, -n, n, x1, x2)
-    # hyH = map_number(0, -n, n, y1, y2)
-    # pts = [[hxA, hyH], [hxB, y1], [hxC, y1], [hxD, hyH], [hxC, y2], [hxB, y2]]
+    n  = 3
     hyA = map_number(4, -n, n, y1, y2)
     hyB = map_number(2, -n, n, y1, y2)
     hyC = map_number(-2, -n, n, y1, y2)
@@ -42,13 +60,27 @@ def hex_from_corners(p0, p1):
     pts = [[hxH, hyA], [x1, hyB], [x1, hyC], [hxH, hyD], [x2, hyC], [x2, hyB]]
     return pts
 
+# this will go into a helper file...
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+shift_pixel_types = ["hex", "rectshift", "diamond"]
+
 class PixelDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
         parser.add_argument("--pixel_size", nargs=2, type=int, help="Pixel size (width height)", default=None, dest='pixel_size')
         parser.add_argument("--pixel_scale", type=float, help="Pixel scale", default=None, dest='pixel_scale')
         parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri", default="rect", dest='pixel_type')
-        parser.add_argument("--pixel_odd_check", type=bool, help="ensure offset grids are odd", default=True, dest='pixel_odd_check')
+        parser.add_argument("--pixel_edge_check", type=str2bool, help="ensure grid is symmetric", default=True, dest='pixel_edge_check')
+        parser.add_argument("--pixel_iso_check", type=str2bool, help="ensure tri and hex shapes are w/h scaled", default=True, dest='pixel_iso_check')
         return parser
 
     def __init__(self, settings):
@@ -65,17 +97,33 @@ class PixelDrawer(DrawingInterface):
         else:
             self.num_cols, self.num_rows = [80, 45]
 
+        self.pixel_type = settings.pixel_type
+
+        if settings.pixel_iso_check and settings.pixel_size is None:
+            if self.pixel_type == "tri":
+                # auto-adjust triangles to be wider if not specified
+                self.num_cols = int(1.414 * self.num_cols)
+            elif self.pixel_type == "hex":
+                # auto-adjust hexes to be narrower if not specified
+                self.num_rows = int(1.414 * self.num_rows)
+            elif self.pixel_type == "diamond":
+                self.num_rows = int(2 * self.num_rows)
+ 
         # we can also "scale" pixels -- scaling "up" meaning fewer rows/cols, etc.
         if settings.pixel_scale is not None and settings.pixel_scale > 0:
             self.num_cols = int(self.num_cols / settings.pixel_scale)
             self.num_rows = int(self.num_rows / settings.pixel_scale)
 
-        self.pixel_type = settings.pixel_type
-        if settings.pixel_odd_check:
-            if self.pixel_type == "hex" or self.pixel_type == "rectshift":
+        if settings.pixel_edge_check:
+            if self.pixel_type in shift_pixel_types:
                 if self.num_cols % 2 == 0:
                     self.num_cols = self.num_cols + 1
                 if self.num_rows % 2 == 0:
+                    self.num_rows = self.num_rows + 1
+            elif self.pixel_type == "tri":
+                if self.num_cols % 2 == 0:
+                    self.num_cols = self.num_cols + 1
+                if self.num_rows % 2 == 1:
                     self.num_rows = self.num_rows + 1
 
     def load_model(self, settings, device):
@@ -116,7 +164,7 @@ class PixelDrawer(DrawingInterface):
             cur_y = r * cell_height
             num_cols_this_row = num_cols
             col_offset = 0
-            if (self.pixel_type == "hex" or self.pixel_type == "rectshift") and r % 2 == 0:
+            if self.pixel_type in shift_pixel_types and r % 2 == 0:
                 num_cols_this_row = num_cols - 1
                 col_offset = 0.5
             for c in range(num_cols_this_row):
@@ -139,6 +187,10 @@ class PixelDrawer(DrawingInterface):
 
                 if self.pixel_type == "hex":
                     pts = hex_from_corners(p0, p1)
+                elif self.pixel_type == "tri":
+                    pts = tri_from_corners(p0, p1, (r + c) % 2 == 0)
+                elif self.pixel_type == "diamond":
+                    pts = diamond_from_corners(p0, p1)
                 else:
                     pts = rect_from_corners(p0, p1)
                 pts = torch.tensor(pts, dtype=torch.float32).view(-1, 2)
