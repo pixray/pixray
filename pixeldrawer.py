@@ -14,11 +14,41 @@ import torchvision.transforms as transforms
 import numpy as np
 import PIL.Image
 
+def rect_from_corners(p0, p1):
+    x1, y1 = p0
+    x2, y2 = p1
+    pts = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+    return pts
+
+# canonical interpolation function, like https://p5js.org/reference/#/p5/map
+def map_number(n, start1, stop1, start2, stop2):
+  return ((n-start1)/(stop1-start1))*(stop2-start2)+start2;
+
+def hex_from_corners(p0, p1):
+    x1, y1 = p0
+    x2, y2 = p1
+    n  = 3.0
+    # hxA = map_number(4, -n, n, x1, x2)
+    # hxB = map_number(2, -n, n, x1, x2)
+    # hxC = map_number(-2, -n, n, x1, x2)
+    # hxD = map_number(-4, -n, n, x1, x2)
+    # hyH = map_number(0, -n, n, y1, y2)
+    # pts = [[hxA, hyH], [hxB, y1], [hxC, y1], [hxD, hyH], [hxC, y2], [hxB, y2]]
+    hyA = map_number(4, -n, n, y1, y2)
+    hyB = map_number(2, -n, n, y1, y2)
+    hyC = map_number(-2, -n, n, y1, y2)
+    hyD = map_number(-4, -n, n, y1, y2)
+    hxH = map_number(0, -n, n, x1, x2)
+    pts = [[hxH, hyA], [x1, hyB], [x1, hyC], [hxH, hyD], [x2, hyC], [x2, hyB]]
+    return pts
+
 class PixelDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
         parser.add_argument("--pixel_size", nargs=2, type=int, help="Pixel size (width height)", default=None, dest='pixel_size')
         parser.add_argument("--pixel_scale", type=float, help="Pixel scale", default=None, dest='pixel_scale')
+        parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri", default="rect", dest='pixel_type')
+        parser.add_argument("--pixel_odd_check", type=bool, help="ensure offset grids are odd", default=True, dest='pixel_odd_check')
         return parser
 
     def __init__(self, settings):
@@ -39,6 +69,14 @@ class PixelDrawer(DrawingInterface):
         if settings.pixel_scale is not None and settings.pixel_scale > 0:
             self.num_cols = int(self.num_cols / settings.pixel_scale)
             self.num_rows = int(self.num_rows / settings.pixel_scale)
+
+        self.pixel_type = settings.pixel_type
+        if settings.pixel_odd_check:
+            if self.pixel_type == "hex" or self.pixel_type == "rectshift":
+                if self.num_cols % 2 == 0:
+                    self.num_cols = self.num_cols + 1
+                if self.num_rows % 2 == 0:
+                    self.num_rows = self.num_rows + 1
 
     def load_model(self, settings, device):
         # gamma = 1.0
@@ -76,9 +114,14 @@ class PixelDrawer(DrawingInterface):
         for r in range(num_rows):
             tensor_cur_y = int(0.5 + r * tensor_cell_height)
             cur_y = r * cell_height
-            for c in range(num_cols):
-                tensor_cur_x = (0.5 + c * tensor_cell_width)
-                cur_x = c * cell_width
+            num_cols_this_row = num_cols
+            col_offset = 0
+            if (self.pixel_type == "hex" or self.pixel_type == "rectshift") and r % 2 == 0:
+                num_cols_this_row = num_cols - 1
+                col_offset = 0.5
+            for c in range(num_cols_this_row):
+                tensor_cur_x =  (0.5 + (col_offset + c) * tensor_cell_width)
+                cur_x = (col_offset + c) * cell_width
                 if init_tensor is None:
                     cell_color = torch.tensor([random.random(), random.random(), random.random(), 1.0])
                 else:
@@ -93,7 +136,15 @@ class PixelDrawer(DrawingInterface):
                 colors.append(cell_color)
                 p0 = [cur_x, cur_y]
                 p1 = [cur_x+cell_width, cur_y+cell_height]
-                path = pydiffvg.Rect(p_min=torch.tensor(p0), p_max=torch.tensor(p1))
+
+                if self.pixel_type == "hex":
+                    pts = hex_from_corners(p0, p1)
+                else:
+                    pts = rect_from_corners(p0, p1)
+                pts = torch.tensor(pts, dtype=torch.float32).view(-1, 2)
+                path = pydiffvg.Polygon(pts, True)
+
+                # path = pydiffvg.Rect(p_min=torch.tensor(p0), p_max=torch.tensor(p1))
                 shapes.append(path)
                 path_group = pydiffvg.ShapeGroup(shape_ids = torch.tensor([len(shapes) - 1]), stroke_color = None, fill_color = cell_color)
                 shape_groups.append(path_group)
