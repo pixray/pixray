@@ -60,7 +60,8 @@ except ImportError:
 
 class_table = {
     "vqgan": VqganDrawer,
-    "pixel": PixelDrawer
+    "pixel": PixelDrawer,
+    "clipdraw": ClipDrawer
 }
 
 # this is enabled when not in the master branch
@@ -438,12 +439,7 @@ def do_init(args):
     # Do it (init that is)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    if args.drawer == "clipdraw":
-        drawer = ClipDrawer(args.size[0], args.size[1], args.strokes)
-    elif args.drawer == "linedraw":
-        drawer = LineDrawer(args.size[0], args.size[1], args.strokes)
-    else:
-        drawer = class_table[args.drawer](args)
+    drawer = class_table[args.drawer](args)
     drawer.load_model(args, device)
     num_resolutions = drawer.get_num_resolutions()
     # print("-----------> NUMR ", num_resolutions)
@@ -1210,7 +1206,6 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
-    vq_parser.add_argument("-st",   "--strokes", type=int, help="clipdraw strokes", default=1024, dest='strokes')
     vq_parser.add_argument("-mo",   "--do_mono", type=bool, help="Monochromatic", default=False, dest='do_mono')
     vq_parser.add_argument("-epw",  "--enforce_palette_annealing", type=int, help="enforce palette annealing, 0 -- skip", default=5000, dest='enforce_palette_annealing')
     vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
