@@ -256,8 +256,7 @@ class PixelDrawer(DrawingInterface):
         return self.opts
 
     def reapply_from_tensor(self, new_tensor):
-        # TODO
-        pass
+        self.init_from_tensor(new_tensor)
 
     def get_z_from_tensor(self, ref_tensor):
         return None
