@@ -80,18 +80,29 @@ class ClampWithGrad(torch.autograd.Function):
 clamp_with_grad = ClampWithGrad.apply
 
 class VqganDrawer(DrawingInterface):
-    def __init__(self, vqgan_model):
-        super(DrawingInterface, self).__init__()
-        self.vqgan_model = vqgan_model
+    @staticmethod
+    def add_settings(parser):
+        parser.add_argument("--vqgan_model", type=str, help="VQGAN model", default='imagenet_f16_16384', dest='vqgan_model')
+        parser.add_argument("--vqgan_config", type=str, help="VQGAN config", default=None, dest='vqgan_config')
+        parser.add_argument("--vqgan_checkpoint", type=str, help="VQGAN checkpoint", default=None, dest='vqgan_checkpoint')
+        return parser
 
-    def load_model(self, config_path, checkpoint_path, device):
+    def __init__(self, settings):
+        super(DrawingInterface, self).__init__()
+        self.vqgan_model = settings.vqgan_model
+
+    def load_model(self, settings, device):
         gumbel = False
 
-        if config_path is None:
+        if settings.vqgan_config is None:
             config_path = f'models/vqgan_{self.vqgan_model}.yaml'
+        else:
+            config_path = settings.config_path
 
-        if checkpoint_path is None:
+        if settings.vqgan_checkpoint is None:
             checkpoint_path = f'models/vqgan_{self.vqgan_model}.ckpt'
+        else:
+            checkpoint_path = settings.checkpoint_path
 
         if not os.path.exists(config_path):
             wget_file(vqgan_config_table[self.vqgan_model], config_path)

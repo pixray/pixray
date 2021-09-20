@@ -44,10 +44,19 @@ global_spot_file = None
 
 from vqgan import VqganDrawer
 
+class_table = {
+    "vqgan": VqganDrawer
+}
+
 try:
     from clipdrawer import ClipDrawer
     from pixeldrawer import PixelDrawer
-    from linedrawer import LineDrawer
+    # from linedrawer import LineDrawer
+    # update class_table if these import OK
+    class_table.update({
+        "pixel": PixelDrawer,
+        "clipdraw": ClipDrawer
+    })
 except ImportError:
     # diffvg is not strictly required
     pass
@@ -57,6 +66,7 @@ try:
 except ImportError:
     # only needed for palette stuff
     pass
+
 
 # this is enabled when not in the master branch
 # print("warning: running unreleased future version")
@@ -433,20 +443,8 @@ def do_init(args):
     # Do it (init that is)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    if args.drawer == "clipdraw":
-        drawer = ClipDrawer(args.size[0], args.size[1], args.strokes)
-    elif args.drawer == "pixeldraw":
-        if args.pixel_size is not None:
-            drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, args.pixel_size, scale=args.pixel_scale)
-        elif global_aspect_width == 1:
-            drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, [40, 40], scale=args.pixel_scale)
-        else:
-            drawer = PixelDrawer(args.size[0], args.size[1], args.do_mono, scale=args.pixel_scale)
-    elif args.drawer == "linedraw":
-        drawer = LineDrawer(args.size[0], args.size[1], args.strokes)
-    elif args.drawer == "vqgan":
-        drawer = VqganDrawer(args.vqgan_model)
-    drawer.load_model(args.vqgan_config, args.vqgan_checkpoint, device)
+    drawer = class_table[args.drawer](args)
+    drawer.load_model(args, device)
     num_resolutions = drawer.get_num_resolutions()
     # print("-----------> NUMR ", num_resolutions)
 
@@ -730,10 +728,13 @@ def checkin(args, iter, losses):
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
     num_cycles_not_best = iter - best_iter
-    losses_str = ', '.join(f'{loss.item():2.3g}' for loss in losses)
 
-    # writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str} (-{num_cycles_not_best}=>{best_loss:2.4g})'
-    writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str}'
+    if losses is not None:
+        losses_str = ', '.join(f'{loss.item():2.3g}' for loss in losses)
+        writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str}'
+    else:
+        writestr = f'iter: {iter}, finished'
+
     if args.animation_dir is not None:
         writestr = f'anim: {cur_anim_index}/{len(anim_output_files)} {writestr}'
     else:
@@ -967,45 +968,49 @@ def train(args, cur_it):
     
     rebuild_opts_when_done = False
 
-    for opt in opts:
-        # opt.zero_grad(set_to_none=True)
-        opt.zero_grad()
+    lossAll = None
+    if cur_it < args.iterations:
+        # this is awkward, but train is in also in charge of saving, so...
+        rebuild_opts_when_done = False
 
-    # print("drops at ", args.learning_rate_drops)
+        for opt in opts:
+            # opt.zero_grad(set_to_none=True)
+            opt.zero_grad()
 
-    # if args.overlay_every and cur_it != 0 and \
-    #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
-    if args.overlay_every and  \
-        (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
-        if cur_anim_index is not None:
-            overlay_image_rgba = overlay_image_rgba_list[cur_anim_index]
-        re_average_z(args)
+        # if args.overlay_every and cur_it != 0 and \
+        #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
+        if args.overlay_every is not None and \
+            (cur_it % args.overlay_every) == args.overlay_offset:
+            if cur_anim_index is not None:
+                overlay_image_rgba = overlay_image_rgba_list[cur_anim_index]
+            re_average_z(args)
 
-    # num_batches = args.batches * (num_loss_drop + 1)
-    num_batches = args.batches
-    for i in range(num_batches):
-        lossAll = ascend_txt(args)
+        # num_batches = args.batches * (num_loss_drop + 1)
+        num_batches = args.batches
+        for i in range(num_batches):
+            lossAll = ascend_txt(args)
 
-        if i == 0:
-            if cur_it in args.learning_rate_drops:
-                print("Dropping learning rate")
-                rebuild_opts_when_done = True
-            else:
-                did_drop = checkdrop(args, cur_it, lossAll)
-                if args.auto_stop is True:
-                    rebuild_opts_when_done = disabl
+            if i == 0:
+                if cur_it in args.learning_rate_drops:
+                    print("Dropping learning rate")
+                    rebuild_opts_when_done = True
+                else:
+                    did_drop = checkdrop(args, cur_it, lossAll)
+                    if args.auto_stop is True:
+                        rebuild_opts_when_done = disabl
 
-        if i == 0 and cur_it % args.save_every == 0:
-            checkin(args, cur_it, lossAll)
+            if i == 0 and cur_it % args.save_every == 0:
+                checkin(args, cur_it, lossAll)
 
-        loss = sum(lossAll)
-        loss.backward()
+            loss = sum(lossAll)
+            loss.backward()
 
-    for opt in opts:
-        opt.step()
+        for opt in opts:
+            opt.step()
 
-    drawer.clip_z()
-    if cur_iteration == args.iterations:
+        drawer.clip_z()
+
+    if cur_it == args.iterations:
         # this resetting to best is currently disabled
         # drawer.set_z(best_z)
         checkin(args, cur_it, lossAll)
@@ -1161,9 +1166,9 @@ def do_video(args):
 # this dictionary is used for settings in the notebook
 global_pixray_settings = {}
 
-def setup_parser():
+def setup_parser(vq_parser):
     # Create the parser
-    vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
+    # vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
 
     # Add the arguments
     vq_parser.add_argument("-p",    "--prompts", type=str, help="Text prompts", default=[], dest='prompts')
@@ -1189,8 +1194,6 @@ def setup_parser():
     vq_parser.add_argument("-sca",  "--scale", type=float, help="scale (instead of ezsize)", default=None, dest='scale')
     vq_parser.add_argument("-ova",  "--overlay_alpha", type=int, help="Overlay alpha (0-255)", default=None, dest='overlay_alpha')    
     vq_parser.add_argument("-s",    "--size", nargs=2, type=int, help="Image size (width height)", default=None, dest='size')
-    vq_parser.add_argument("-ps",   "--pixel_size", nargs=2, type=int, help="Pixel size (width height)", default=None, dest='pixel_size')
-    vq_parser.add_argument("-psc",  "--pixel_scale", type=float, help="Pixel scale", default=None, dest='pixel_scale')
     vq_parser.add_argument("-ii",   "--init_image", type=str, help="Initial image", default=None, dest='init_image')
     vq_parser.add_argument("-iia",  "--init_image_alpha", type=int, help="Init image alpha (0-255)", default=200, dest='init_image_alpha')
     vq_parser.add_argument("-in",   "--init_noise", type=str, help="Initial noise image (pixels or gradient)", default="pixels", dest='init_noise')
@@ -1204,9 +1207,6 @@ def setup_parser():
     vq_parser.add_argument("-iwc",  "--init_weight_cos", type=float, help="Initial weight cos loss", default=0., dest='init_weight_cos')
     vq_parser.add_argument("-iwp",  "--init_weight_pix", type=float, help="Initial weight pix loss", default=0., dest='init_weight_pix')
     vq_parser.add_argument("-m",    "--clip_models", type=str, help="CLIP model", default=None, dest='clip_models')
-    vq_parser.add_argument("-vqgan", "--vqgan_model", type=str, help="VQGAN model", default='imagenet_f16_16384', dest='vqgan_model')
-    vq_parser.add_argument("-conf", "--vqgan_config", type=str, help="VQGAN config", default=None, dest='vqgan_config')
-    vq_parser.add_argument("-ckpt", "--vqgan_checkpoint", type=str, help="VQGAN checkpoint", default=None, dest='vqgan_checkpoint')
     vq_parser.add_argument("-nps",  "--noise_prompt_seeds", nargs="*", type=int, help="Noise prompt seeds", default=[], dest='noise_prompt_seeds')
     vq_parser.add_argument("-npw",  "--noise_prompt_weights", nargs="*", type=float, help="Noise prompt weights", default=[], dest='noise_prompt_weights')
     vq_parser.add_argument("-lr",   "--learning_rate", type=float, help="Learning rate", default=0.2, dest='learning_rate')
@@ -1220,8 +1220,6 @@ def setup_parser():
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
-    vq_parser.add_argument("-dr",   "--drawer", type=str, help="clipdraw, pixeldraw, etc", default="vqgan", dest='drawer')
-    vq_parser.add_argument("-st",   "--strokes", type=int, help="clipdraw strokes", default=1024, dest='strokes')
     vq_parser.add_argument("-mo",   "--do_mono", type=bool, help="Monochromatic", default=False, dest='do_mono')
     vq_parser.add_argument("-epw",  "--enforce_palette_annealing", type=int, help="enforce palette annealing, 0 -- skip", default=5000, dest='enforce_palette_annealing')
     vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
@@ -1357,7 +1355,7 @@ def palette_from_string(s):
         pal = pal + palette_from_section(c)
     return pal
 
-def process_args(vq_parser, namespace=None, do_both=False):
+def process_args(vq_parser, namespace=None):
     global global_aspect_width
     global cur_iteration, cur_anim_index, anim_output_files, anim_cur_zs, anim_next_zs;
     global global_spot_file
@@ -1366,12 +1364,11 @@ def process_args(vq_parser, namespace=None, do_both=False):
     if namespace == None:
       # command line: use ARGV to get args
       args = vq_parser.parse_args()
-    elif do_both:
+    elif isnotebook():
+      args = vq_parser.parse_args(args=[], namespace=namespace)
+    else:
       # sometimes there are both settings and cmd line
       args = vq_parser.parse_args(namespace=namespace)        
-    else:
-      # notebook, ignore ARGV and use dictionary instead
-      args = vq_parser.parse_args(args=[], namespace=namespace)
 
     if args.cudnn_determinism:
        torch.backends.cudnn.deterministic = True
@@ -1528,10 +1525,19 @@ def get_settings():
     global global_pixray_settings
     return global_pixray_settings.copy()
 
-def apply_settings(do_both=False):
+def apply_settings():
     global global_pixray_settings
     settingsDict = None
-    vq_parser = setup_parser()
+
+    # first pass - just get the drawer
+    # Create the parser
+    vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
+    vq_parser.add_argument("--drawer", type=str, help="clipdraw, pixeldraw, etc", default="vqgan", dest='drawer')
+    settingsDict = SimpleNamespace(**global_pixray_settings)
+    settings_core, unknown = vq_parser.parse_known_args(namespace=settingsDict)
+
+    vq_parser = setup_parser(vq_parser)
+    class_table[settings_core.drawer].add_settings(vq_parser)
 
     if len(global_pixray_settings) > 0:
         # check for any bogus entries in the settings
@@ -1545,7 +1551,7 @@ def apply_settings(do_both=False):
         # settingsDict = easydict.EasyDict(global_pixray_settings)
         settingsDict = SimpleNamespace(**global_pixray_settings)
 
-    settings = process_args(vq_parser, settingsDict, do_both)
+    settings = process_args(vq_parser, settingsDict)
     return settings
 
 def command_line_override():
