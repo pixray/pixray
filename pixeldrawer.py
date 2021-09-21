@@ -14,6 +14,8 @@ import torchvision.transforms as transforms
 import numpy as np
 import PIL.Image
 
+from util import str2bool
+
 def rect_from_corners(p0, p1):
     x1, y1 = p0
     x2, y2 = p1
@@ -59,17 +61,6 @@ def hex_from_corners(p0, p1):
     hxH = map_number(0, -n, n, x1, x2)
     pts = [[hxH, hyA], [x1, hyB], [x1, hyC], [hxH, hyD], [x2, hyC], [x2, hyB]]
     return pts
-
-# this will go into a helper file...
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 shift_pixel_types = ["hex", "rectshift", "diamond"]
 

@@ -34,8 +34,6 @@ class ClipDrawer(DrawingInterface):
         self.num_paths = settings.strokes
 
     def load_model(self, settings, device):
-        # gamma = 1.0
-
         # Use GPU if available
         pydiffvg.set_use_gpu(torch.cuda.is_available())
         device = torch.device('cuda')
