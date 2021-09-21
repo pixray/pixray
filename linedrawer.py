@@ -18,22 +18,30 @@ import torchvision.transforms as transforms
 import numpy as np
 import PIL.Image
 
+from util import str2bool
+
 def bound(value, low, high):
     return max(low, min(high, value))
 
 class LineDrawer(DrawingInterface):
-    num_paths = 72
+    @staticmethod
+    def add_settings(parser):
+        parser.add_argument("--strokes", type=int, help="number strokes", default=24, dest='strokes')
+        parser.add_argument("--stroke_length", type=int, help="stroke length", default=8, dest='stroke_length')
+        parser.add_argument("--min_stroke_width", type=float, help="min width (percent of height)", default=0.5, dest='min_stroke_width')
+        parser.add_argument("--max_stroke_width", type=float, help="max width (percent of height)", default=2, dest='max_stroke_width')
+        parser.add_argument("--allow_paper_color", type=str2bool, help="allow paper color to change", default=False, dest='allow_paper_color')
+        return parser
 
-    def __init__(self, width, height, num_paths):
-       super(DrawingInterface, self).__init__()
+    def __init__(self, settings):
+        super(DrawingInterface, self).__init__()
 
-       self.canvas_width = width
-       self.canvas_height = height
-       self.num_paths = num_paths
+        self.canvas_width = settings.size[0]
+        self.canvas_height = settings.size[1]
+        self.num_paths = settings.strokes
+        self.stroke_length = settings.stroke_length
 
-    def load_model(self, config_path, checkpoint_path, device):
-        # gamma = 1.0
-
+    def load_model(self, settings, device):
         # Use GPU if available
         pydiffvg.set_use_gpu(torch.cuda.is_available())
         device = torch.device('cuda')
@@ -41,22 +49,42 @@ class LineDrawer(DrawingInterface):
 
         canvas_width, canvas_height = self.canvas_width, self.canvas_height
         num_paths = self.num_paths
-        max_width = canvas_height / 30
+        max_width = settings.max_stroke_width * canvas_height / 100
+        min_width = settings.min_stroke_width * canvas_height / 100
 
-        # Initialize Random Curves
         shapes = []
         shape_groups = []
-        for i in range(1):
-            num_segments = num_paths
+        color_vars = []
+
+        # background shape
+        p0 = [0, 0]
+        p1 = [canvas_width, canvas_height]
+        path = pydiffvg.Rect(p_min=torch.tensor(p0), p_max=torch.tensor(p1))
+        shapes.append(path)
+        # https://encycolorpedia.com/f2eecb
+        cell_color = torch.tensor([242/255.0, 238/255.0, 203/255.0, 1.0])
+        path_group = pydiffvg.ShapeGroup(shape_ids = torch.tensor([len(shapes)-1]), stroke_color = None, fill_color = cell_color)
+        shape_groups.append(path_group)
+
+        if settings.allow_paper_color:
+            path_group.fill_color.requires_grad = True
+            color_vars.append(path_group.fill_color)
+
+        # Initialize Random Curves
+        for i in range(num_paths):
+            num_segments = self.stroke_length
             num_control_points = torch.zeros(num_segments, dtype = torch.int32) + 2
             points = []
-            p0 = (0.5, 0.5)
+            radius = 0.5
+            radius_x = radius * canvas_height / canvas_width
+            p0 = (0.5 + radius_x * (random.random() - 0.5), 0.5 + radius * (random.random() - 0.5))
             points.append(p0)
             for j in range(num_segments):
-                radius = 0.1
-                p1 = (p0[0] + radius * (random.random() - 0.5), p0[1] + radius * (random.random() - 0.5))
-                p2 = (p1[0] + radius * (random.random() - 0.5), p1[1] + radius * (random.random() - 0.5))
-                p3 = (p2[0] + radius * (random.random() - 0.5), p2[1] + radius * (random.random() - 0.5))
+                radius = 1.0 / (num_segments + 2)
+                radius_x = radius * canvas_height / canvas_width
+                p1 = (p0[0] + radius_x * (random.random() - 0.5), p0[1] + radius * (random.random() - 0.5))
+                p2 = (p1[0] + radius_x * (random.random() - 0.5), p1[1] + radius * (random.random() - 0.5))
+                p3 = (p2[0] + radius_x * (random.random() - 0.5), p2[1] + radius * (random.random() - 0.5))
                 points.append(p1)
                 points.append(p2)
                 points.append(p3)
@@ -67,7 +95,7 @@ class LineDrawer(DrawingInterface):
             path = pydiffvg.Path(num_control_points = num_control_points, points = points, stroke_width = torch.tensor(max_width/10), is_closed = False)
             shapes.append(path)
             s_col = [0, 0, 0, 1]
-            path_group = pydiffvg.ShapeGroup(shape_ids = torch.tensor([len(shapes) - 1]), fill_color = None, stroke_color = torch.tensor(s_col))
+            path_group = pydiffvg.ShapeGroup(shape_ids = torch.tensor([len(shapes)-1]), fill_color = None, stroke_color = torch.tensor(s_col))
             shape_groups.append(path_group)
 
         # Just some diffvg setup
@@ -78,8 +106,7 @@ class LineDrawer(DrawingInterface):
 
         points_vars = []
         stroke_width_vars = []
-        color_vars = []
-        for path in shapes:
+        for path in shapes[1:]:
             path.points.requires_grad = True
             points_vars.append(path.points)
             path.stroke_width.requires_grad = True
@@ -102,8 +129,10 @@ class LineDrawer(DrawingInterface):
         # Optimizers
         points_optim = torch.optim.Adam(self.points_vars, lr=1.0/decay_divisor)
         width_optim = torch.optim.Adam(self.stroke_width_vars, lr=0.1/decay_divisor)
-        # color_optim = torch.optim.Adam(self.color_vars, lr=0.01/decay_divisor)
         opts = [points_optim, width_optim]
+        if len(self.color_vars) > 0:
+            color_optim = torch.optim.Adam(self.color_vars, lr=0.01/decay_divisor)
+            opts.append(color_optim)
         return opts
 
     def rand_init(self, toksX, toksY):
@@ -150,9 +179,9 @@ class LineDrawer(DrawingInterface):
 
     def clip_z(self):
         with torch.no_grad():
-            for path in self.shapes:
+            for path in self.shapes[1:]:
                 path.stroke_width.data.clamp_(1.0, self.max_width)
-            for group in self.shape_groups:
+            for group in self.shape_groups[1:]:
                 group.stroke_color.data.clamp_(0.0, 1.0)
 
     def get_z(self):
