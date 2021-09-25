@@ -50,9 +50,6 @@ def do_image_features(model, images, image_mean, image_std):
 
     return image_features
 
-def vector_to_json_array(v):
-    return json.dumps(v.tolist())
-
 def spew_vectors(args, inputs, outfile):
     global perceptors, resolutions
 
@@ -74,15 +71,85 @@ def spew_vectors(args, inputs, outfile):
 
         features = do_image_features(perceptor, images, image_mean, image_std)
         print(f"saving {features.shape} to {clip_model}")
-        save_table[clip_model] = vector_to_json_array(features)
+        save_table[clip_model] = features.tolist()
 
     with open(outfile, 'w') as fp:
+        json.dump(save_table, fp)
+
+def run_avg_diff(args):
+    f1, f2 = args.avg_diff.split(",")
+    with open(f1) as f_in:
+        table1 = json.load(f_in)
+    with open(f2) as f_in:
+        table2 = json.load(f_in)
+    save_table = {}
+    for k in table1:
+        encoded1 = np.array(table1[k])
+        encoded2 = np.array(table2[k])
+        print("Taking the difference between {} and {} vectors".format(encoded1.shape, encoded2.shape))
+        m1 = np.mean(encoded1,axis=0)
+        m2 = np.mean(encoded2,axis=0)
+        atvec = m2 - m1
+        z_dim, = atvec.shape
+        atvecs = atvec.reshape(1,z_dim)
+        print("Computed diff shape: {}".format(atvecs.shape))
+        save_table[k] = atvecs.tolist()
+
+    with open(args.outfile, 'w') as fp:
+        json.dump(save_table, fp)
+
+def run_svm_diff(args):
+    f1, f2 = args.svm_diff.split(",")
+    with open(f1) as f_in:
+        table1 = json.load(f_in)
+    with open(f2) as f_in:
+        table2 = json.load(f_in)
+    save_table = {}
+    for k in table1:
+        encoded1 = np.array(table1[k])
+        encoded2 = np.array(table2[k])
+        print("Taking the svm difference between {} and {} vectors".format(encoded1.shape, encoded2.shape))
+        h = .02  # step size in the mesh
+        C = 1.0  # SVM regularization parameter
+        X_arr = []
+        y_arr = []
+        for l in range(len(encoded1)):
+            X_arr.append(encoded1[l])
+            y_arr.append(False)
+        for l in range(len(encoded2)):
+            X_arr.append(encoded2[l])
+            y_arr.append(True)
+        X = np.array(X_arr)
+        y = np.array(y_arr)
+        # svc = svm.LinearSVC(C=C, class_weight="balanced").fit(X, y)
+        svc = svm.LinearSVC(C=C,max_iter=20000).fit(X, y)
+        # get the separating hyperplane
+        w = svc.coef_[0]
+
+        #FIXME: this is a scaling hack.
+        m1 = np.mean(encoded1,axis=0)
+        m2 = np.mean(encoded2,axis=0)
+        mean_vector = m1 - m2
+        mean_length = np.linalg.norm(mean_vector)
+        svn_length = np.linalg.norm(w)
+
+        atvec = (mean_length / svn_length)  * w
+        z_dim, = atvec.shape
+        atvecs = atvec.reshape(1,z_dim)
+        print("Computed svm diff shape: {}".format(atvecs.shape))
+        save_table[k] = atvecs.tolist()
+
+    with open(args.outfile, 'w') as fp:
         json.dump(save_table, fp)
 
 def main():
     parser = argparse.ArgumentParser(description="Do vectory things")
     parser.add_argument("--models", type=str, help="CLIP model", default='ViT-B/32,ViT-B/16,RN50,RN50x4', dest='models')
     parser.add_argument("--inputs", type=str, help="Images to process", default=None, dest='inputs')
+    parser.add_argument("--avg-diff", dest='avg_diff', type=str, default=None,
+                        help="Two vector files to average and then diff")
+    parser.add_argument("--svm-diff", dest='svm_diff', type=str, default=None,
+                        help="Two vector files to average and then svm diff")
     parser.add_argument("--z-dim", dest='z_dim', type=int, default=100,
                         help="z dimension of vectors")
     parser.add_argument("--encoded-vectors", type=str, default=None,
@@ -105,15 +172,19 @@ def main():
                         help="score ROC/accuracy against true/false/all")
     parser.add_argument('--attribute-indices', dest='attribute_indices', default=None, type=str,
                         help="indices to select specific attribute vectors")
-    parser.add_argument("--avg-diff", dest='avg_diff', type=str, default=None,
-                        help="Two lists of vectors to average and then diff")
-    parser.add_argument("--svm-diff", dest='svm_diff', type=str, default=None,
-                        help="Two lists of vectors to average and then svm diff")
     parser.add_argument('--outfile', dest='outfile', default=None,
                         help="Output json file for vectors.")
     args = parser.parse_args()
 
     init(args)
+    if args.avg_diff:
+        run_avg_diff(args)
+        sys.exit(0)
+
+    if args.svm_diff:
+        run_svm_diff(args)
+        sys.exit(0)
+
     spew_vectors(args, args.inputs, args.outfile)
 
 if __name__ == '__main__':
