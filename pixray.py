@@ -42,7 +42,7 @@ global_padding_mode = 'reflection'
 global_aspect_width = 1
 global_spot_file = None
 
-from util import map_number, palette_from_string
+from util import map_number, palette_from_string, real_glob
 
 from vqgan import VqganDrawer
 
@@ -97,14 +97,6 @@ if IS_NOTEBOOK:
     from IPython.display import clear_output
 else:
     from tqdm import tqdm
-
-# file helpers
-def real_glob(rglob):
-    glob_list = braceexpand(rglob)
-    files = []
-    for g in glob_list:
-        files = files + glob.glob(g)
-    return sorted(files)
 
 # Functions and classes
 def sinc(x):

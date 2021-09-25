@@ -1,11 +1,21 @@
 import re
 import argparse
+import glob
+from braceexpand import braceexpand
 
 try:
     import matplotlib.colors
 except ImportError:
     # only needed for palette stuff
     pass
+
+# file helpers
+def real_glob(rglob):
+    glob_list = braceexpand(rglob)
+    files = []
+    for g in glob_list:
+        files = files + glob.glob(g)
+    return sorted(files)
 
 ####### argparse bools ##########
 def str2bool(v):
