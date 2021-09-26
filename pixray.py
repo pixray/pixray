@@ -579,6 +579,18 @@ def do_init(args):
             embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
             pMs.append(Prompt(embed, weight, stop).to(device))
 
+    for vect_prompt in args.vector_prompts:
+        f1, weight, stop = parse_prompt(vect_prompt)
+        # vect_promts are by nature tuned to 10% of a normal prompt
+        weight = 0.1 * weight
+        with open(f"vectors/{f1}.json") as f_in:
+            vect_table = json.load(f_in)
+        for clip_model in args.clip_models:
+            pMs = pmsTable[clip_model]
+            v = np.array(vect_table[clip_model])
+            embed = torch.FloatTensor(v).to(device).float()
+            pMs.append(Prompt(embed, weight, stop).to(device))
+
     for prompt in args.spot_prompts:
         for clip_model in args.clip_models:
             pMs = spotPmsTable[clip_model]
@@ -1161,6 +1173,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-spo",  "--spot_off", type=str, help="Spot off Text prompts", default=[], dest='spot_prompts_off')
     vq_parser.add_argument("-spf",  "--spot_file", type=str, help="Custom spot file", default=None, dest='spot_file')
     vq_parser.add_argument("-l",    "--labels", type=str, help="ImageNet labels", default=[], dest='labels')
+    vq_parser.add_argument("-vp",   "--vector_prompts", type=str, help="Vector prompts", default=[], dest='vector_prompts')
     vq_parser.add_argument("-ip",   "--image_prompts", type=str, help="Image prompts", default=[], dest='image_prompts')
     vq_parser.add_argument("-ipw",  "--image_prompt_weight", type=float, help="Weight for image prompt", default=None, dest='image_prompt_weight')
     vq_parser.add_argument("-ips",  "--image_prompt_shuffle", type=bool, help="Shuffle image prompts", default=False, dest='image_prompt_shuffle')
@@ -1333,6 +1346,10 @@ def process_args(vq_parser, namespace=None):
     # Split target images using the pipe character
     if args.image_prompts:
         args.image_prompts = real_glob(args.image_prompts)
+
+    # Split text prompts using the pipe character
+    if args.vector_prompts:
+        args.vector_prompts = [phrase.strip() for phrase in args.vector_prompts.split("|")]
 
     if args.target_palette is not None:
         args.target_palette = palette_from_string(args.target_palette)
