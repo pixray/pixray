@@ -329,7 +329,7 @@ class MakeCutouts(nn.Module):
             cutout = (self.av_pool(input) + self.max_pool(input))/2
 
             if mask_indexes is not None:
-                cutout[0][mask_indexes] = 0.5
+                cutout[0][mask_indexes] = 0.0 # 0.5
 
             if global_aspect_width != 1:
                 if global_aspect_width > 1:
