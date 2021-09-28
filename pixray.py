@@ -583,9 +583,15 @@ def do_init(args):
         f1, weight, stop = parse_prompt(vect_prompt)
         # vect_promts are by nature tuned to 10% of a normal prompt
         weight = 0.1 * weight
-        infile = f"vectors/{f1}.json"
-        if not os.path.exists(infile):
-            infile = f"pixray/vectors/{f1}.json"
+        if 'http' in f1:
+            # note: this is currently untested...
+            infile = urlopen(f1)
+        elif 'json' in f1:
+            infile = f1
+        else:
+            infile = f"vectors/{f1}.json"
+            if not os.path.exists(infile):
+                infile = f"pixray/vectors/{f1}.json"
         with open(infile) as f_in:
             vect_table = json.load(f_in)
         for clip_model in args.clip_models:

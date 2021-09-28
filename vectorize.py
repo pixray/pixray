@@ -18,13 +18,14 @@ perceptors = {}
 def init(args):
     global perceptors, resolutions
 
-    model, preprocess = clip.load("ViT-B/32")
-
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     jit = True if float(torch.__version__[:3]) < 1.8 else False
 
-    models = args.models.split(",")
-    args.models = [model.strip() for model in models]
+    if args.models is not None:
+        models = args.models.split(",")
+        args.models = [model.strip() for model in models]
+    else:
+        args.models = clip.available_models()
 
     for clip_model in args.models:
         model, preprocess = clip.load(clip_model, jit=jit)
@@ -144,7 +145,7 @@ def run_svm_diff(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Do vectory things")
-    parser.add_argument("--models", type=str, help="CLIP model", default='ViT-B/32,ViT-B/16,RN50,RN50x4', dest='models')
+    parser.add_argument("--models", type=str, help="CLIP model", default=None, dest='models')
     parser.add_argument("--inputs", type=str, help="Images to process", default=None, dest='inputs')
     parser.add_argument("--avg-diff", dest='avg_diff', type=str, default=None,
                         help="Two vector files to average and then diff")
