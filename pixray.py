@@ -420,7 +420,7 @@ def rebuild_optimisers(args):
 def do_init(args):
     global opts, perceptors, normalize, cutoutsTable, cutoutSizeTable
     global z_orig, z_targets, z_labels, init_image_tensor, target_image_tensor
-    global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list
+    global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer
 
@@ -483,23 +483,32 @@ def do_init(args):
 
         if args.init_image:
             # now we might overlay an init image (init_image also can be recycled as overlay)
+            filelist = None
             if 'http' in args.init_image:
-              init_image = Image.open(urlopen(args.init_image))
+                init_images = [Image.open(urlopen(args.init_image))]
             else:
-              init_image = Image.open(args.init_image)
-            # this version is needed potentially for the loss function
-            init_image_rgb = init_image.convert('RGB')
-            init_image_rgb = init_image_rgb.resize((sideX, sideY), Image.LANCZOS)
-            init_image_tensor = TF.to_tensor(init_image_rgb)
-            init_image_tensor = init_image_tensor.to(device).unsqueeze(0)
+                filelist = real_glob(args.init_image)
+                init_images = [Image.open(f) for f in filelist]
 
-            # this version gets overlaid on the background (noise)
-            init_image_rgba = init_image.convert('RGBA')
-            init_image_rgba = init_image_rgba.resize((sideX, sideY), Image.LANCZOS)
-            top_image = init_image_rgba.copy()
-            if args.init_image_alpha and args.init_image_alpha >= 0:
-                top_image.putalpha(args.init_image_alpha)
-            starting_image.paste(top_image, (0, 0), top_image)
+            init_image_rgba_list = []
+            for init_image in init_images:
+                # this version is needed potentially for the loss function
+                init_image_rgb = init_image.convert('RGB')
+                init_image_rgb = init_image_rgb.resize((sideX, sideY), Image.LANCZOS)
+                init_image_tensor = TF.to_tensor(init_image_rgb)
+                init_image_tensor = init_image_tensor.to(device).unsqueeze(0)
+
+                # this version gets overlaid on the background (noise)
+                init_image_rgba = init_image.convert('RGBA')
+                init_image_rgba = init_image_rgba.resize((sideX, sideY), Image.LANCZOS)
+                top_image = init_image_rgba.copy()
+                if args.init_image_alpha and args.init_image_alpha >= 0:
+                    top_image.putalpha(args.init_image_alpha)
+                cur_start_image = starting_image.copy()
+                cur_start_image.paste(top_image, (0, 0), top_image)
+                init_image_rgba_list.append(cur_start_image)
+
+            starting_image = init_image_rgba_list[0]
 
         starting_image.save("starting_image.png")
         starting_tensor = TF.to_tensor(starting_image)
@@ -660,7 +669,7 @@ def do_init(args):
     if args.image_prompts:
         print('Using #image prompts:', len(args.image_prompts))
     if args.init_image:
-        print('Using initial image:', args.init_image)
+        print(f'Using initial image {args.init_image} ({len(init_image_rgba_list)})')
     if args.noise_prompt_weights:
         print('Noise prompt weights:', args.noise_prompt_weights)
 
@@ -683,6 +692,7 @@ spotOffPmsTable = None
 pmsImageTable = None
 gside_X=None
 gside_Y=None
+init_image_rgba_list=[]
 overlay_image_rgba_list=None
 overlay_image_rgba=None
 device=None
@@ -975,12 +985,25 @@ def re_average_z(args):
     cur_z_image = cur_z_image.resize((gside_X, gside_Y), Image.LANCZOS)
     drawer.reapply_from_tensor(TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1)
 
+def init_anim_z(args, init_rgba):
+    global gside_X, gside_Y
+    global device, drawer
+
+    # old_z = z.clone()
+    cur_z_image = init_rgba.copy()
+    # cur_z_image = cur_z_image.convert('RGB')
+    # if init_rgba:
+    #     cur_z_image.paste(init_rgba, (0, 0))
+    #     # cur_z_image.save(f"init_image_{cur_anim_index}.png")
+    # cur_z_image = cur_z_image.resize((gside_X, gside_Y), Image.LANCZOS)
+    drawer.reapply_from_tensor(TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1)
+
 # torch.autograd.set_detect_anomaly(True)
 
 def train(args, cur_it):
     global drawer, opts
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
-    global overlay_image_rgba, overlay_image_rgba_list, cur_anim_index
+    global overlay_image_rgba, overlay_image_rgba_list, cur_anim_index, init_image_rgba_list
     
     rebuild_opts_when_done = False
 
@@ -992,6 +1015,10 @@ def train(args, cur_it):
         for opt in opts:
             # opt.zero_grad(set_to_none=True)
             opt.zero_grad()
+
+        if cur_it == 0 and len(init_image_rgba_list) > 0:
+            if cur_anim_index is not None:
+                init_anim_z(args, init_image_rgba_list[cur_anim_index])
 
         # if args.overlay_every and cur_it != 0 and \
         #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
@@ -1072,6 +1099,8 @@ def do_run(args):
             filelist = real_glob(args.overlay_image)
         elif args.target_images is not None:
             filelist = real_glob(args.target_images)
+        elif args.init_image is not None:
+            filelist = real_glob(args.init_image)
         else:
             filelist = args.image_prompts
         num_anim_frames = len(filelist)
