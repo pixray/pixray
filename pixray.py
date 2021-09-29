@@ -24,7 +24,13 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 from torch_optimizer import DiffGrad, AdamP, RAdam
 from perlin_numpy import generate_fractal_noise_2d
 
-from CLIP import clip
+try:
+    # installed by adding github.com/openai/CLIP to sys.path
+    from CLIP import clip
+except ImportError:
+    # installed by doing `pip install git+https://github.com/openai/CLIP`
+    from clip import clip
+
 import kornia
 import kornia.augmentation as K
 import numpy as np
@@ -1421,7 +1427,7 @@ def apply_settings():
     # first pass - just get the drawer
     # Create the parser
     vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
-    vq_parser.add_argument("--drawer", type=str, help="clipdraw, pixeldraw, etc", default="vqgan", dest='drawer')
+    vq_parser.add_argument("--drawer", type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = vq_parser.parse_known_args(namespace=settingsDict)
 
