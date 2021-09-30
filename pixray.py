@@ -600,7 +600,6 @@ def do_init(args):
             vect_table = json.load(infile_handle)
         for clip_model in args.clip_models:
             if clip_model not in vect_table: continue
-            print(clip_model, pmsTable.keys(), vect_table.keys())
             pMs = pmsTable[clip_model]
             v = np.array(vect_table[clip_model])
             embed = torch.FloatTensor(v).to(device).float()
