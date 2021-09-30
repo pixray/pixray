@@ -105,6 +105,8 @@ class PixelDrawer(DrawingInterface):
             self.num_cols = int(self.num_cols / settings.pixel_scale)
             self.num_rows = int(self.num_rows / settings.pixel_scale)
 
+        print(f"Running pixeldrawer with {self.num_rows}x{self.num_cols} grid")
+
         if settings.pixel_edge_check:
             if self.pixel_type in shift_pixel_types:
                 if self.num_cols % 2 == 0:
