@@ -76,7 +76,7 @@ class LineDrawer(DrawingInterface):
             num_control_points = torch.zeros(num_segments, dtype = torch.int32) + 2
             points = []
             radius = 0.5
-            radius_x = radius * canvas_height / canvas_width
+            radius_x = 0.5 #radius * canvas_height / canvas_width
             p0 = (0.5 + radius_x * (random.random() - 0.5), 0.5 + radius * (random.random() - 0.5))
             points.append(p0)
             for j in range(num_segments):
@@ -193,8 +193,6 @@ class LineDrawer(DrawingInterface):
     def set_z(self, new_z):
         return None
 
-### EXTERNAL INTERFACE
-### load_vqgan_model
-
-if __name__ == '__main__':
-    main()
+    @torch.no_grad()
+    def to_svg(self):
+        pydiffvg.save_svg("./lineout.svg", self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)
