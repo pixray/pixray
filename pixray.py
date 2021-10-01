@@ -24,6 +24,8 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 from torch_optimizer import DiffGrad, AdamP, RAdam
 from perlin_numpy import generate_fractal_noise_2d
 
+from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
+
 from CLIP import clip
 import kornia
 import kornia.augmentation as K
@@ -416,10 +418,30 @@ def rebuild_optimisers(args):
 
     return new_opts
 
+# used for target image
+def fetch_images(preprocess, image_files):
+    images = []
+
+    for filename in image_files:
+        image = preprocess(Image.open(filename).convert("RGB"))
+        images.append(image)
+
+    return images
+
+def do_image_features(model, images, image_mean, image_std):
+    image_input = torch.tensor(np.stack(images)).cuda()
+    image_input -= image_mean[:, None, None]
+    image_input /= image_std[:, None, None]
+
+    with torch.no_grad():
+        image_features = model.encode_image(image_input).float()
+
+    return image_features
+
 
 def do_init(args):
     global opts, perceptors, normalize, cutoutsTable, cutoutSizeTable
-    global z_orig, z_targets, z_labels, init_image_tensor, target_image_tensor
+    global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer
@@ -535,17 +557,49 @@ def do_init(args):
             sys.exit(1)
         overlay_image_rgba_list[0].save('overlay_image0.png')
 
+    pmsTable = {}
+    pmsImageTable = {}
+    spotPmsTable = {}
+    spotOffPmsTable = {}
+    for clip_model in args.clip_models:
+        pmsTable[clip_model] = []
+        pmsImageTable[clip_model] = []
+        spotPmsTable[clip_model] = []
+        spotOffPmsTable[clip_model] = []
+
     if args.target_images is not None:
-        z_targets = []
-        filelist = real_glob(args.target_images)
-        for target_image in filelist:
-            target_image = Image.open(target_image)
-            target_image_rgb = target_image.convert('RGB')
-            target_image_rgb = target_image_rgb.resize((sideX, sideY), Image.LANCZOS)
-            target_image_tensor_local = TF.to_tensor(target_image_rgb)
-            target_image_tensor = target_image_tensor_local.to(device).unsqueeze(0) * 2 - 1
-            z_target = drawer.get_z_from_tensor(target_image_tensor)
-            z_targets.append(z_target)
+        # TODO: if args.animation_dir is not None, save ring of pMs
+        for clip_model in args.clip_models:
+            pMs = pmsTable[clip_model]
+            perceptor = perceptors[clip_model]
+
+            input_resolution = perceptor.visual.input_resolution
+            print(f"Running {clip_model} at {input_resolution}")
+            preprocess = Compose([
+                Resize(input_resolution, interpolation=Image.BICUBIC),
+                CenterCrop(input_resolution),
+                ToTensor()
+            ])
+            image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
+            image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
+
+            input_files = []
+            for target_image in args.target_images:
+                f1, weight, stop = parse_prompt(target_image)
+                # print("Target parse ", target_image, "to", f1)
+                if 'http' in f1:
+                    # note: this is currently untested...
+                    infile = urlopen(f1)
+                    input_files.apped(infile)
+                else:
+                    infiles = real_glob(f1)
+                    input_files.extend(infiles)
+
+            print(input_files)
+            images = fetch_images(preprocess, input_files);
+
+            features = do_image_features(perceptor, images, image_mean, image_std)
+            pMs.append(Prompt(features, weight, stop).to(device))
 
     if args.image_labels is not None:
         z_labels = []
@@ -568,15 +622,6 @@ def do_init(args):
 
     z_orig = drawer.get_z_copy()
 
-    pmsTable = {}
-    pmsImageTable = {}
-    spotPmsTable = {}
-    spotOffPmsTable = {}
-    for clip_model in args.clip_models:
-        pmsTable[clip_model] = []
-        pmsImageTable[clip_model] = []
-        spotPmsTable[clip_model] = []
-        spotOffPmsTable[clip_model] = []
     normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
                                       std=[0.26862954, 0.26130258, 0.27577711])
 
@@ -676,7 +721,7 @@ def do_init(args):
 
 # dreaded globals (for now)
 z_orig = None
-z_targets = None
+im_targets = None
 z_labels = None
 opts = None
 drawer = None
@@ -790,7 +835,7 @@ def checkin(args, iter, losses):
 
 def ascend_txt(args):
     global cur_iteration, cur_anim_index, perceptors, normalize, cutoutsTable, cutoutSizeTable
-    global z_orig, z_targets, z_labels, init_image_tensor, target_image_tensor, drawer
+    global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
     global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode
 
     out = drawer.synth(cur_iteration);
@@ -911,25 +956,26 @@ def ascend_txt(args):
         make_cutouts.transforms = None
 
     # main init_weight uses spherical loss
-    if args.target_images is not None and args.target_image_weight > 0:
-        if cur_anim_index is None:
-            cur_z_targets = z_targets
-        else:
-            cur_z_targets = [ z_targets[cur_anim_index] ]
-        for z_target in cur_z_targets:
-            f_z = drawer.get_z()
-            if f_z is not None:
-                f = f_z.reshape(1,-1)
-                f2 = z_target.reshape(1,-1)
-                cur_loss = spherical_dist_loss(f, f2) * args.target_image_weight
-                result.append(cur_loss)
+    # image target (im_targets) here
+    # if args.target_images is not None and args.target_image_weight > 0:
+    #     if cur_anim_index is None:
+    #         cur_z_targets = z_targets
+    #     else:
+    #         cur_z_targets = [ z_targets[cur_anim_index] ]
+    #     for z_target in cur_z_targets:
+    #         f_z = drawer.get_z()
+    #         if f_z is not None:
+    #             f = f_z.reshape(1,-1)
+    #             f2 = z_target.reshape(1,-1)
+    #             cur_loss = spherical_dist_loss(f, f2) * args.target_image_weight
+    #             result.append(cur_loss)
 
-    if args.target_weight_pix:
-        if target_image_tensor is None:
-            print("OOPS TIT is 0")
-        else:
-            cur_loss = F.l1_loss(out, target_image_tensor) * args.target_weight_pix
-            result.append(cur_loss)
+    # if args.target_weight_pix:
+    #     if target_image_tensor is None:
+    #         print("OOPS TIT is 0")
+    #     else:
+    #         cur_loss = F.l1_loss(out, target_image_tensor) * args.target_weight_pix
+    #         result.append(cur_loss)
 
     if args.image_labels is not None:
         for z_label in z_labels:
@@ -1244,8 +1290,6 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-iia",  "--init_image_alpha", type=int, help="Init image alpha (0-255)", default=200, dest='init_image_alpha')
     vq_parser.add_argument("-in",   "--init_noise", type=str, help="Initial noise image (pixels or gradient)", default="pixels", dest='init_noise')
     vq_parser.add_argument("-ti",   "--target_images", type=str, help="Target images", default=None, dest='target_images')
-    vq_parser.add_argument("-tiw",  "--target_image_weight", type=float, help="Target images weight", default=1.0, dest='target_image_weight')
-    vq_parser.add_argument("-twp",  "--target_weight_pix", type=float, help="Target weight pix loss", default=0., dest='target_weight_pix')
     vq_parser.add_argument("-anim", "--animation_dir", type=str, help="Animation output dir", default=None, dest='animation_dir')    
     vq_parser.add_argument("-ana",  "--animation_alpha", type=int, help="Forward blend for consistency", default=128, dest='animation_alpha')
     vq_parser.add_argument("-iw",   "--init_weight", type=float, help="Initial weight (main=spherical)", default=None, dest='init_weight')
@@ -1378,6 +1422,10 @@ def process_args(vq_parser, namespace=None):
     # Split text prompts using the pipe character
     if args.prompts:
         args.prompts = [phrase.strip() for phrase in args.prompts.split("|")]
+
+    # Split text prompts using the pipe character
+    if args.target_images:
+        args.target_images = [phrase.strip() for phrase in args.target_images.split("|")]
 
     # Split text prompts using the pipe character
     if args.spot_prompts:
