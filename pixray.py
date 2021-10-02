@@ -13,6 +13,7 @@ import os.path
 
 from omegaconf import OmegaConf
 
+import time
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
@@ -655,7 +656,11 @@ def do_init(args):
         else:
             vect_table = json.load(infile_handle)
         for clip_model in args.clip_models:
-            if clip_model not in vect_table: continue
+            if clip_model not in vect_table:
+                print(f"WARNING: no vector for {clip_model} in {f1}!")
+                print("Continuing... (BUT THIS RESULT MIGHT NOT BE WHAT YOU WANT 😬)")
+                time.sleep(3)
+                continue
             pMs = pmsTable[clip_model]
             v = np.array(vect_table[clip_model])
             embed = torch.FloatTensor(v).to(device).float()
