@@ -450,7 +450,7 @@ def do_init(args):
     global opts, perceptors, normalize, cutoutsTable, cutoutSizeTable
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
-    global pmsTable, pmsImageTable, pImages, device, spotPmsTable, spotOffPmsTable
+    global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer
 
     # do seed first!
@@ -566,47 +566,74 @@ def do_init(args):
 
     pmsTable = {}
     pmsImageTable = {}
+    pmsTargetTable = {}
     spotPmsTable = {}
     spotOffPmsTable = {}
     for clip_model in args.clip_models:
         pmsTable[clip_model] = []
         pmsImageTable[clip_model] = []
+        pmsTargetTable[clip_model] = []
         spotPmsTable[clip_model] = []
         spotOffPmsTable[clip_model] = []
 
     if args.target_images is not None:
-        # TODO: if args.animation_dir is not None, save ring of pMs
-        for clip_model in args.clip_models:
-            pMs = pmsTable[clip_model]
-            perceptor = perceptors[clip_model]
+        if args.animation_dir is not None:
+            for clip_model in args.clip_models:
+                pmsTarget = pmsTargetTable[clip_model]
+                perceptor = perceptors[clip_model]
 
-            input_resolution = perceptor.visual.input_resolution
-            print(f"Running {clip_model} at {input_resolution}")
-            preprocess = Compose([
-                Resize(input_resolution, interpolation=Image.BICUBIC),
-                CenterCrop(input_resolution),
-                ToTensor()
-            ])
-            image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
-            image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
+                input_resolution = perceptor.visual.input_resolution
+                # print(f"Running {clip_model} at {input_resolution}")
+                preprocess = Compose([
+                    Resize(input_resolution, interpolation=Image.BICUBIC),
+                    CenterCrop(input_resolution),
+                    ToTensor()
+                ])
+                image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
+                image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
 
-            input_files = []
-            for target_image in args.target_images:
-                f1, weight, stop = parse_prompt(target_image)
-                # print("Target parse ", target_image, "to", f1)
-                if 'http' in f1:
-                    # note: this is currently untested...
-                    infile = urlopen(f1)
-                    input_files.apped(infile)
-                else:
+                input_files = []
+                for target_image in args.target_images:
+                    f1, weight, stop = parse_prompt(target_image)
                     infiles = real_glob(f1)
                     input_files.extend(infiles)
 
-            print(input_files)
-            images = fetch_images(preprocess, input_files);
+                for path in input_files:
+                    images = fetch_images(preprocess, [path])
+                    features = do_image_features(perceptor, images, image_mean, image_std)
+                    pmsTarget.append(Prompt(features, weight, stop).to(device))
+        else:
+            for clip_model in args.clip_models:
+                pMs = pmsTable[clip_model]
+                perceptor = perceptors[clip_model]
 
-            features = do_image_features(perceptor, images, image_mean, image_std)
-            pMs.append(Prompt(features, weight, stop).to(device))
+                input_resolution = perceptor.visual.input_resolution
+                # print(f"Running {clip_model} at {input_resolution}")
+                preprocess = Compose([
+                    Resize(input_resolution, interpolation=Image.BICUBIC),
+                    CenterCrop(input_resolution),
+                    ToTensor()
+                ])
+                image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
+                image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
+
+                input_files = []
+                for target_image in args.target_images:
+                    f1, weight, stop = parse_prompt(target_image)
+                    # print("Target parse ", target_image, "to", f1)
+                    if 'http' in f1:
+                        # note: this is currently untested...
+                        infile = urlopen(f1)
+                        input_files.apped(infile)
+                    else:
+                        infiles = real_glob(f1)
+                        input_files.extend(infiles)
+
+                print(input_files)
+                images = fetch_images(preprocess, input_files);
+
+                features = do_image_features(perceptor, images, image_mean, image_std)
+                pMs.append(Prompt(features, weight, stop).to(device))
 
     if args.image_labels is not None:
         z_labels = []
@@ -751,6 +778,7 @@ pmsTable = None
 spotPmsTable = None 
 spotOffPmsTable = None 
 pmsImageTable = None
+pmsTargetTable = None
 gside_X=None
 gside_Y=None
 init_image_rgba_list=[]
@@ -853,6 +881,7 @@ def ascend_txt(args):
     global cur_iteration, cur_anim_index, perceptors, normalize, cutoutsTable, cutoutSizeTable
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
     global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode
+    global pmsTargetTable
 
     out = drawer.synth(cur_iteration);
 
@@ -895,10 +924,17 @@ def ascend_txt(args):
             for prompt in spotOffPms:
                 result.append(prompt(iii_so))
 
-        pMs = pmsTable[clip_model]
         iii = perceptor.encode_image(normalize( cur_cutouts[cutoutSize] )).float()
+
+        pMs = pmsTable[clip_model]
         for prompt in pMs:
             result.append(prompt(iii))
+
+        # add target frame prompts if applicable
+        if cur_anim_index is not None and len(pmsTargetTable[clip_model]) > 0:
+            pmsTarget = [ pmsTargetTable[clip_model][cur_anim_index] ]
+            for prompt in pmsTarget:
+                result.append(prompt(iii))
 
         # If there are image prompts we make cutouts for those each time
         # so that they line up with the current cutouts from augmentation
@@ -1160,7 +1196,11 @@ def do_run(args):
         if args.overlay_image is not None:
             filelist = real_glob(args.overlay_image)
         elif args.target_images is not None:
-            filelist = real_glob(args.target_images)
+            filelist = []
+            for target_image in args.target_images:
+                f1, weight, stop = parse_prompt(target_image)
+                infiles = real_glob(f1)
+                filelist.extend(infiles)
         elif args.init_image is not None:
             filelist = real_glob(args.init_image)
         else:
