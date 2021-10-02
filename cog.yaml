@@ -1,0 +1,10 @@
+build:
+  gpu: true
+  cuda: "10.2"
+  python_version: "3.8"
+  python_requirements: "requirements.txt"
+  run:
+    # CMAKE_PREFIX_PATH fix is from https://github.com/readthedocs/readthedocs.org/issues/5867
+    - "git clone https://github.com/BachiLi/diffvg && cd diffvg && git submodule update --init --recursive && CMAKE_PREFIX_PATH=$(pyenv prefix) DIFFVG_CUDA=1 python setup.py install"
+  
+

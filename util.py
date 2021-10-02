@@ -37,7 +37,7 @@ def map_number(n, start1, stop1, start2, stop2):
 
 # parses either (255,255,0) or [1,1,0] as yellow, etc
 def parse_triple_to_rgb(s):
-    s2 = re.sub('[(\[\])]', '', s)
+    s2 = re.sub(r'[(\[\])]', '', s)
     t = s2.split("+")
     rgb = [float(n) for n in t]
     if s[0] == "(":
