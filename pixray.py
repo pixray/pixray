@@ -641,16 +641,21 @@ def do_init(args):
         weight = 0.1 * weight
         if 'http' in f1:
             # note: this is currently untested...
-            infile = urlopen(f1)
+            infile = None
+            infile_handle = urlopen(f1)
         elif 'json' in f1:
             infile = f1
         else:
             infile = f"vectors/{f1}.json"
             if not os.path.exists(infile):
                 infile = f"pixray/vectors/{f1}.json"
-        with open(infile) as f_in:
-            vect_table = json.load(f_in)
+        if infile:
+            with open(infile) as f_in:
+                vect_table = json.load(f_in)
+        else:
+            vect_table = json.load(infile_handle)
         for clip_model in args.clip_models:
+            if clip_model not in vect_table: continue
             pMs = pmsTable[clip_model]
             v = np.array(vect_table[clip_model])
             embed = torch.FloatTensor(v).to(device).float()
