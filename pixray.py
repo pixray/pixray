@@ -932,7 +932,8 @@ def ascend_txt(args):
 
         # add target frame prompts if applicable
         if cur_anim_index is not None and len(pmsTargetTable[clip_model]) > 0:
-            pmsTarget = [ pmsTargetTable[clip_model][cur_anim_index] ]
+            num_anim_frames = len(pmsTargetTable[clip_model])
+            pmsTarget = [ pmsTargetTable[clip_model][cur_anim_index % num_anim_frames] ]
             for prompt in pmsTarget:
                 result.append(prompt(iii))
 
@@ -942,7 +943,8 @@ def ascend_txt(args):
 
         # if animating select one pImage, otherwise use them all
         if cur_anim_index is not None and len(pmsImageTable[clip_model]) > 0:
-            pImages = [ pmsImageTable[clip_model][cur_anim_index] ]
+            num_anim_frames = len(pmsImageTable[clip_model])
+            pImages = [ pmsImageTable[clip_model][cur_anim_index % num_anim_frames] ]
         else:
             pImages = pmsImageTable[clip_model]
         
@@ -1007,28 +1009,6 @@ def ascend_txt(args):
         make_cutouts = cutoutsTable[cutoutSize]
         make_cutouts.transforms = None
 
-    # main init_weight uses spherical loss
-    # image target (im_targets) here
-    # if args.target_images is not None and args.target_image_weight > 0:
-    #     if cur_anim_index is None:
-    #         cur_z_targets = z_targets
-    #     else:
-    #         cur_z_targets = [ z_targets[cur_anim_index] ]
-    #     for z_target in cur_z_targets:
-    #         f_z = drawer.get_z()
-    #         if f_z is not None:
-    #             f = f_z.reshape(1,-1)
-    #             f2 = z_target.reshape(1,-1)
-    #             cur_loss = spherical_dist_loss(f, f2) * args.target_image_weight
-    #             result.append(cur_loss)
-
-    # if args.target_weight_pix:
-    #     if target_image_tensor is None:
-    #         print("OOPS TIT is 0")
-    #     else:
-    #         cur_loss = F.l1_loss(out, target_image_tensor) * args.target_weight_pix
-    #         result.append(cur_loss)
-
     if args.image_labels is not None:
         for z_label in z_labels:
             f = drawer.get_z().reshape(1,-1)
@@ -1087,13 +1067,7 @@ def init_anim_z(args, init_rgba):
     global gside_X, gside_Y
     global device, drawer
 
-    # old_z = z.clone()
     cur_z_image = init_rgba.copy()
-    # cur_z_image = cur_z_image.convert('RGB')
-    # if init_rgba:
-    #     cur_z_image.paste(init_rgba, (0, 0))
-    #     # cur_z_image.save(f"init_image_{cur_anim_index}.png")
-    # cur_z_image = cur_z_image.resize((gside_X, gside_Y), Image.LANCZOS)
     drawer.reapply_from_tensor(TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1)
 
 # torch.autograd.set_detect_anomaly(True)
@@ -1116,14 +1090,16 @@ def train(args, cur_it):
 
         if cur_it == 0 and len(init_image_rgba_list) > 0:
             if cur_anim_index is not None:
-                init_anim_z(args, init_image_rgba_list[cur_anim_index])
+                num_anim_frames = len(init_image_rgba_list)
+                init_anim_z(args, init_image_rgba_list[cur_anim_index % num_anim_frames])
 
         # if args.overlay_every and cur_it != 0 and \
         #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
         if args.overlay_every is not None and \
             (cur_it % args.overlay_every) == args.overlay_offset:
             if cur_anim_index is not None:
-                overlay_image_rgba = overlay_image_rgba_list[cur_anim_index]
+                num_anim_frames = len(overlay_image_rgba_list)
+                overlay_image_rgba = overlay_image_rgba_list[cur_anim_index % num_anim_frames]
             re_average_z(args)
 
         # num_batches = args.batches * (num_loss_drop + 1)
@@ -1132,13 +1108,14 @@ def train(args, cur_it):
             lossAll = ascend_txt(args)
 
             if i == 0:
-                if cur_it in args.learning_rate_drops:
-                    print("Dropping learning rate")
-                    rebuild_opts_when_done = True
-                else:
-                    did_drop = checkdrop(args, cur_it, lossAll)
-                    if args.auto_stop is True:
-                        rebuild_opts_when_done = disabl
+                if cur_anim_index is None or cur_anim_index == 0:
+                    if cur_it in args.learning_rate_drops:
+                        print("Dropping learning rate")
+                        rebuild_opts_when_done = True
+                    else:
+                        did_drop = checkdrop(args, cur_it, lossAll)
+                        if args.auto_stop is True:
+                            rebuild_opts_when_done = disabl
 
             if i == 0 and cur_it % args.save_every == 0:
                 checkin(args, cur_it, lossAll)
@@ -1179,6 +1156,20 @@ imagenet_templates = [
     "a photo of the small {}.",
 ]
 
+def check_new_filelist(filelist_old_source, filelist_old, filelist_cur_source, filelist_cur):
+    if filelist_old_source is None:
+        print(f"==> setting animation filelist to {filelist_cur_source} ({len(filelist_cur)} files)")
+        return filelist_cur_source, filelist_cur
+    elif len(filelist_old) > len(filelist_cur):
+        print(f"==> anim filelist {filelist_cur_source} only has {len(filelist_cur)} files - sticking with {filelist_old_source}")
+        return filelist_old_source, filelist_old
+    elif len(filelist_old) == len(filelist_cur):
+        print(f"==> anim filelist {filelist_cur_source} also has {len(filelist_cur)} files - sticking with {filelist_old_source}")
+        return filelist_old_source, filelist_old
+    elif len(filelist_old) < len(filelist_cur):
+        print(f"==> anim filelist {filelist_cur_source} has {len(filelist_cur)} files - switching from {filelist_old_source}")
+        return filelist_cur_source, filelist_cur
+
 def do_run(args):
     global cur_iteration, cur_anim_index
     global anim_cur_zs, anim_next_zs, anim_output_files
@@ -1193,18 +1184,24 @@ def do_run(args):
         #
         if not os.path.exists(args.animation_dir):
             os.mkdir(args.animation_dir)
+        filelist = []
+        filelist_source = None
         if args.overlay_image is not None:
-            filelist = real_glob(args.overlay_image)
-        elif args.target_images is not None:
-            filelist = []
+            filelist_cur = real_glob(args.overlay_image)
+            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "overlay_images", filelist_cur)
+        if args.target_images is not None and len(args.target_images) > 0:
+            filelist_cur = []
             for target_image in args.target_images:
                 f1, weight, stop = parse_prompt(target_image)
                 infiles = real_glob(f1)
-                filelist.extend(infiles)
-        elif args.init_image is not None:
-            filelist = real_glob(args.init_image)
-        else:
+                filelist_cur.extend(infiles)
+            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "target_images", filelist_cur)
+        if args.init_image is not None:
+            filelist_cur = real_glob(args.init_image)
+            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "init_images", filelist_cur)
+        if args.image_prompts is not None and len(args.image_prompts) > 0:
             filelist = args.image_prompts
+            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "image_prompts", filelist_cur)
         num_anim_frames = len(filelist)
         for target_image in filelist:
             basename = os.path.basename(target_image)
