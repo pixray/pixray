@@ -511,7 +511,7 @@ def do_init(args):
         starting_image = starting_image.resize((sideX, sideY), Image.LANCZOS)
 
         if args.init_image:
-            # now we might overlay an init image (init_image also can be recycled as overlay)
+            # now we might overlay an init image
             filelist = None
             if 'http' in args.init_image:
                 init_images = [Image.open(urlopen(args.init_image))]
@@ -548,20 +548,22 @@ def do_init(args):
         # untested
         drawer.rand_init(toksX, toksY)
 
-    if args.overlay_every:
+    if args.overlay_image is not None:
+        # todo: maybe split this up on pipes and whatnot
         overlay_image_rgba_list = []
-        if args.overlay_image:
-            filelist = real_glob(args.overlay_image)
-            for target_image in filelist:
-                overlay_image = Image.open(target_image)
-                overlay_image_rgba = overlay_image.convert('RGBA')
-                overlay_image_rgba = overlay_image_rgba.resize((sideX, sideY), Image.LANCZOS)
-                if args.overlay_alpha:
-                    overlay_image_rgba.putalpha(args.overlay_alpha)
-                overlay_image_rgba_list.append(overlay_image_rgba)
+        if 'http' in args.overlay_image:
+            overlay_images = [Image.open(urlopen(args.overlay_image))]
         else:
-            print("Overlay images missing")
-            sys.exit(1)
+            filelist = real_glob(args.overlay_image)
+            overlay_images = [Image.open(f) for f in filelist]
+
+        for overlay_image in overlay_images:
+            overlay_image_rgba = overlay_image.convert('RGBA')
+            overlay_image_rgba = overlay_image_rgba.resize((sideX, sideY), Image.LANCZOS)
+            if args.overlay_alpha:
+                overlay_image_rgba.putalpha(args.overlay_alpha)
+            overlay_image_rgba_list.append(overlay_image_rgba)
+
         overlay_image_rgba_list[0].save('overlay_image0.png')
 
     pmsTable = {}
@@ -1095,7 +1097,7 @@ def train(args, cur_it):
 
         # if args.overlay_every and cur_it != 0 and \
         #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
-        if args.overlay_every is not None and \
+        if args.overlay_image is not None and \
             (cur_it % args.overlay_every) == args.overlay_offset:
             if cur_anim_index is not None:
                 num_anim_frames = len(overlay_image_rgba_list)
@@ -1330,7 +1332,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-se",   "--save_every", type=int, help="Save image iterations", default=10, dest='save_every')
     vq_parser.add_argument("-de",   "--display_every", type=int, help="Display image iterations", default=20, dest='display_every')
     vq_parser.add_argument("-dc",   "--display_clear", type=bool, help="Clear dispaly when updating", default=False, dest='display_clear')
-    vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=None, dest='overlay_every')
+    vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=10, dest='overlay_every')
     vq_parser.add_argument("-ovo",  "--overlay_offset", type=int, help="Overlay image iteration offset", default=0, dest='overlay_offset')
     vq_parser.add_argument("-ovi",  "--overlay_image", type=str, help="Overlay image (if not init)", default=None, dest='overlay_image')
     vq_parser.add_argument("-qua",  "--quality", type=str, help="draft, normal, best", default="normal", dest='quality')
@@ -1503,8 +1505,8 @@ def process_args(vq_parser, namespace=None):
     if args.target_palette is not None:
         args.target_palette = palette_from_string(args.target_palette)
 
-    if args.overlay_every is not None and args.overlay_every <= 0:
-        args.overlay_every = None
+    if args.overlay_image is not None and args.overlay_every <= 0:
+        args.overlay_image = None
 
     clip_models = args.clip_models.split(",")
     args.clip_models = [model.strip() for model in clip_models]
