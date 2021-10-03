@@ -12,3 +12,11 @@ Pixray is an image generation system. It combines previous ideas including:
 pixray it itself a python library and command line utility, but is also friendly to running on line in Google Colab notebooks.
 
 The system is currently lacking documentation. Instead plese checkout [THE DEMO NOTEBOOKS](https://github.com/dribnet/clipit/tree/master/demos) - especially the super simple "Start Here" colab or join in the [discussion on discord](https://discord.gg/BDZjQ6qq).
+
+## Usage
+
+Pixray can be run in Docker using [Cog](https://github.com/replicate/cog).
+
+First, [install Docker and Cog](https://github.com/replicate/cog#install), then you can use `cog run` to run Pixray inside Docker. For example: 
+
+    cog run python pixray.py --drawer=pixel --prompt=sunrise --output myfile.png

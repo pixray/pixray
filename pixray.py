@@ -13,6 +13,7 @@ import os.path
 
 from omegaconf import OmegaConf
 
+import time
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
@@ -24,7 +25,15 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 from torch_optimizer import DiffGrad, AdamP, RAdam
 from perlin_numpy import generate_fractal_noise_2d
 
-from CLIP import clip
+from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
+
+try:
+    # installed by adding github.com/openai/CLIP to sys.path
+    from CLIP import clip
+except ImportError:
+    # installed by doing `pip install git+https://github.com/openai/CLIP`
+    from clip import clip
+
 import kornia
 import kornia.augmentation as K
 import numpy as np
@@ -416,12 +425,32 @@ def rebuild_optimisers(args):
 
     return new_opts
 
+# used for target image
+def fetch_images(preprocess, image_files):
+    images = []
+
+    for filename in image_files:
+        image = preprocess(Image.open(filename).convert("RGB"))
+        images.append(image)
+
+    return images
+
+def do_image_features(model, images, image_mean, image_std):
+    image_input = torch.tensor(np.stack(images)).cuda()
+    image_input -= image_mean[:, None, None]
+    image_input /= image_std[:, None, None]
+
+    with torch.no_grad():
+        image_features = model.encode_image(image_input).float()
+
+    return image_features
+
 
 def do_init(args):
     global opts, perceptors, normalize, cutoutsTable, cutoutSizeTable
-    global z_orig, z_targets, z_labels, init_image_tensor, target_image_tensor
-    global gside_X, gside_Y, overlay_image_rgba
-    global pmsTable, pmsImageTable, pImages, device, spotPmsTable, spotOffPmsTable
+    global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor
+    global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
+    global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer
 
     # do seed first!
@@ -483,23 +512,32 @@ def do_init(args):
 
         if args.init_image:
             # now we might overlay an init image (init_image also can be recycled as overlay)
+            filelist = None
             if 'http' in args.init_image:
-              init_image = Image.open(urlopen(args.init_image))
+                init_images = [Image.open(urlopen(args.init_image))]
             else:
-              init_image = Image.open(args.init_image)
-            # this version is needed potentially for the loss function
-            init_image_rgb = init_image.convert('RGB')
-            init_image_rgb = init_image_rgb.resize((sideX, sideY), Image.LANCZOS)
-            init_image_tensor = TF.to_tensor(init_image_rgb)
-            init_image_tensor = init_image_tensor.to(device).unsqueeze(0)
+                filelist = real_glob(args.init_image)
+                init_images = [Image.open(f) for f in filelist]
 
-            # this version gets overlaid on the background (noise)
-            init_image_rgba = init_image.convert('RGBA')
-            init_image_rgba = init_image_rgba.resize((sideX, sideY), Image.LANCZOS)
-            top_image = init_image_rgba.copy()
-            if args.init_image_alpha and args.init_image_alpha >= 0:
-                top_image.putalpha(args.init_image_alpha)
-            starting_image.paste(top_image, (0, 0), top_image)
+            init_image_rgba_list = []
+            for init_image in init_images:
+                # this version is needed potentially for the loss function
+                init_image_rgb = init_image.convert('RGB')
+                init_image_rgb = init_image_rgb.resize((sideX, sideY), Image.LANCZOS)
+                init_image_tensor = TF.to_tensor(init_image_rgb)
+                init_image_tensor = init_image_tensor.to(device).unsqueeze(0)
+
+                # this version gets overlaid on the background (noise)
+                init_image_rgba = init_image.convert('RGBA')
+                init_image_rgba = init_image_rgba.resize((sideX, sideY), Image.LANCZOS)
+                top_image = init_image_rgba.copy()
+                if args.init_image_alpha and args.init_image_alpha >= 0:
+                    top_image.putalpha(args.init_image_alpha)
+                cur_start_image = starting_image.copy()
+                cur_start_image.paste(top_image, (0, 0), top_image)
+                init_image_rgba_list.append(cur_start_image)
+
+            starting_image = init_image_rgba_list[0]
 
         starting_image.save("starting_image.png")
         starting_tensor = TF.to_tensor(starting_image)
@@ -511,30 +549,91 @@ def do_init(args):
         drawer.rand_init(toksX, toksY)
 
     if args.overlay_every:
+        overlay_image_rgba_list = []
         if args.overlay_image:
-            if 'http' in args.overlay_image:
-              overlay_image = Image.open(urlopen(args.overlay_image))
-            else:
-              overlay_image = Image.open(args.overlay_image)
-            overlay_image_rgba = overlay_image.convert('RGBA')
-            overlay_image_rgba = overlay_image_rgba.resize((sideX, sideY), Image.LANCZOS)
+            filelist = real_glob(args.overlay_image)
+            for target_image in filelist:
+                overlay_image = Image.open(target_image)
+                overlay_image_rgba = overlay_image.convert('RGBA')
+                overlay_image_rgba = overlay_image_rgba.resize((sideX, sideY), Image.LANCZOS)
+                if args.overlay_alpha:
+                    overlay_image_rgba.putalpha(args.overlay_alpha)
+                overlay_image_rgba_list.append(overlay_image_rgba)
         else:
-            overlay_image_rgba = init_image_rgba
-        if args.overlay_alpha:
-            overlay_image_rgba.putalpha(args.overlay_alpha)
-        overlay_image_rgba.save('overlay_image.png')
+            print("Overlay images missing")
+            sys.exit(1)
+        overlay_image_rgba_list[0].save('overlay_image0.png')
+
+    pmsTable = {}
+    pmsImageTable = {}
+    pmsTargetTable = {}
+    spotPmsTable = {}
+    spotOffPmsTable = {}
+    for clip_model in args.clip_models:
+        pmsTable[clip_model] = []
+        pmsImageTable[clip_model] = []
+        pmsTargetTable[clip_model] = []
+        spotPmsTable[clip_model] = []
+        spotOffPmsTable[clip_model] = []
 
     if args.target_images is not None:
-        z_targets = []
-        filelist = real_glob(args.target_images)
-        for target_image in filelist:
-            target_image = Image.open(target_image)
-            target_image_rgb = target_image.convert('RGB')
-            target_image_rgb = target_image_rgb.resize((sideX, sideY), Image.LANCZOS)
-            target_image_tensor_local = TF.to_tensor(target_image_rgb)
-            target_image_tensor = target_image_tensor_local.to(device).unsqueeze(0) * 2 - 1
-            z_target = drawer.get_z_from_tensor(target_image_tensor)
-            z_targets.append(z_target)
+        if args.animation_dir is not None:
+            for clip_model in args.clip_models:
+                pmsTarget = pmsTargetTable[clip_model]
+                perceptor = perceptors[clip_model]
+
+                input_resolution = perceptor.visual.input_resolution
+                # print(f"Running {clip_model} at {input_resolution}")
+                preprocess = Compose([
+                    Resize(input_resolution, interpolation=Image.BICUBIC),
+                    CenterCrop(input_resolution),
+                    ToTensor()
+                ])
+                image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
+                image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
+
+                input_files = []
+                for target_image in args.target_images:
+                    f1, weight, stop = parse_prompt(target_image)
+                    infiles = real_glob(f1)
+                    input_files.extend(infiles)
+
+                for path in input_files:
+                    images = fetch_images(preprocess, [path])
+                    features = do_image_features(perceptor, images, image_mean, image_std)
+                    pmsTarget.append(Prompt(features, weight, stop).to(device))
+        else:
+            for clip_model in args.clip_models:
+                pMs = pmsTable[clip_model]
+                perceptor = perceptors[clip_model]
+
+                input_resolution = perceptor.visual.input_resolution
+                # print(f"Running {clip_model} at {input_resolution}")
+                preprocess = Compose([
+                    Resize(input_resolution, interpolation=Image.BICUBIC),
+                    CenterCrop(input_resolution),
+                    ToTensor()
+                ])
+                image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
+                image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
+
+                input_files = []
+                for target_image in args.target_images:
+                    f1, weight, stop = parse_prompt(target_image)
+                    # print("Target parse ", target_image, "to", f1)
+                    if 'http' in f1:
+                        # note: this is currently untested...
+                        infile = urlopen(f1)
+                        input_files.apped(infile)
+                    else:
+                        infiles = real_glob(f1)
+                        input_files.extend(infiles)
+
+                print(input_files)
+                images = fetch_images(preprocess, input_files);
+
+                features = do_image_features(perceptor, images, image_mean, image_std)
+                pMs.append(Prompt(features, weight, stop).to(device))
 
     if args.image_labels is not None:
         z_labels = []
@@ -557,15 +656,6 @@ def do_init(args):
 
     z_orig = drawer.get_z_copy()
 
-    pmsTable = {}
-    pmsImageTable = {}
-    spotPmsTable = {}
-    spotOffPmsTable = {}
-    for clip_model in args.clip_models:
-        pmsTable[clip_model] = []
-        pmsImageTable[clip_model] = []
-        spotPmsTable[clip_model] = []
-        spotOffPmsTable[clip_model] = []
     normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
                                       std=[0.26862954, 0.26130258, 0.27577711])
 
@@ -585,16 +675,25 @@ def do_init(args):
         weight = 0.1 * weight
         if 'http' in f1:
             # note: this is currently untested...
-            infile = urlopen(f1)
+            infile = None
+            infile_handle = urlopen(f1)
         elif 'json' in f1:
             infile = f1
         else:
             infile = f"vectors/{f1}.json"
             if not os.path.exists(infile):
                 infile = f"pixray/vectors/{f1}.json"
-        with open(infile) as f_in:
-            vect_table = json.load(f_in)
+        if infile:
+            with open(infile) as f_in:
+                vect_table = json.load(f_in)
+        else:
+            vect_table = json.load(infile_handle)
         for clip_model in args.clip_models:
+            if clip_model not in vect_table:
+                print(f"WARNING: no vector for {clip_model} in {f1}!")
+                print("Continuing... (BUT THIS RESULT MIGHT NOT BE WHAT YOU WANT 😬)")
+                time.sleep(3)
+                continue
             pMs = pmsTable[clip_model]
             v = np.array(vect_table[clip_model])
             embed = torch.FloatTensor(v).to(device).float()
@@ -658,14 +757,14 @@ def do_init(args):
     if args.image_prompts:
         print('Using #image prompts:', len(args.image_prompts))
     if args.init_image:
-        print('Using initial image:', args.init_image)
+        print(f'Using initial image {args.init_image} ({len(init_image_rgba_list)})')
     if args.noise_prompt_weights:
         print('Noise prompt weights:', args.noise_prompt_weights)
 
 
 # dreaded globals (for now)
 z_orig = None
-z_targets = None
+im_targets = None
 z_labels = None
 opts = None
 drawer = None
@@ -679,8 +778,11 @@ pmsTable = None
 spotPmsTable = None 
 spotOffPmsTable = None 
 pmsImageTable = None
+pmsTargetTable = None
 gside_X=None
 gside_Y=None
+init_image_rgba_list=[]
+overlay_image_rgba_list=None
 overlay_image_rgba=None
 device=None
 cur_iteration=None
@@ -777,8 +879,9 @@ def checkin(args, iter, losses):
 
 def ascend_txt(args):
     global cur_iteration, cur_anim_index, perceptors, normalize, cutoutsTable, cutoutSizeTable
-    global z_orig, z_targets, z_labels, init_image_tensor, target_image_tensor, drawer
+    global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
     global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode
+    global pmsTargetTable
 
     out = drawer.synth(cur_iteration);
 
@@ -821,20 +924,29 @@ def ascend_txt(args):
             for prompt in spotOffPms:
                 result.append(prompt(iii_so))
 
-        pMs = pmsTable[clip_model]
         iii = perceptor.encode_image(normalize( cur_cutouts[cutoutSize] )).float()
+
+        pMs = pmsTable[clip_model]
         for prompt in pMs:
             result.append(prompt(iii))
+
+        # add target frame prompts if applicable
+        if cur_anim_index is not None and len(pmsTargetTable[clip_model]) > 0:
+            num_anim_frames = len(pmsTargetTable[clip_model])
+            pmsTarget = [ pmsTargetTable[clip_model][cur_anim_index % num_anim_frames] ]
+            for prompt in pmsTarget:
+                result.append(prompt(iii))
 
         # If there are image prompts we make cutouts for those each time
         # so that they line up with the current cutouts from augmentation
         make_cutouts = cutoutsTable[cutoutSize]
 
         # if animating select one pImage, otherwise use them all
-        if cur_anim_index is None:
-            pImages = pmsImageTable[clip_model]
+        if cur_anim_index is not None and len(pmsImageTable[clip_model]) > 0:
+            num_anim_frames = len(pmsImageTable[clip_model])
+            pImages = [ pmsImageTable[clip_model][cur_anim_index % num_anim_frames] ]
         else:
-            pImages = [ pmsImageTable[clip_model][cur_anim_index] ]
+            pImages = pmsImageTable[clip_model]
         
         for timg in pImages:
             # note: this caches and reuses the transforms - a bit of a hack but it works
@@ -897,27 +1009,6 @@ def ascend_txt(args):
         make_cutouts = cutoutsTable[cutoutSize]
         make_cutouts.transforms = None
 
-    # main init_weight uses spherical loss
-    if args.target_images is not None and args.target_image_weight > 0:
-        if cur_anim_index is None:
-            cur_z_targets = z_targets
-        else:
-            cur_z_targets = [ z_targets[cur_anim_index] ]
-        for z_target in cur_z_targets:
-            f_z = drawer.get_z()
-            if f_z is not None:
-                f = f_z.reshape(1,-1)
-                f2 = z_target.reshape(1,-1)
-                cur_loss = spherical_dist_loss(f, f2) * args.target_image_weight
-                result.append(cur_loss)
-
-    if args.target_weight_pix:
-        if target_image_tensor is None:
-            print("OOPS TIT is 0")
-        else:
-            cur_loss = F.l1_loss(out, target_image_tensor) * args.target_weight_pix
-            result.append(cur_loss)
-
     if args.image_labels is not None:
         for z_label in z_labels:
             f = drawer.get_z().reshape(1,-1)
@@ -968,8 +1059,15 @@ def re_average_z(args):
     if overlay_image_rgba:
         # print("applying overlay image")
         cur_z_image.paste(overlay_image_rgba, (0, 0), overlay_image_rgba)
-        cur_z_image.save("overlaid.png")
+        # cur_z_image.save("overlaid.png")
     cur_z_image = cur_z_image.resize((gside_X, gside_Y), Image.LANCZOS)
+    drawer.reapply_from_tensor(TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1)
+
+def init_anim_z(args, init_rgba):
+    global gside_X, gside_Y
+    global device, drawer
+
+    cur_z_image = init_rgba.copy()
     drawer.reapply_from_tensor(TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1)
 
 # torch.autograd.set_detect_anomaly(True)
@@ -977,6 +1075,9 @@ def re_average_z(args):
 def train(args, cur_it):
     global drawer, opts
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
+    global overlay_image_rgba, overlay_image_rgba_list, cur_anim_index, init_image_rgba_list
+    
+    rebuild_opts_when_done = False
 
     lossAll = None
     if cur_it < args.iterations:
@@ -987,7 +1088,19 @@ def train(args, cur_it):
             # opt.zero_grad(set_to_none=True)
             opt.zero_grad()
 
-        # print("drops at ", args.learning_rate_drops)
+        if cur_it == 0 and len(init_image_rgba_list) > 0:
+            if cur_anim_index is not None:
+                num_anim_frames = len(init_image_rgba_list)
+                init_anim_z(args, init_image_rgba_list[cur_anim_index % num_anim_frames])
+
+        # if args.overlay_every and cur_it != 0 and \
+        #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
+        if args.overlay_every is not None and \
+            (cur_it % args.overlay_every) == args.overlay_offset:
+            if cur_anim_index is not None:
+                num_anim_frames = len(overlay_image_rgba_list)
+                overlay_image_rgba = overlay_image_rgba_list[cur_anim_index % num_anim_frames]
+            re_average_z(args)
 
         # num_batches = args.batches * (num_loss_drop + 1)
         num_batches = args.batches
@@ -995,13 +1108,14 @@ def train(args, cur_it):
             lossAll = ascend_txt(args)
 
             if i == 0:
-                if cur_it in args.learning_rate_drops:
-                    print("Dropping learning rate")
-                    rebuild_opts_when_done = True
-                else:
-                    did_drop = checkdrop(args, cur_it, lossAll)
-                    if args.auto_stop is True:
-                        rebuild_opts_when_done = disabl
+                if cur_anim_index is None or cur_anim_index == 0:
+                    if cur_it in args.learning_rate_drops:
+                        print("Dropping learning rate")
+                        rebuild_opts_when_done = True
+                    else:
+                        did_drop = checkdrop(args, cur_it, lossAll)
+                        if args.auto_stop is True:
+                            rebuild_opts_when_done = disabl
 
             if i == 0 and cur_it % args.save_every == 0:
                 checkin(args, cur_it, lossAll)
@@ -1011,10 +1125,6 @@ def train(args, cur_it):
 
         for opt in opts:
             opt.step()
-
-        if args.overlay_every and cur_it != 0 and \
-            (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
-            re_average_z(args)
 
         drawer.clip_z()
 
@@ -1046,6 +1156,20 @@ imagenet_templates = [
     "a photo of the small {}.",
 ]
 
+def check_new_filelist(filelist_old_source, filelist_old, filelist_cur_source, filelist_cur):
+    if filelist_old_source is None:
+        print(f"==> setting animation filelist to {filelist_cur_source} ({len(filelist_cur)} files)")
+        return filelist_cur_source, filelist_cur
+    elif len(filelist_old) > len(filelist_cur):
+        print(f"==> anim filelist {filelist_cur_source} only has {len(filelist_cur)} files - sticking with {filelist_old_source}")
+        return filelist_old_source, filelist_old
+    elif len(filelist_old) == len(filelist_cur):
+        print(f"==> anim filelist {filelist_cur_source} also has {len(filelist_cur)} files - sticking with {filelist_old_source}")
+        return filelist_old_source, filelist_old
+    elif len(filelist_old) < len(filelist_cur):
+        print(f"==> anim filelist {filelist_cur_source} has {len(filelist_cur)} files - switching from {filelist_old_source}")
+        return filelist_cur_source, filelist_cur
+
 def do_run(args):
     global cur_iteration, cur_anim_index
     global anim_cur_zs, anim_next_zs, anim_output_files
@@ -1060,10 +1184,24 @@ def do_run(args):
         #
         if not os.path.exists(args.animation_dir):
             os.mkdir(args.animation_dir)
-        if args.target_images is not None:
-            filelist = real_glob(args.target_images)
-        else:
+        filelist = []
+        filelist_source = None
+        if args.overlay_image is not None:
+            filelist_cur = real_glob(args.overlay_image)
+            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "overlay_images", filelist_cur)
+        if args.target_images is not None and len(args.target_images) > 0:
+            filelist_cur = []
+            for target_image in args.target_images:
+                f1, weight, stop = parse_prompt(target_image)
+                infiles = real_glob(f1)
+                filelist_cur.extend(infiles)
+            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "target_images", filelist_cur)
+        if args.init_image is not None:
+            filelist_cur = real_glob(args.init_image)
+            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "init_images", filelist_cur)
+        if args.image_prompts is not None and len(args.image_prompts) > 0:
             filelist = args.image_prompts
+            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "image_prompts", filelist_cur)
         num_anim_frames = len(filelist)
         for target_image in filelist:
             basename = os.path.basename(target_image)
@@ -1205,8 +1343,6 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-iia",  "--init_image_alpha", type=int, help="Init image alpha (0-255)", default=200, dest='init_image_alpha')
     vq_parser.add_argument("-in",   "--init_noise", type=str, help="Initial noise image (pixels or gradient)", default="pixels", dest='init_noise')
     vq_parser.add_argument("-ti",   "--target_images", type=str, help="Target images", default=None, dest='target_images')
-    vq_parser.add_argument("-tiw",  "--target_image_weight", type=float, help="Target images weight", default=1.0, dest='target_image_weight')
-    vq_parser.add_argument("-twp",  "--target_weight_pix", type=float, help="Target weight pix loss", default=0., dest='target_weight_pix')
     vq_parser.add_argument("-anim", "--animation_dir", type=str, help="Animation output dir", default=None, dest='animation_dir')    
     vq_parser.add_argument("-ana",  "--animation_alpha", type=int, help="Forward blend for consistency", default=128, dest='animation_alpha')
     vq_parser.add_argument("-iw",   "--init_weight", type=float, help="Initial weight (main=spherical)", default=None, dest='init_weight')
@@ -1341,6 +1477,10 @@ def process_args(vq_parser, namespace=None):
         args.prompts = [phrase.strip() for phrase in args.prompts.split("|")]
 
     # Split text prompts using the pipe character
+    if args.target_images:
+        args.target_images = [phrase.strip() for phrase in args.target_images.split("|")]
+
+    # Split text prompts using the pipe character
     if args.spot_prompts:
         args.spot_prompts = [phrase.strip() for phrase in args.spot_prompts.split("|")]
 
@@ -1421,7 +1561,7 @@ def apply_settings():
     # first pass - just get the drawer
     # Create the parser
     vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
-    vq_parser.add_argument("--drawer", type=str, help="clipdraw, pixeldraw, etc", default="vqgan", dest='drawer')
+    vq_parser.add_argument("--drawer", type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = vq_parser.parse_known_args(namespace=settingsDict)
 
