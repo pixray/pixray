@@ -1,0 +1,5 @@
+quality: "draft"
+drawer: vqgan
+iterations: 100
+prompts: "sunset in the city"
+output: outputs/hello_pixray.png
