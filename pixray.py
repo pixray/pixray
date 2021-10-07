@@ -43,6 +43,8 @@ import random
 
 from einops import rearrange
 
+from colorlookup import ColorLookup
+
 from PIL import ImageFile, Image, PngImagePlugin
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -394,7 +396,7 @@ def resize_image(image, out_size):
 
 def rebuild_optimisers(args):
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
-    global drawer
+    global drawer, color_mapper
 
     drop_divisor = 10 ** num_loss_drop
     new_opts = drawer.get_opts(drop_divisor)
@@ -451,7 +453,7 @@ def do_init(args):
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
-    global drawer
+    global drawer, color_mapper
 
     # do seed first!
     if args.seed is None:
@@ -491,6 +493,13 @@ def do_init(args):
         if not cut_size in cutoutsTable:    
             make_cutouts = MakeCutouts(cut_size, args.num_cuts, cut_pow=args.cut_pow)
             cutoutsTable[cut_size] = make_cutouts
+
+    if args.color_mapper is not None:
+        if args.color_mapper == "lookup":
+            color_mapper = ColorLookup(args.target_palette, device=device)
+        else:
+            print(f"Color mapper {args.color_mapper} not understood")
+            sys.exit(1)
 
     init_image_tensor = None
     target_image_tensor = None
@@ -770,6 +779,7 @@ im_targets = None
 z_labels = None
 opts = None
 drawer = None
+color_mapper = None
 perceptors = {}
 normalize = None
 cutoutsTable = {}
@@ -841,7 +851,7 @@ def checkdrop(args, iter, losses):
 
 @torch.no_grad()
 def checkin(args, iter, losses):
-    global drawer
+    global drawer, color_mapper
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
     num_cycles_not_best = iter - best_iter
@@ -859,6 +869,8 @@ def checkin(args, iter, losses):
     info = PngImagePlugin.PngInfo()
     info.add_text('comment', f'{args.prompts}')
     timg = drawer.synth(cur_iteration)
+    if color_mapper is not None:
+        timg, closs = color_mapper(timg);
     img = TF.to_pil_image(timg[0].cpu())
     # img = drawer.to_image()
     if cur_anim_index is None:
@@ -888,6 +900,10 @@ def ascend_txt(args):
     out = drawer.synth(cur_iteration);
 
     result = []
+
+    if color_mapper is not None:
+        out, c_loss = color_mapper(out);
+        result.append(c_loss);
 
     if (cur_iteration%2 == 0):
         global_padding_mode = 'reflection'
@@ -1365,7 +1381,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
-    vq_parser.add_argument("-mo",   "--do_mono", type=bool, help="Monochromatic", default=False, dest='do_mono')
+    vq_parser.add_argument("-cm",   "--color_mapper", type=str, help="Color Mapping", default=None, dest='color_mapper')
     vq_parser.add_argument("-epw",  "--enforce_palette_annealing", type=int, help="enforce palette annealing, 0 -- skip", default=5000, dest='enforce_palette_annealing')
     vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
     vq_parser.add_argument("-tpl",  "--target_palette_length", type=int, help="target palette length", default=16, dest='target_palette_length')
