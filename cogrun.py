@@ -6,17 +6,29 @@ import yaml
 import pathlib
 import os
 
-class Predictor(cog.Predictor):
+# https://stackoverflow.com/a/6587648/1010653
+import tempfile, shutil
+def create_temporary_copy(src_path):
+    _, tf_suffix = os.path.splitext(src_path)
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, f"tempfile{tf_suffix}")
+    shutil.copy2(src_path, temp_path)
+    return temp_path
+
+class BasePixrayPredictor(cog.Predictor):
     def setup(self):
+        print("---> BasePixrayPredictor Setup")
+        os.environ['TRANSFORMERS_CACHE'] = 'models/'
         pixray.reset_settings()
 
     # Define the input types for a prediction
-    @cog.input("settings", type=Path, help="Image to classify")
+    @cog.input("settings", type=str, help="Image to classify")
     @cog.input("prompts", type=str, help="New Prompts")
     def predict(self, settings, prompts):
         """Run a single prediction on the model"""
-        # settings_file = f"cogs/{settings}.yaml"
-        with open(settings, 'r') as stream:
+        print("---> BasePixrayPredictor Predict")
+        settings_file = f"cogs/{settings}.yaml"
+        with open(settings_file, 'r') as stream:
           try:
               base_settings = yaml.safe_load(stream)
           except yaml.YAMLError as exc:
@@ -27,11 +39,13 @@ class Predictor(cog.Predictor):
         if prompts is not None and prompts != "":
           pixray.add_settings(prompts=prompts)
         settings = pixray.apply_settings()
-        print("---> ", settings.output)
         pixray.do_init(settings)
         pixray.do_run(settings)
-        print("---> ", settings.output)
-        print(os.getcwd())
-        # print(os.path.dirname(os.path.realpath(settings.output)))
-        # return pathlib.Path(settings.output)
-        return pathlib.Path(os.path.realpath(settings.output))
+        temp_copy = create_temporary_copy(settings.output)
+        print(temp_copy)
+        return pathlib.Path(os.path.realpath(temp_copy))
+
+class PixrayVqgan(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="New Prompts")
+    def predict(self, prompts):
+        super().predict(settings="pixray_vqgan", prompts=prompts)

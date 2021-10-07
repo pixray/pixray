@@ -1,0 +1,4 @@
+quality: "draft"
+drawer: vqgan
+iterations: 100
+output: outputs/pixray_vqgan.png
