@@ -763,6 +763,8 @@ def do_init(args):
     if args.noise_prompt_weights:
         print('Noise prompt weights:', args.noise_prompt_weights)
 
+    cur_iteration = 0
+
 
 # dreaded globals (for now)
 z_orig = None
@@ -1172,11 +1174,11 @@ def check_new_filelist(filelist_old_source, filelist_old, filelist_cur_source, f
         print(f"==> anim filelist {filelist_cur_source} has {len(filelist_cur)} files - switching from {filelist_old_source}")
         return filelist_cur_source, filelist_cur
 
-def do_run(args):
+# return only once to run only one iteration
+# returns True when complete, False otherwise
+def do_run(args, return_display=False):
     global cur_iteration, cur_anim_index
     global anim_cur_zs, anim_next_zs, anim_output_files
-
-    cur_iteration = 0
 
     if args.animation_dir is not None:
         # we already have z_targets. setup some sort of global ring
@@ -1254,7 +1256,11 @@ def do_run(args):
                         if cur_iteration == args.iterations:
                             break
                         cur_iteration += 1
-                        pbar.update()
+                        if not hasattr(args, 'skip_args'):
+                            pbar.update()
+                        if keep_going and return_display and cur_iteration % args.display_every == 0:
+                            # print("Returning after iteration ", cur_iteration)
+                            return False
                     except RuntimeError as e:
                         print("Oops: runtime error: ", e)
                         print("Try reducing --num-cuts to save memory")
@@ -1264,6 +1270,8 @@ def do_run(args):
 
     if args.make_video:
         do_video(args)
+
+    return True
 
 def do_video(args):
     global cur_iteration
@@ -1385,16 +1393,16 @@ def process_args(vq_parser, namespace=None):
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
     if namespace == None:
-      # command line: use ARGV to get args
-      args = vq_parser.parse_args()
-    elif isnotebook():
-      args = vq_parser.parse_args(args=[], namespace=namespace)
+        # command line: use ARGV to get args
+        args = vq_parser.parse_args()
+    elif isnotebook() or hasattr(namespace, 'skip_args'):
+        args = vq_parser.parse_args(args=[], namespace=namespace)
     else:
-      # sometimes there are both settings and cmd line
-      args = vq_parser.parse_args(namespace=namespace)        
+        # sometimes there are both settings and cmd line
+        args = vq_parser.parse_args(namespace=namespace)        
 
     if args.cudnn_determinism:
-       torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.deterministic = True
 
     quality_to_clip_models_table = {
         'draft': 'ViT-B/32',
@@ -1574,7 +1582,7 @@ def apply_settings():
         # check for any bogus entries in the settings
         dests = [d.dest for d in vq_parser._actions]
         for k in global_pixray_settings:
-            if not k in dests:
+            if not k in dests and k != "skip_args":
                 raise ValueError(f"Requested setting not found, aborting: {k}={global_pixray_settings[k]}")
 
         # convert dictionary to easyDict

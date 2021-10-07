@@ -18,15 +18,16 @@ def create_temporary_copy(src_path):
 class BasePixrayPredictor(cog.Predictor):
     def setup(self):
         print("---> BasePixrayPredictor Setup")
-        os.environ['TRANSFORMERS_CACHE'] = 'models/'
+        os.environ['TORCH_HOME'] = 'models/'
         pixray.reset_settings()
 
     # Define the input types for a prediction
-    @cog.input("settings", type=str, help="Image to classify")
-    @cog.input("prompts", type=str, help="New Prompts")
-    def predict(self, settings, prompts):
+    @cog.input("settings", type=str, help="Default settings to use")
+    @cog.input("prompts", type=str, help="Text Prompts")
+    def predict(self, settings, **kwargs):
         """Run a single prediction on the model"""
         print("---> BasePixrayPredictor Predict")
+        os.environ['TORCH_HOME'] = 'models/'
         settings_file = f"cogs/{settings}.yaml"
         with open(settings_file, 'r') as stream:
           try:
@@ -36,16 +37,19 @@ class BasePixrayPredictor(cog.Predictor):
               sys.exit(1)
 
         pixray.add_settings(**base_settings)
-        if prompts is not None and prompts != "":
-          pixray.add_settings(prompts=prompts)
+        pixray.add_settings(**kwargs)
+        pixray.add_settings(skip_args=True)
         settings = pixray.apply_settings()
         pixray.do_init(settings)
-        pixray.do_run(settings)
-        temp_copy = create_temporary_copy(settings.output)
-        print(temp_copy)
-        return pathlib.Path(os.path.realpath(temp_copy))
+        run_complete = False
+        while run_complete == False:
+            run_complete = pixray.do_run(settings, return_display=True)
+            temp_copy = create_temporary_copy(settings.output)
+            yield pathlib.Path(os.path.realpath(temp_copy))
 
 class PixrayVqgan(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="New Prompts")
-    def predict(self, prompts):
-        super().predict(settings="pixray_vqgan", prompts=prompts)
+    @cog.input("prompts", type=str, help="Text Prompts")
+    @cog.input("quality", type=str, help="Better is slower", default="normal", options=["draft", "normal", "better", "best"])
+    @cog.input("aspect", type=str, help="Wide vs square", default="widescreen", options=["widescreen", "square"])
+    def predict(self, **kwargs):
+        yield from super().predict(settings="pixray_vqgan", **kwargs)
