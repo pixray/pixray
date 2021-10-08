@@ -1,3 +1,4 @@
 drawer: vqgan
 display_every: 10
 output: outputs/pixray_vqgan.png
+vector_prompts: textoff

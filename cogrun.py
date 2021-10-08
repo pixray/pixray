@@ -48,8 +48,15 @@ class BasePixrayPredictor(cog.Predictor):
             yield pathlib.Path(os.path.realpath(temp_copy))
 
 class PixrayVqgan(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="Text Prompts")
-    @cog.input("quality", type=str, help="Better is slower", default="normal", options=["draft", "normal", "better", "best"])
+    @cog.input("prompts", type=str, help="text prompt", default="rainbow mountain")
+    @cog.input("quality", type=str, help="better is slower", default="normal", options=["draft", "normal", "better", "best"])
     @cog.input("aspect", type=str, help="Wide vs square", default="widescreen", options=["widescreen", "square"])
     def predict(self, **kwargs):
         yield from super().predict(settings="pixray_vqgan", **kwargs)
+
+class PixrayPixel(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="text prompt", default="Beirut Skyline. #pixelart")
+    @cog.input("aspect", type=str, help="wide vs square", default="widescreen", options=["widescreen", "square"])
+    @cog.input("drawer", type=str, help="render engine", default="pixel", options=["pixel", "vqgan", "line_sketch", "clipdraw"])
+    def predict(self, **kwargs):
+        yield from super().predict(settings="pixray_pixel", **kwargs)
