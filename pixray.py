@@ -447,13 +447,15 @@ def do_image_features(model, images, image_mean, image_std):
 
     return image_features
 
-
+# note: this should probably be split into a setup and a session init
 def do_init(args):
     global opts, perceptors, normalize, cutoutsTable, cutoutSizeTable
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer, color_mapper
+
+    reset_session_globals()
 
     # do seed first!
     if args.seed is None:
@@ -466,8 +468,9 @@ def do_init(args):
     np.random.seed(int_seed)
     random.seed(int_seed)
 
-    # Do it (init that is)
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # set device only once
+    if device is None:
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     drawer = class_table[args.drawer](args)
     drawer.load_model(args, device)
@@ -484,10 +487,19 @@ def do_init(args):
     gside_X = sideX
     gside_Y = sideY
 
-    for clip_model in args.clip_models:
-        perceptor = clip.load(clip_model, jit=jit, download_root="models")[0].eval().requires_grad_(False).to(device)
-        perceptors[clip_model] = perceptor
+    # model loading optimization: if all models are loaded keep things as they are
+    if set(args.clip_models) <= set(perceptors.keys()):
+        print("All CLIP models already loaded: ", args.clip_models)
+    else:
+        # TODO: unload models?
+        perceptors = {}
+        for clip_model in args.clip_models:
+            perceptor = clip.load(clip_model, jit=jit, download_root="models")[0].eval().requires_grad_(False).to(device)
+            perceptors[clip_model] = perceptor
 
+    # now separately setup cuts
+    for clip_model in args.clip_models:
+        perceptor = perceptors[clip_model]
         cut_size = perceptor.visual.input_resolution
         cutoutSizeTable[clip_model] = cut_size
         if not cut_size in cutoutsTable:    
@@ -775,17 +787,14 @@ def do_init(args):
     cur_iteration = 0
 
 
-# dreaded globals (for now)
+# dreaded unsorted globals (for now)
 z_orig = None
 im_targets = None
 z_labels = None
 opts = None
 drawer = None
 color_mapper = None
-perceptors = {}
 normalize = None
-cutoutsTable = {}
-cutoutSizeTable = {}
 init_image_tensor = None
 target_image_tensor = None
 pmsTable = None
@@ -798,7 +807,6 @@ gside_Y=None
 init_image_rgba_list=[]
 overlay_image_rgba_list=None
 overlay_image_rgba=None
-device=None
 cur_iteration=None
 cur_anim_index=None
 anim_output_files=[]
@@ -810,6 +818,21 @@ best_z = None
 num_loss_drop = 0
 max_loss_drops = 2
 iter_drop_delay = 20
+
+# session globals
+cutoutsTable = {}
+cutoutSizeTable = {}
+
+# persistent globals
+perceptors = {}
+device=None
+
+
+# on re-runs this should reset most important globals
+def reset_session_globals():
+    global cutoutsTable, cutoutSizeTable
+    cutoutsTable = {}
+    cutoutSizeTable = {}
 
 def make_gif(args, iter):
     gif_output = os.path.join(args.animation_dir, "anim.gif")

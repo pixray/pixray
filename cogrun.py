@@ -19,7 +19,6 @@ class BasePixrayPredictor(cog.Predictor):
     def setup(self):
         print("---> BasePixrayPredictor Setup")
         os.environ['TORCH_HOME'] = 'models/'
-        pixray.reset_settings()
 
     # Define the input types for a prediction
     @cog.input("settings", type=str, help="Default settings to use")
@@ -36,6 +35,7 @@ class BasePixrayPredictor(cog.Predictor):
               print("YAML ERROR", exc)
               sys.exit(1)
 
+        pixray.reset_settings()
         pixray.add_settings(**base_settings)
         pixray.add_settings(**kwargs)
         pixray.add_settings(skip_args=True)

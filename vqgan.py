@@ -79,6 +79,8 @@ class ClampWithGrad(torch.autograd.Function):
 
 clamp_with_grad = ClampWithGrad.apply
 
+global_model_cache = {}
+
 class VqganDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
@@ -92,6 +94,7 @@ class VqganDrawer(DrawingInterface):
         self.vqgan_model = settings.vqgan_model
 
     def load_model(self, settings, device):
+        global global_model_cache
         gumbel = False
 
         if settings.vqgan_config is None:
@@ -109,27 +112,37 @@ class VqganDrawer(DrawingInterface):
         if not os.path.exists(checkpoint_path):
             wget_file(vqgan_checkpoint_table[self.vqgan_model], checkpoint_path)
 
-        config = OmegaConf.load(config_path)
-        if config.model.target == 'taming.models.vqgan.VQModel':
-            model = vqgan.VQModel(**config.model.params)
-            model.eval().requires_grad_(False)
-            model.init_from_ckpt(checkpoint_path)
-        elif config.model.target == 'taming.models.vqgan.GumbelVQ':
-            model = vqgan.GumbelVQ(**config.model.params)
-            model.eval().requires_grad_(False)
-            model.init_from_ckpt(checkpoint_path)
-            gumbel = True
-        elif config.model.target == 'taming.models.cond_transformer.Net2NetTransformer':
-            parent_model = cond_transformer.Net2NetTransformer(**config.model.params)
-            parent_model.eval().requires_grad_(False)
-            parent_model.init_from_ckpt(checkpoint_path)
-            model = parent_model.first_stage_model
+        if checkpoint_path in global_model_cache:
+            print("reusing cached copy of model ", checkpoint_path)
+            cache_hit = global_model_cache[checkpoint_path]
+            model = cache_hit["model"]
+            gumbel = cache_hit["gumbel"]
         else:
-            raise ValueError(f'unknown model type: {config.model.target}')
-        del model.loss
+            # TODO: unload if cache not empty?
+            config = OmegaConf.load(config_path)
+            if config.model.target == 'taming.models.vqgan.VQModel':
+                model = vqgan.VQModel(**config.model.params)
+                model.eval().requires_grad_(False)
+                model.init_from_ckpt(checkpoint_path)
+            elif config.model.target == 'taming.models.vqgan.GumbelVQ':
+                model = vqgan.GumbelVQ(**config.model.params)
+                model.eval().requires_grad_(False)
+                model.init_from_ckpt(checkpoint_path)
+                gumbel = True
+            elif config.model.target == 'taming.models.cond_transformer.Net2NetTransformer':
+                parent_model = cond_transformer.Net2NetTransformer(**config.model.params)
+                parent_model.eval().requires_grad_(False)
+                parent_model.init_from_ckpt(checkpoint_path)
+                model = parent_model.first_stage_model
+            else:
+                raise ValueError(f'unknown model type: {config.model.target}')
+            del model.loss
+            model = model.to(device)
+            cache_entry = {"model": model, "gumbel": gumbel}
+            global_model_cache[checkpoint_path] = cache_entry
 
         # model, gumbel = load_vqgan_model(vqgan_config, vqgan_checkpoint)
-        self.model = model.to(device)
+        self.model = model
         self.gumbel = gumbel
         self.device = device
 
