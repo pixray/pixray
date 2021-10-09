@@ -23,7 +23,13 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 from torch_optimizer import DiffGrad, AdamP, RAdam
 from perlin_numpy import generate_fractal_noise_2d
 
-from CLIP import clip
+# todo: fix this mess
+try:
+    # installed by adding github.com/openai/CLIP to sys.path
+    from CLIP import clip
+except ImportError:
+    # installed by doing `pip install git+https://github.com/openai/CLIP`
+    from clip import clip
 import kornia
 import kornia.augmentation as K
 import numpy as np
