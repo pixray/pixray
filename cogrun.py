@@ -50,7 +50,9 @@ class BasePixrayPredictor(cog.Predictor):
 class PixrayVqgan(BasePixrayPredictor):
     @cog.input("prompts", type=str, help="text prompt", default="rainbow mountain")
     @cog.input("quality", type=str, help="better is slower", default="normal", options=["draft", "normal", "better", "best"])
-    @cog.input("aspect", type=str, help="Wide vs square", default="widescreen", options=["widescreen", "square"])
+    @cog.input("aspect", type=str, help="wide vs square", default="widescreen", options=["widescreen", "square"])
+    # @cog.input("num_cuts", type=int, default="24", min=4, max=96)
+    # @cog.input("batches", type=int, default="1", min=1, max=32)
     def predict(self, **kwargs):
         yield from super().predict(settings="pixray_vqgan", **kwargs)
 

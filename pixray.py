@@ -1447,27 +1447,39 @@ def process_args(vq_parser, namespace=None):
         'draft': 'ViT-B/32',
         'normal': 'ViT-B/32,ViT-B/16',
         'better': 'RN50,ViT-B/32,ViT-B/16',
-        'best': 'RN50x4,ViT-B/32,ViT-B/16'
+        'best': 'RN50x4,ViT-B/32,ViT-B/16',
+        'supreme': 'RN50x16,ViT-B/32,ViT-B/16'
     }
     quality_to_iterations_table = {
         'draft': 200,
-        'normal': 300,
-        'better': 400,
-        'best': 500
+        'normal': 250,
+        'better': 300,
+        'best': 350,
+        'supreme': 400
     }
     quality_to_scale_table = {
         'draft': 1,
         'normal': 2,
         'better': 3,
-        'best': 4
+        'best': 4,
+        'supreme': 5
     }
     # this should be replaced with logic that does somethings
     # smart based on available memory (eg: size, num_models, etc)
     quality_to_num_cuts_table = {
-        'draft': 40,
-        'normal': 40,
-        'better': 40,
-        'best': 40
+        'draft': 32,
+        'normal': 48,
+        'better': 32,
+        'best': 10,
+        'supreme': 8
+    }
+
+    quality_to_batches_table = {
+        'draft': 1,
+        'normal': 1,
+        'better': 2,
+        'best': 8,
+        'supreme': 12
     }
 
     if args.quality not in quality_to_clip_models_table:
@@ -1480,6 +1492,8 @@ def process_args(vq_parser, namespace=None):
         args.iterations = quality_to_iterations_table[args.quality]
     if args.num_cuts is None:
         args.num_cuts = quality_to_num_cuts_table[args.quality]
+    if args.batches is None:
+        args.batches = quality_to_batches_table[args.quality]
     if args.ezsize is None and args.scale is None:
         args.scale = quality_to_scale_table[args.quality]
 
