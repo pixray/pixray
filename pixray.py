@@ -1448,7 +1448,7 @@ def process_args(vq_parser, namespace=None):
         'normal': 'ViT-B/32,ViT-B/16',
         'better': 'RN50,ViT-B/32,ViT-B/16',
         'best': 'RN50x4,ViT-B/32,ViT-B/16',
-        'supreme': 'RN50x16,ViT-B/32,ViT-B/16'
+        'supreme': 'RN50x4,RN101,ViT-B/32,ViT-B/16'
     }
     quality_to_iterations_table = {
         'draft': 200,
