@@ -62,6 +62,35 @@ def hex_from_corners(p0, p1):
     pts = [[hxH, hyA], [x1, hyB], [x1, hyC], [hxH, hyD], [x2, hyC], [x2, hyB]]
     return pts
 
+def knit_from_corners(p0, p1):
+    x1, y1 = p0
+    x2, y2 = p1
+    xm = (x1 + x2) / 2.0
+    lean_up = 0.45
+    slump_down = 0.30
+    fall_back = 0.2
+    y_up1 = map_number(lean_up, 0, 1, y2, y1)
+    y_up2 = map_number(1 + lean_up, 0, 1, y2, y1)
+    y_down1 = map_number(slump_down, 0, 1, y1, y2)
+    y_down2 = map_number(1 + slump_down, 0, 1, y1, y2)
+    x_fall_back1 = map_number(fall_back, 0, 1, x2, xm)
+    x_fall_back2 = map_number(fall_back, 0, 1, x1, xm)
+
+    pts = []
+    # center bottom
+    pts.append([xm, y_down2])
+    # vertical line on right side
+    pts.extend([[x2, y_up1], [x2, y_up2]])
+    # horizontal line back
+    pts.append([x_fall_back1, y_up2])
+    # center top
+    pts.append([xm, y_down1])
+    # back up to top
+    pts.append([x_fall_back2, y_up2])
+    # vertical line on left side
+    pts.extend([[x1, y_up2], [x1, y_up1]])
+    return pts
+
 shift_pixel_types = ["hex", "rectshift", "diamond"]
 
 class PixelDrawer(DrawingInterface):
@@ -69,7 +98,7 @@ class PixelDrawer(DrawingInterface):
     def add_settings(parser):
         parser.add_argument("--pixel_size", nargs=2, type=int, help="Pixel size (width height)", default=None, dest='pixel_size')
         parser.add_argument("--pixel_scale", type=float, help="Pixel scale", default=None, dest='pixel_scale')
-        parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri, diamond", default="rect", dest='pixel_type')
+        parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri, diamond, knit", default="rect", dest='pixel_type')
         parser.add_argument("--pixel_edge_check", type=str2bool, help="ensure grid is symmetric", default=True, dest='pixel_edge_check')
         parser.add_argument("--pixel_iso_check", type=str2bool, help="ensure tri and hex shapes are w/h scaled", default=True, dest='pixel_iso_check')
         return parser
@@ -213,6 +242,8 @@ class PixelDrawer(DrawingInterface):
                     pts = tri_from_corners(p0, p1, (r + c) % 2 == 0)
                 elif self.pixel_type == "diamond":
                     pts = diamond_from_corners(p0, p1)
+                elif self.pixel_type == "knit":
+                    pts = knit_from_corners(p0, p1)
                 else:
                     pts = rect_from_corners(p0, p1)
                 pts = torch.tensor(pts, dtype=torch.float32).view(-1, 2)
