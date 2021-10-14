@@ -123,8 +123,7 @@ class ClipDrawer(DrawingInterface):
         return None
 
     def get_num_resolutions(self):
-        # TODO
-        return 5
+        return None
 
     def synth(self, cur_iteration):
         render = pydiffvg.RenderFunction.apply
