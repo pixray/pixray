@@ -478,10 +478,13 @@ def do_init(args):
     # print("-----------> NUMR ", num_resolutions)
 
     jit = True if float(torch.__version__[:3]) < 1.8 else False
-    f = 2**(num_resolutions - 1)
-
-    toksX, toksY = args.size[0] // f, args.size[1] // f
-    sideX, sideY = toksX * f, toksY * f
+    
+    if num_resolutions!=None:
+        f = 2**(num_resolutions - 1)
+        toksX, toksY = args.size[0] // f, args.size[1] // f
+        sideX, sideY = toksX * f, toksY * f
+    else:
+        sideX, sideY = args.size[0], args.size[1]
 
     # save sideX, sideY in globals (need if using overlay)
     gside_X = sideX

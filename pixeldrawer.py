@@ -134,6 +134,17 @@ class PixelDrawer(DrawingInterface):
             self.num_cols = int(self.num_cols / settings.pixel_scale)
             self.num_rows = int(self.num_rows / settings.pixel_scale)
 
+
+        shrink = False
+        if self.num_cols>self.canvas_width:
+            shrink = True
+            self.num_cols = self.canvas_width
+        if self.num_rows>self.canvas_height:
+            shrink = True
+            self.num_rows = self.canvas_height
+        if shrink:
+            print('pixel grid size should not be larger than output pixel size: reducing pixel grid')
+
         print(f"Running pixeldrawer with {self.num_cols}x{self.num_rows} grid")
 
         if settings.pixel_edge_check:
@@ -218,7 +229,7 @@ class PixelDrawer(DrawingInterface):
                             for t_y in tensor_subsamples_y:
                                 cur_subsample_y = tensor_cur_y + t_y
                                 if(cur_subsample_x < tensor_shape[3] and cur_subsample_y < tensor_shape[2]):
-                                    rgb_count += 1;
+                                    rgb_count += 1
                                     rgb_sum[0] += scaled_init_tensor[0][int(cur_subsample_y)][int(cur_subsample_x)]
                                     rgb_sum[1] += scaled_init_tensor[1][int(cur_subsample_y)][int(cur_subsample_x)]
                                     rgb_sum[2] += scaled_init_tensor[2][int(cur_subsample_y)][int(cur_subsample_x)]
@@ -286,8 +297,7 @@ class PixelDrawer(DrawingInterface):
         return None
 
     def get_num_resolutions(self):
-        # TODO
-        return 5
+        return None
 
     def synth(self, cur_iteration):
         if cur_iteration < 0:
