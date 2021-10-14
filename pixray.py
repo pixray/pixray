@@ -1372,7 +1372,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-spo",  "--spot_off", type=str, help="Spot off Text prompts", default=[], dest='spot_prompts_off')
     vq_parser.add_argument("-spf",  "--spot_file", type=str, help="Custom spot file", default=None, dest='spot_file')
     vq_parser.add_argument("-l",    "--labels", type=str, help="ImageNet labels", default=[], dest='labels')
-    vq_parser.add_argument("-vp",   "--vector_prompts", type=str, help="Vector prompts", default=[], dest='vector_prompts')
+    vq_parser.add_argument("-vp",   "--vector_prompts", type=str, help="Vector prompts", default="textoff", dest='vector_prompts')
     vq_parser.add_argument("-ip",   "--image_prompts", type=str, help="Image prompts", default=[], dest='image_prompts')
     vq_parser.add_argument("-ipw",  "--image_prompt_weight", type=float, help="Weight for image prompt", default=None, dest='image_prompt_weight')
     vq_parser.add_argument("-ips",  "--image_prompt_shuffle", type=bool, help="Shuffle image prompts", default=False, dest='image_prompt_shuffle')
@@ -1424,9 +1424,6 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-sat",  "--saturation", type=float, help="encourage saturation, 0 -- skip", default=0, dest='saturation')
 
     return vq_parser
-
-square_size = [144, 144]
-widescreen_size = [200, 112]  # at the small size this becomes 192,112
 
 def process_args(vq_parser, namespace=None):
     global global_aspect_width
@@ -1506,8 +1503,8 @@ def process_args(vq_parser, namespace=None):
         'large': 4
     }
     aspect_to_size_table = {
-        'square': [150, 150],
-        'widescreen': [200, 112]
+        'square': [144, 144],
+        'widescreen': [192, 108]  # vqgan trims to 192x96, 384x208, 576x320, 768x432, 960x528, 1152x640, etc
     }
 
     if args.size is not None:
@@ -1564,7 +1561,14 @@ def process_args(vq_parser, namespace=None):
 
     # Split text prompts using the pipe character
     if args.vector_prompts:
-        args.vector_prompts = [phrase.strip() for phrase in args.vector_prompts.split("|")]
+        if args.vector_prompts.lower() == "none" or args.vector_prompts == "0":
+            # print("----> EMPTY VECTOR PROMPT")
+            args.vector_prompts = []
+        else:
+            args.vector_prompts = [phrase.strip() for phrase in args.vector_prompts.split("|")]
+    else:
+        # print("----> NO VECTOR PROMPT")
+        args.vector_prompts = []
 
     if args.target_palette is not None:
         args.target_palette = palette_from_string(args.target_palette)
