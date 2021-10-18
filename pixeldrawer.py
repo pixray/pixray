@@ -109,11 +109,14 @@ class PixelDrawer(DrawingInterface):
         self.canvas_width = settings.size[0]
         self.canvas_height = settings.size[1]
 
-        # current logic: assume 16x9, but check for 1x1 (all others must be provided explicitly)
+        # current logic: assume 16x9, or 4x5, but check for 1x1 (all others must be provided explicitly)
+        # TODO: could compute this based on output size instead?
         if settings.pixel_size is not None:
             self.num_cols, self.num_rows = settings.pixel_size
         elif self.canvas_width == self.canvas_height:
             self.num_cols, self.num_rows = [40, 40]
+        elif self.canvas_width < self.canvas_height:
+            self.num_cols, self.num_rows = [40, 50]
         else:
             self.num_cols, self.num_rows = [80, 45]
 

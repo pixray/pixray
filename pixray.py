@@ -1504,15 +1504,9 @@ def process_args(vq_parser, namespace=None):
     }
     aspect_to_size_table = {
         'square': [144, 144],
+        'portrait': [128, 160],
         'widescreen': [192, 108]  # vqgan trims to 192x96, 384x208, 576x320, 768x432, 960x528, 1152x640, etc
     }
-
-    if args.size is not None:
-        global_aspect_width = args.size[0] / args.size[1]
-    elif args.aspect == "widescreen":
-        global_aspect_width = 16/9
-    else:
-        global_aspect_width = 1
 
     # determine size if not set
     if args.size is None:
@@ -1531,6 +1525,8 @@ def process_args(vq_parser, namespace=None):
         else:
             print("aspect not understood, aborting -> ", args.aspect)
             exit(1)
+
+    global_aspect_width = args.size[0] / args.size[1]
 
     if args.init_noise.lower() == "none":
         args.init_noise = None
