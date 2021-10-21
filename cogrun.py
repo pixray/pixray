@@ -69,3 +69,11 @@ class Text2Image(BasePixrayPredictor):
     @cog.input("aspect", type=str, help="wide or narrow", default="widescreen", options=["widescreen", "square", "portrait"])
     def predict(self, **kwargs):
         yield from super().predict(settings="text2image", **kwargs)
+
+class Text2Pixel(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #pixelart")
+    @cog.input("aspect", type=str, help="wide or narrow", default="widescreen", options=["widescreen", "square", "portrait"])
+    @cog.input("pixel_scale", type=float, help="bigger pixels", default=1.0, min=0.5, max=2.0)
+    def predict(self, **kwargs):
+        yield from super().predict(settings="text2pixel", **kwargs)
+
