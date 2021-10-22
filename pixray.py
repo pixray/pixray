@@ -81,6 +81,13 @@ except ImportError:
     # only needed for palette stuff
     pass
 
+from LossInterface import LossInterface
+from EdgeLoss import EdgeLoss
+
+loss_class_table = {
+    "edge": EdgeLoss,
+}
+
 
 # this is enabled when not in the master branch
 # print("warning: running unreleased future version")
@@ -454,6 +461,7 @@ def do_init(args):
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer, color_mapper
+    global lossGlobals
 
     reset_session_globals()
 
@@ -768,6 +776,12 @@ def do_init(args):
         embed = torch.empty([1, perceptor.visual.output_dim]).normal_(generator=gen)
         pMs.append(Prompt(embed, weight).to(device))
 
+    #custom loss 
+    if len(args.custom_loss)>0:
+        for loss in args.custom_loss:
+            lossGlobals.update(loss.add_globals(args))
+
+    
     opts = rebuild_optimisers(args)
 
     # Output for the user
@@ -830,6 +844,8 @@ cutoutSizeTable = {}
 perceptors = {}
 device=None
 
+#loss globals
+lossGlobals = {}
 
 # on re-runs this should reset most important globals
 def reset_session_globals():
@@ -924,6 +940,7 @@ def ascend_txt(args):
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
     global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode
     global pmsTargetTable
+    global lossGlobals
 
     out = drawer.synth(cur_iteration);
 
@@ -1087,6 +1104,10 @@ def ascend_txt(args):
         y = torch.ones_like(f[0])
         cur_loss = F.cosine_embedding_loss(f, f2, y) * args.init_weight_cos
         result.append(cur_loss)
+    
+    if len(args.custom_loss)>0:
+        for lossClass in args.custom_loss:
+            result.append(lossClass(out, args, lossGlobals))
 
     if args.make_video:    
         img = np.array(out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8))[:,:,:]
@@ -1423,6 +1444,8 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-est",  "--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
     vq_parser.add_argument("-sat",  "--saturation", type=float, help="encourage saturation, 0 -- skip", default=0, dest='saturation')
 
+    vq_parser.add_argument("-loss",  "--custom_loss", type=float, help="implement a custom loss type through LossInterface. example: ['edge']", default=[], dest='custom_loss')
+
     return vq_parser
 
 def process_args(vq_parser, namespace=None):
@@ -1575,6 +1598,23 @@ def process_args(vq_parser, namespace=None):
     clip_models = args.clip_models.split(",")
     args.clip_models = [model.strip() for model in clip_models]
 
+    if type(args.custom_loss) != list and type(args.custom_loss) != tuple:
+        args.custom_loss = [args.custom_loss]
+    
+    if len(args.custom_loss)>0:
+        lossClasses = []
+        for loss in args.custom_loss:
+            lossClass = loss_class_table[loss]
+            # do initializations here
+            if loss=='edge':
+                customloss = lossClass()
+                lossClasses.append(customloss)
+
+    #Loss args parse
+    if len(args.custom_loss)>0:
+        for loss in args.custom_loss:
+            args = loss.parse_settings(args)
+
     # Make video steps directory
     if args.make_video:
         if not os.path.exists('steps'):
@@ -1633,6 +1673,9 @@ def apply_settings():
 
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
+
+    for n,l in loss_class_table.items():
+        l.add_settings(vq_parser)
 
     if len(global_pixray_settings) > 0:
         # check for any bogus entries in the settings
