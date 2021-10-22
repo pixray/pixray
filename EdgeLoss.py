@@ -19,14 +19,6 @@ class EdgeLoss(LossInterface):
         parser.add_argument("-gc",  "--use_global_color", type=bool, help="if you want a tendency for globally to be this color", default=False, dest='use_global_color')
         parser.add_argument("-gcw",  "--global_color_weight", type=float, help="how much global color is enforced ", default=0.5, dest='global_color_weight')
         return parser
-    
-    def help(self):
-        parser = argparse.ArgumentParser()
-        parser = self.add_settings(parser)
-        helpstring = ""
-        for d in parser._actions:
-            helpstring = f"""parmeter name: {d.dest}\nHelp: {d.help}\nUse case: pixray.add_argument({d.dest}={d.default})"""
-        return helpstring
 
     def parse_settings(self,args):
         #do stuff with args here
@@ -34,7 +26,7 @@ class EdgeLoss(LossInterface):
             args.edge_color = (255,255,255)
         return args
     
-    def forward(self, out, args, kwargs):
+    def forward(self, cur_cutouts, out, args, kwargs):
         zers = torch.zeros(out.size()).cuda()
         # print(out.size())
         # print(out.size()[1])

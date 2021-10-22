@@ -83,9 +83,11 @@ except ImportError:
 
 from LossInterface import LossInterface
 from EdgeLoss import EdgeLoss
+from PaletteLoss import PaletteLoss
 
 loss_class_table = {
     "edge": EdgeLoss,
+    "palette": PaletteLoss,
 }
 
 
@@ -777,6 +779,28 @@ def do_init(args):
         pMs.append(Prompt(embed, weight).to(device))
 
     #custom loss 
+
+    if type(args.custom_loss) != list and type(args.custom_loss) != tuple and args.custom_loss is not None:
+        args.custom_loss = [args.custom_loss]
+    
+    if len(args.custom_loss)>0:
+        lossClasses = []
+        for loss in args.custom_loss:
+            # lossClass = loss_class_table[loss]
+            # do initializations here
+            if loss=='edge':
+                customloss = EdgeLoss()
+                lossClasses.append(customloss)
+            if loss=='palette':
+                customloss = PaletteLoss(device=device)
+                lossClasses.append(customloss)
+        args.custom_loss = lossClasses
+
+    #Loss args parse
+    if len(args.custom_loss)>0:
+        for loss in args.custom_loss:
+            args = loss.parse_settings(args)
+
     if len(args.custom_loss)>0:
         for loss in args.custom_loss:
             lossGlobals.update(loss.add_globals(args))
@@ -1030,14 +1054,15 @@ def ascend_txt(args):
         for prompt in transient_pMs:
             result.append(prompt(iii))
 
-    if args.enforce_palette_annealing and args.target_palette:
-        target_palette = torch.FloatTensor(args.target_palette).requires_grad_(False).to(device)
-        _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
-        palette_dists = torch.cdist(target_palette, _pixels, p=2)
-        best_guesses = palette_dists.argmin(axis=0)
-        diffs = _pixels - target_palette[best_guesses]
-        palette_loss = torch.mean( torch.norm( diffs, 2, dim=1 ) )*cur_cutouts[cutoutSize].shape[0]
-        result.append( palette_loss*cur_iteration/args.enforce_palette_annealing )
+    # if args.enforce_palette_annealing and args.target_palette:
+    #     target_palette = torch.FloatTensor(args.target_palette).requires_grad_(False).to(device)
+    #     _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
+    #     palette_dists = torch.cdist(target_palette, _pixels, p=2)
+    #     best_guesses = palette_dists.argmin(axis=0)
+    #     diffs = _pixels - target_palette[best_guesses]
+    #     palette_loss = torch.mean( torch.norm( diffs, 2, dim=1 ) )*cur_cutouts[cutoutSize].shape[0]
+    #     result.append( palette_loss*cur_iteration/args.enforce_palette_annealing )
+    
 
     if args.smoothness > 0 and args.smoothness_type:
         _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,cur_cutouts[cutoutSize].shape[2],3)
@@ -1105,9 +1130,17 @@ def ascend_txt(args):
         cur_loss = F.cosine_embedding_loss(f, f2, y) * args.init_weight_cos
         result.append(cur_loss)
     
+    needed_globals = {
+        'cur_iteration':cur_iteration,
+    }
+    
     if len(args.custom_loss)>0:
-        for lossClass in args.custom_loss:
-            result.append(lossClass(out, args, lossGlobals))
+        for lossclass in args.custom_loss:
+            new_losses = lossclass(cur_cutouts, out, args, needed_globals)
+            if type(new_losses) is not list and type(new_losses) is not tuple:
+                result.append(new_losses)
+            else:
+                result += new_losses
 
     if args.make_video:    
         img = np.array(out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8))[:,:,:]
@@ -1437,9 +1470,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("-cm",   "--color_mapper", type=str, help="Color Mapping", default=None, dest='color_mapper')
-    vq_parser.add_argument("-epw",  "--enforce_palette_annealing", type=int, help="enforce palette annealing, 0 -- skip", default=5000, dest='enforce_palette_annealing')
-    vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
-    vq_parser.add_argument("-tpl",  "--target_palette_length", type=int, help="target palette length", default=16, dest='target_palette_length')
+
     vq_parser.add_argument("-smo",  "--smoothness", type=float, help="encourage smoothness, 0 -- skip", default=0, dest='smoothness')
     vq_parser.add_argument("-est",  "--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
     vq_parser.add_argument("-sat",  "--saturation", type=float, help="encourage saturation, 0 -- skip", default=0, dest='saturation')
@@ -1589,31 +1620,14 @@ def process_args(vq_parser, namespace=None):
         # print("----> NO VECTOR PROMPT")
         args.vector_prompts = []
 
-    if args.target_palette is not None:
-        args.target_palette = palette_from_string(args.target_palette)
+    # if args.target_palette is not None:
+    #     args.target_palette = palette_from_string(args.target_palette)
 
     if args.overlay_image is not None and args.overlay_every <= 0:
         args.overlay_image = None
 
     clip_models = args.clip_models.split(",")
     args.clip_models = [model.strip() for model in clip_models]
-
-    if type(args.custom_loss) != list and type(args.custom_loss) != tuple:
-        args.custom_loss = [args.custom_loss]
-    
-    if len(args.custom_loss)>0:
-        lossClasses = []
-        for loss in args.custom_loss:
-            lossClass = loss_class_table[loss]
-            # do initializations here
-            if loss=='edge':
-                customloss = lossClass()
-                lossClasses.append(customloss)
-
-    #Loss args parse
-    if len(args.custom_loss)>0:
-        for loss in args.custom_loss:
-            args = loss.parse_settings(args)
 
     # Make video steps directory
     if args.make_video:

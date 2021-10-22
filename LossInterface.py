@@ -27,7 +27,7 @@ class LossInterface(nn.Module):
         globals = {}
         return globals
 
-    def forward(self, z):
+    def forward(self, cur_cutouts, out, args, globals):
         loss = None
         return loss
     
