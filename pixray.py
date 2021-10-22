@@ -84,10 +84,12 @@ except ImportError:
 from LossInterface import LossInterface
 from EdgeLoss import EdgeLoss
 from PaletteLoss import PaletteLoss
+from SaturationLoss import SaturationLoss
 
 loss_class_table = {
     "edge": EdgeLoss,
     "palette": PaletteLoss,
+    "saturation": SaturationLoss,
 }
 
 
@@ -794,6 +796,9 @@ def do_init(args):
             if loss=='palette':
                 customloss = PaletteLoss(device=device)
                 lossClasses.append(customloss)
+            if loss=='saturation':
+                customloss = SaturationLoss()
+                lossClasses.append(customloss)
         args.custom_loss = lossClasses
 
     #Loss args parse
@@ -1078,19 +1083,19 @@ def ascend_txt(args):
 
         result.append( sharpness*args.smoothness )
 
-    if args.saturation:
-        # based on the old "percepted colourfulness" heuristic from Hasler and Süsstrunk’s 2003 paper
-        # https://www.researchgate.net/publication/243135534_Measuring_Colourfulness_in_Natural_Images
-        _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
-        rg = _pixels[:,0]-_pixels[:,1]
-        yb = 0.5*(_pixels[:,0]+_pixels[:,1])-_pixels[:,2]
-        rg_std, rg_mean = torch.std_mean(rg)
-        yb_std, yb_mean = torch.std_mean(yb)
-        std_rggb = torch.sqrt(rg_std**2 + yb_std**2)
-        mean_rggb = torch.sqrt(rg_mean**2 + yb_mean**2)
-        colorfullness = std_rggb+.3*mean_rggb
+    # if args.saturation:
+    #     # based on the old "percepted colourfulness" heuristic from Hasler and Süsstrunk’s 2003 paper
+    #     # https://www.researchgate.net/publication/243135534_Measuring_Colourfulness_in_Natural_Images
+    #     _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
+    #     rg = _pixels[:,0]-_pixels[:,1]
+    #     yb = 0.5*(_pixels[:,0]+_pixels[:,1])-_pixels[:,2]
+    #     rg_std, rg_mean = torch.std_mean(rg)
+    #     yb_std, yb_mean = torch.std_mean(yb)
+    #     std_rggb = torch.sqrt(rg_std**2 + yb_std**2)
+    #     mean_rggb = torch.sqrt(rg_mean**2 + yb_mean**2)
+    #     colorfullness = std_rggb+.3*mean_rggb
 
-        result.append( -colorfullness*args.saturation/5.0 )
+    #     result.append( -colorfullness*args.saturation/5.0 )
 
     for cutoutSize in cutoutsTable:
         # clear the transform "cache"
@@ -1473,7 +1478,6 @@ def setup_parser(vq_parser):
 
     vq_parser.add_argument("-smo",  "--smoothness", type=float, help="encourage smoothness, 0 -- skip", default=0, dest='smoothness')
     vq_parser.add_argument("-est",  "--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
-    vq_parser.add_argument("-sat",  "--saturation", type=float, help="encourage saturation, 0 -- skip", default=0, dest='saturation')
 
     vq_parser.add_argument("-loss",  "--custom_loss", type=float, help="implement a custom loss type through LossInterface. example: ['edge']", default=[], dest='custom_loss')
 
