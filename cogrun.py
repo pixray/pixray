@@ -5,6 +5,7 @@ import pixray
 import yaml
 import pathlib
 import os
+import yaml
 
 # https://stackoverflow.com/a/6587648/1010653
 import tempfile, shutil
@@ -76,4 +77,11 @@ class Text2Pixel(BasePixrayPredictor):
     @cog.input("pixel_scale", type=float, help="bigger pixels", default=1.0, min=0.5, max=2.0)
     def predict(self, **kwargs):
         yield from super().predict(settings="text2pixel", **kwargs)
+
+class PixrayRaw(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #pixelart")
+    @cog.input("settings", type=str, help="yaml settings", default='drawer: pixel\nscale: 2.5\nquality: better')
+    def predict(self, prompts, settings):
+        ydict = yaml.safe_load(settings)
+        yield from super().predict(settings="pixrayraw", prompts=prompts, **ydict)
 

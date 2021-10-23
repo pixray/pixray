@@ -10,4 +10,5 @@ build:
 # predict: "cogrun.py:PixrayVqgan"
 # predict: "cogrun.py:PixrayPixel"
 # predict: "cogrun.py:Text2Image"
-predict: "cogrun.py:Text2Pixel"
+# predict: "cogrun.py:Text2Pixel"
+predict: "cogrun.py:PixrayRaw"
