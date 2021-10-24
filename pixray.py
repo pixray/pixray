@@ -85,11 +85,13 @@ from LossInterface import LossInterface
 from EdgeLoss import EdgeLoss
 from PaletteLoss import PaletteLoss
 from SaturationLoss import SaturationLoss
+from DetailLoss import DetailLoss
 
 loss_class_table = {
     "edge": EdgeLoss,
     "palette": PaletteLoss,
     "saturation": SaturationLoss,
+    "detail": DetailLoss,
 }
 
 
@@ -706,6 +708,8 @@ def do_init(args):
             txt, weight, stop = parse_prompt(prompt)
             embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
             pMs.append(Prompt(embed, weight, stop).to(device))
+    
+
 
     for vect_prompt in args.vector_prompts:
         f1, weight, stop = parse_prompt(vect_prompt)
@@ -788,17 +792,13 @@ def do_init(args):
     if len(args.custom_loss)>0:
         lossClasses = []
         for loss in args.custom_loss:
-            # lossClass = loss_class_table[loss]
-            # do initializations here
+            lossClass = loss_class_table[loss]
+            # do special initializations here
             if loss=='edge':
-                customloss = EdgeLoss()
+                customloss = EdgeLoss(custom_init = "custom initialization")
                 lossClasses.append(customloss)
-            if loss=='palette':
-                customloss = PaletteLoss(device=device)
-                lossClasses.append(customloss)
-            if loss=='saturation':
-                customloss = SaturationLoss()
-                lossClasses.append(customloss)
+                continue
+            lossClasses.append(lossClass(device=device))
         args.custom_loss = lossClasses
 
     #Loss args parse
@@ -1136,12 +1136,13 @@ def ascend_txt(args):
         result.append(cur_loss)
     
     needed_globals = {
+        # for palette loss
         'cur_iteration':cur_iteration,
     }
     
     if len(args.custom_loss)>0:
         for lossclass in args.custom_loss:
-            new_losses = lossclass(cur_cutouts, out, args, needed_globals)
+            new_losses = lossclass(cur_cutouts, out, args, needed_globals, lossGlobals)
             if type(new_losses) is not list and type(new_losses) is not tuple:
                 result.append(new_losses)
             else:

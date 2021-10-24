@@ -3,7 +3,8 @@ from torch import nn
 
 
 class LossInterface(nn.Module):
-    def __init__(self):
+    def __init__(self, device):
+        self.device = device
         super().__init__()
     
     @staticmethod
@@ -24,10 +25,10 @@ class LossInterface(nn.Module):
         return args
     
     def add_globals(self,args):
-        globals = {}
-        return globals
+        lossglobals = {}
+        return lossglobals
 
-    def forward(self, cur_cutouts, out, args, globals):
+    def forward(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         loss = None
         return loss
     

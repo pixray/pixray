@@ -9,8 +9,7 @@ from util import  palette_from_string
 from LossInterface import LossInterface
 
 class PaletteLoss(LossInterface):
-    def __init__(self,device):
-        self.device = device
+    def __init__(self):
         super().__init__()
     
     @staticmethod
@@ -25,7 +24,7 @@ class PaletteLoss(LossInterface):
         args.target_palette = palette_from_string(args.target_palette)
         return args
     
-    def forward(self, cur_cutouts, out, args, globals):
+    def forward(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         target_palette = torch.FloatTensor(args.target_palette).requires_grad_(False).to(self.device)
         all_loss = []
         for _,cutouts in cur_cutouts.items():
