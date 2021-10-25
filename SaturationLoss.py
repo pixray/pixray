@@ -4,8 +4,8 @@ import torch
 from LossInterface import LossInterface
 
 class SaturationLoss(LossInterface):
-    def __init__(self):
-        super().__init__()
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
     
     @staticmethod
     def add_settings(parser):

@@ -9,8 +9,8 @@ from util import  palette_from_string
 from LossInterface import LossInterface
 
 class PaletteLoss(LossInterface):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
     
     @staticmethod
     def add_settings(parser):

@@ -7,9 +7,10 @@ from torch import nn, optim
 from LossInterface import LossInterface
 
 class EdgeLoss(LossInterface):
-    def __init__(self,custom_init):
-        print(custom_init,"custom init message :)")
-        super().__init__()
+    def __init__(self,custom_init,**kwargs):
+        print(kwargs)
+        print(custom_init,"custom init 0 message :)")
+        super().__init__(**kwargs)
     
     @staticmethod
     def add_settings(parser):

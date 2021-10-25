@@ -3,7 +3,7 @@ from torch import nn
 
 
 class LossInterface(nn.Module):
-    def __init__(self, device):
+    def __init__(self, device=None):
         self.device = device
         super().__init__()
     

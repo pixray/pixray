@@ -86,12 +86,14 @@ from EdgeLoss import EdgeLoss
 from PaletteLoss import PaletteLoss
 from SaturationLoss import SaturationLoss
 from DetailLoss import DetailLoss
+from SymmetryLoss import SymmetryLoss
 
 loss_class_table = {
     "edge": EdgeLoss,
     "palette": PaletteLoss,
     "saturation": SaturationLoss,
     "detail": DetailLoss,
+    "symmetry": SymmetryLoss,
 }
 
 
@@ -788,14 +790,14 @@ def do_init(args):
 
     if type(args.custom_loss) != list and type(args.custom_loss) != tuple and args.custom_loss is not None:
         args.custom_loss = [args.custom_loss]
-    
+
     if len(args.custom_loss)>0:
         lossClasses = []
         for loss in args.custom_loss:
             lossClass = loss_class_table[loss]
             # do special initializations here
             if loss=='edge':
-                customloss = EdgeLoss(custom_init = "custom initialization")
+                customloss = EdgeLoss(custom_init = "custom initialization",device=device)
                 lossClasses.append(customloss)
                 continue
             lossClasses.append(lossClass(device=device))
