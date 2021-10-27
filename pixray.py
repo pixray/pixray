@@ -1071,19 +1071,19 @@ def ascend_txt(args):
     #     result.append( palette_loss*cur_iteration/args.enforce_palette_annealing )
     
 
-    if args.smoothness > 0 and args.smoothness_type:
-        _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,cur_cutouts[cutoutSize].shape[2],3)
-        gyr, gxr = torch.gradient(_pixels[:,:,0])
-        gyg, gxg = torch.gradient(_pixels[:,:,1])
-        gyb, gxb = torch.gradient(_pixels[:,:,2])
-        sharpness = torch.sqrt(gyr**2 + gxr**2+ gyg**2 + gxg**2 + gyb**2 + gxb**2)
-        if args.smoothness_type=='clipped':
-            sharpness = torch.clamp( sharpness, max=0.5 )
-        elif args.smoothness_type=='log':
-            sharpness = torch.log( torch.ones_like(sharpness)+sharpness )
-        sharpness = torch.mean( sharpness )
+    # if args.smoothness > 0 and args.smoothness_type:
+    #     _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,cur_cutouts[cutoutSize].shape[2],3)
+    #     gyr, gxr = torch.gradient(_pixels[:,:,0])
+    #     gyg, gxg = torch.gradient(_pixels[:,:,1])
+    #     gyb, gxb = torch.gradient(_pixels[:,:,2])
+    #     sharpness = torch.sqrt(gyr**2 + gxr**2+ gyg**2 + gxg**2 + gyb**2 + gxb**2)
+    #     if args.smoothness_type=='clipped':
+    #         sharpness = torch.clamp( sharpness, max=0.5 )
+    #     elif args.smoothness_type=='log':
+    #         sharpness = torch.log( torch.ones_like(sharpness)+sharpness )
+    #     sharpness = torch.mean( sharpness )
 
-        result.append( sharpness*args.smoothness )
+    #     result.append( sharpness*args.smoothness )
 
     # if args.saturation:
     #     # based on the old "percepted colourfulness" heuristic from Hasler and Süsstrunk’s 2003 paper
@@ -1478,9 +1478,6 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("-cm",   "--color_mapper", type=str, help="Color Mapping", default=None, dest='color_mapper')
-
-    vq_parser.add_argument("-smo",  "--smoothness", type=float, help="encourage smoothness, 0 -- skip", default=0, dest='smoothness')
-    vq_parser.add_argument("-est",  "--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
 
     vq_parser.add_argument("-loss",  "--custom_loss", type=float, help="implement a custom loss type through LossInterface. example: ['edge']", default=[], dest='custom_loss')
 
