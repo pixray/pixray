@@ -81,19 +81,17 @@ except ImportError:
     # only needed for palette stuff
     pass
 
-from LossInterface import LossInterface
-from EdgeLoss import EdgeLoss
-from PaletteLoss import PaletteLoss
-from SaturationLoss import SaturationLoss
-from DetailLoss import DetailLoss
-from SymmetryLoss import SymmetryLoss
+from Losses.LossInterface import LossInterface
+from Losses.PaletteLoss import PaletteLoss
+from Losses.SaturationLoss import SaturationLoss
+from Losses.SymmetryLoss import SymmetryLoss
+from Losses.SmoothnessLoss import SmoothnessLoss
 
 loss_class_table = {
-    "edge": EdgeLoss,
     "palette": PaletteLoss,
     "saturation": SaturationLoss,
-    "detail": DetailLoss,
     "symmetry": SymmetryLoss,
+    "smoothness": SmoothnessLoss,
 }
 
 
@@ -1061,43 +1059,6 @@ def ascend_txt(args):
         for prompt in transient_pMs:
             result.append(prompt(iii))
 
-    # if args.enforce_palette_annealing and args.target_palette:
-    #     target_palette = torch.FloatTensor(args.target_palette).requires_grad_(False).to(device)
-    #     _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
-    #     palette_dists = torch.cdist(target_palette, _pixels, p=2)
-    #     best_guesses = palette_dists.argmin(axis=0)
-    #     diffs = _pixels - target_palette[best_guesses]
-    #     palette_loss = torch.mean( torch.norm( diffs, 2, dim=1 ) )*cur_cutouts[cutoutSize].shape[0]
-    #     result.append( palette_loss*cur_iteration/args.enforce_palette_annealing )
-    
-
-    # if args.smoothness > 0 and args.smoothness_type:
-    #     _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,cur_cutouts[cutoutSize].shape[2],3)
-    #     gyr, gxr = torch.gradient(_pixels[:,:,0])
-    #     gyg, gxg = torch.gradient(_pixels[:,:,1])
-    #     gyb, gxb = torch.gradient(_pixels[:,:,2])
-    #     sharpness = torch.sqrt(gyr**2 + gxr**2+ gyg**2 + gxg**2 + gyb**2 + gxb**2)
-    #     if args.smoothness_type=='clipped':
-    #         sharpness = torch.clamp( sharpness, max=0.5 )
-    #     elif args.smoothness_type=='log':
-    #         sharpness = torch.log( torch.ones_like(sharpness)+sharpness )
-    #     sharpness = torch.mean( sharpness )
-
-    #     result.append( sharpness*args.smoothness )
-
-    # if args.saturation:
-    #     # based on the old "percepted colourfulness" heuristic from Hasler and Süsstrunk’s 2003 paper
-    #     # https://www.researchgate.net/publication/243135534_Measuring_Colourfulness_in_Natural_Images
-    #     _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
-    #     rg = _pixels[:,0]-_pixels[:,1]
-    #     yb = 0.5*(_pixels[:,0]+_pixels[:,1])-_pixels[:,2]
-    #     rg_std, rg_mean = torch.std_mean(rg)
-    #     yb_std, yb_mean = torch.std_mean(yb)
-    #     std_rggb = torch.sqrt(rg_std**2 + yb_std**2)
-    #     mean_rggb = torch.sqrt(rg_mean**2 + yb_mean**2)
-    #     colorfullness = std_rggb+.3*mean_rggb
-
-    #     result.append( -colorfullness*args.saturation/5.0 )
 
     for cutoutSize in cutoutsTable:
         # clear the transform "cache"
