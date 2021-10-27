@@ -5,6 +5,7 @@ import pixray
 import yaml
 import pathlib
 import os
+import yaml
 
 # https://stackoverflow.com/a/6587648/1010653
 import tempfile, shutil
@@ -62,3 +63,25 @@ class PixrayPixel(BasePixrayPredictor):
     @cog.input("drawer", type=str, help="render engine", default="pixel", options=["pixel", "vqgan", "line_sketch", "clipdraw"])
     def predict(self, **kwargs):
         yield from super().predict(settings="pixray_pixel", **kwargs)
+
+class Text2Image(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="description of what to draw", default="Robots skydiving high above the city")
+    @cog.input("quality", type=str, help="speed vs quality", default="better", options=["draft", "normal", "better", "best"])
+    @cog.input("aspect", type=str, help="wide or narrow", default="widescreen", options=["widescreen", "square", "portrait"])
+    def predict(self, **kwargs):
+        yield from super().predict(settings="text2image", **kwargs)
+
+class Text2Pixel(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #pixelart")
+    @cog.input("aspect", type=str, help="wide or narrow", default="widescreen", options=["widescreen", "square", "portrait"])
+    @cog.input("pixel_scale", type=float, help="bigger pixels", default=1.0, min=0.5, max=2.0)
+    def predict(self, **kwargs):
+        yield from super().predict(settings="text2pixel", **kwargs)
+
+class PixrayRaw(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #pixelart")
+    @cog.input("settings", type=str, help="yaml settings", default='drawer: pixel\nscale: 2.5\nquality: better')
+    def predict(self, prompts, settings):
+        ydict = yaml.safe_load(settings)
+        yield from super().predict(settings="pixrayraw", prompts=prompts, **ydict)
+
