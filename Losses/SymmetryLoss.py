@@ -1,6 +1,6 @@
 import torch
 from torch import nn, optim
-from LossInterface import LossInterface
+from Losses.LossInterface import LossInterface
 
 class SymmetryLoss(LossInterface):
     def __init__(self,**kwargs):
@@ -13,5 +13,5 @@ class SymmetryLoss(LossInterface):
    
     def forward(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         mseloss = nn.MSELoss()
-        cur_loss = mseloss(out, torch.flip(out,3)) 
-        return cur_loss
+        cur_loss = mseloss(out, torch.flip(out,[3])) 
+        return cur_loss * args.symmetry_weight

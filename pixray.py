@@ -1,5 +1,6 @@
 import argparse
 import math
+
 from urllib.request import urlopen
 import sys
 import os
@@ -789,7 +790,8 @@ def do_init(args):
     if type(args.custom_loss) != list and type(args.custom_loss) != tuple and args.custom_loss is not None:
         args.custom_loss = [args.custom_loss]
 
-    if len(args.custom_loss)>0:
+    if args.custom_loss:
+        custom_loss_names = args.custom_loss
         lossClasses = []
         for loss in args.custom_loss:
             lossClass = loss_class_table[loss]
@@ -798,18 +800,23 @@ def do_init(args):
                 customloss = EdgeLoss(custom_init = "custom initialization",device=device)
                 lossClasses.append(customloss)
                 continue
-            lossClasses.append(lossClass(device=device))
+            try:
+                lossClasses.append(lossClass(device=device))
+            except TypeError as e:
+                print(f'error in initializing {lossClass} - this message is to provide information')
+                raise TypeError(e)
         args.custom_loss = lossClasses
 
     #Loss args parse
-    if len(args.custom_loss)>0:
+    if args.custom_loss:
         for loss in args.custom_loss:
             args = loss.parse_settings(args)
 
+    #adding globals for loss
     if len(args.custom_loss)>0:
         for loss in args.custom_loss:
             lossGlobals.update(loss.add_globals(args))
-
+    
     
     opts = rebuild_optimisers(args)
 
@@ -829,6 +836,8 @@ def do_init(args):
         print(f'Using initial image {args.init_image} ({len(init_image_rgba_list)})')
     if args.noise_prompt_weights:
         print('Noise prompt weights:', args.noise_prompt_weights)
+    if args.custom_loss:
+        print(f'using custom losses: {str(custom_loss_names)}')
 
     cur_iteration = 0
 
@@ -1105,7 +1114,7 @@ def ascend_txt(args):
     
     if len(args.custom_loss)>0:
         for lossclass in args.custom_loss:
-            new_losses = lossclass(cur_cutouts, out, args, needed_globals, lossGlobals)
+            new_losses = lossclass(cur_cutouts, out, args, globals = needed_globals, lossGlobals = lossGlobals)
             if type(new_losses) is not list and type(new_losses) is not tuple:
                 result.append(new_losses)
             else:
@@ -1670,6 +1679,13 @@ def apply_settings():
 
     settings = process_args(vq_parser, settingsDict)
     return settings
+
+def add_custom_loss(name, customloss):
+    # unfortunately this way it cannot access globals when initializing 
+    assert issubclass(customloss,LossInterface)
+    loss_class_table.update({
+        name: customloss,
+    })
 
 def command_line_override():
     global global_pixray_settings

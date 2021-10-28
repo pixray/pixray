@@ -1,7 +1,7 @@
 
 import torch
 
-from LossInterface import LossInterface
+from Losses.LossInterface import LossInterface
 
 class SaturationLoss(LossInterface):
     def __init__(self,**kwargs):

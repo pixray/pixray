@@ -1,8 +1,8 @@
 import torch
-from LossInterface import LossInterface
+from Losses.LossInterface import LossInterface
 
 class SmoothnessLoss(LossInterface):
-    def __init__(self,custom_init,**kwargs):
+    def __init__(self,**kwargs):
         super().__init__(**kwargs)
     
     @staticmethod

@@ -6,7 +6,7 @@ from util import  palette_from_string
 
 
 
-from LossInterface import LossInterface
+from Losses.LossInterface import LossInterface
 
 class PaletteLoss(LossInterface):
     def __init__(self, **kwargs):
