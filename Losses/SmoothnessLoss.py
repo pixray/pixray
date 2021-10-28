@@ -12,7 +12,7 @@ class SmoothnessLoss(LossInterface):
         return parser
 
     
-    def forward(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
+    def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         cur_loss = []
         for _,cutouts in cur_cutouts.items():
             _pixels = cutouts.permute(0,2,3,1).reshape(-1,cutouts.shape[2],3)

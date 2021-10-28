@@ -11,7 +11,7 @@ class SymmetryLoss(LossInterface):
         parser.add_argument("-symw",  "--symmetry_weight", type=float, help="how much symmetry is weighted in loss", default=1, dest='symmetry_weight')
         return parser
    
-    def forward(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
+    def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         mseloss = nn.MSELoss()
         cur_loss = mseloss(out, torch.flip(out,[3])) 
         return cur_loss * args.symmetry_weight

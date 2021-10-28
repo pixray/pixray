@@ -1,11 +1,9 @@
 import argparse
-from torch import nn
 
 
-class LossInterface(nn.Module):
+class LossInterface():
     def __init__(self, device=None):
         self.device = device
-        super().__init__()
     
     @staticmethod
     def add_settings(parser):
@@ -28,7 +26,7 @@ class LossInterface(nn.Module):
         lossglobals = {}
         return lossglobals
 
-    def forward(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
+    def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         loss = None
         return loss
     

@@ -1114,7 +1114,7 @@ def ascend_txt(args):
     
     if len(args.custom_loss)>0:
         for lossclass in args.custom_loss:
-            new_losses = lossclass(cur_cutouts, out, args, globals = needed_globals, lossGlobals = lossGlobals)
+            new_losses = lossclass.get_loss(cur_cutouts, out, args, globals = needed_globals, lossGlobals = lossGlobals)
             if type(new_losses) is not list and type(new_losses) is not tuple:
                 result.append(new_losses)
             else:

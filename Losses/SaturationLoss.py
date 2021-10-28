@@ -17,7 +17,7 @@ class SaturationLoss(LossInterface):
     
 
     
-    def forward(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
+    def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         # based on the old "percepted colourfulness" heuristic from Hasler and Süsstrunk’s 2003 paper
         # https://www.researchgate.net/publication/243135534_Measuring_Colourfulness_in_Natural_Images
         all_loss = []
