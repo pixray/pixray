@@ -7,10 +7,9 @@ class SmoothnessLoss(LossInterface):
     
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("-smo",  "--smoothness", type=float, help="encourage smoothness, 0 -- skip", default=0, dest='smoothness')
-        parser.add_argument("-est",  "--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
+        parser.add_argument("--smoothness_weight", type=float, help="strength of smoothness loss effect", default=1, dest='smoothness_weight')
+        parser.add_argument("--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
         return parser
-
     
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         cur_loss = []
@@ -25,6 +24,6 @@ class SmoothnessLoss(LossInterface):
             elif args.smoothness_type=='log':
                 sharpness = torch.log( torch.ones_like(sharpness)+sharpness )
             sharpness = torch.mean( sharpness )
-            cur_loss.append(sharpness*args.smoothness)
+            cur_loss.append(sharpness*args.smoothness_weight)
 
         return cur_loss

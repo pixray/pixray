@@ -14,14 +14,12 @@ class PaletteLoss(LossInterface):
     
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("-epw",  "--enforce_palette_annealing", type=int, help="enforce palette annealing, 0 -- skip", default=5000, dest='enforce_palette_annealing')
-        parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
-        parser.add_argument("-tpl",  "--target_palette_length", type=int, help="target palette length", default=16, dest='target_palette_length')
+        parser.add_argument("--palette_weight", type=float, help="strength of pallete loss effect", default=1, dest='palette_weight')
         return parser
 
     def parse_settings(self,args):
         #do stuff with args here
-        args.target_palette = palette_from_string(args.target_palette)
+        # args.target_palette = palette_from_string(args.target_palette)
         return args
     
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
@@ -33,5 +31,5 @@ class PaletteLoss(LossInterface):
             best_guesses = palette_dists.argmin(axis=0)
             diffs = _pixels - target_palette[best_guesses]
             palette_loss = torch.mean( torch.norm( diffs, 2, dim=1 ) )*cutouts.shape[0]
-            all_loss.append( palette_loss*globals['cur_iteration']/args.enforce_palette_annealing )
+            all_loss.append( palette_loss * args.palette_weight/10.0 )
         return all_loss

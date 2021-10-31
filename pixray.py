@@ -786,10 +786,6 @@ def do_init(args):
         pMs.append(Prompt(embed, weight).to(device))
 
     #custom loss 
-
-    if type(args.custom_loss) != list and type(args.custom_loss) != tuple and args.custom_loss is not None:
-        args.custom_loss = [args.custom_loss]
-
     if args.custom_loss:
         custom_loss_names = args.custom_loss
         lossClasses = []
@@ -1108,7 +1104,7 @@ def ascend_txt(args):
         result.append(cur_loss)
     
     needed_globals = {
-        # for palette loss
+        # used to be for palette loss - now left as an example
         'cur_iteration':cur_iteration,
     }
     
@@ -1448,8 +1444,8 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("-cm",   "--color_mapper", type=str, help="Color Mapping", default=None, dest='color_mapper')
-
-    vq_parser.add_argument("-loss",  "--custom_loss", type=float, help="implement a custom loss type through LossInterface. example: ['edge']", default=[], dest='custom_loss')
+    vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
+    vq_parser.add_argument("-loss", "--custom_loss", action="append", help="implement a custom loss type through LossInterface. example: edge", dest='custom_loss')
 
     return vq_parser
 
@@ -1594,8 +1590,8 @@ def process_args(vq_parser, namespace=None):
         # print("----> NO VECTOR PROMPT")
         args.vector_prompts = []
 
-    # if args.target_palette is not None:
-    #     args.target_palette = palette_from_string(args.target_palette)
+    if args.target_palette is not None:
+        args.target_palette = palette_from_string(args.target_palette)
 
     if args.overlay_image is not None and args.overlay_every <= 0:
         args.overlay_image = None
@@ -1662,6 +1658,8 @@ def apply_settings():
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
 
+    # TODO: this is slighly sloppy and better would be to add settings of loss functions
+    # actually used, not all of those available.
     for n,l in loss_class_table.items():
         l.add_settings(vq_parser)
 

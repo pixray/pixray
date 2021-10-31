@@ -9,13 +9,8 @@ class SaturationLoss(LossInterface):
     
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("-sat",  "--saturation", type=float, help="encourage saturation, 0 -- skip", default=0, dest='saturation')
+        parser.add_argument("--saturation_weight", type=float, help="strength of pallete loss effect", default=1, dest='saturation_weight')
         return parser
-    
-
-
-    
-
     
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         # based on the old "percepted colourfulness" heuristic from Hasler and Süsstrunk’s 2003 paper
@@ -30,6 +25,6 @@ class SaturationLoss(LossInterface):
             std_rggb = torch.sqrt(rg_std**2 + yb_std**2)
             mean_rggb = torch.sqrt(rg_mean**2 + yb_mean**2)
             colorfullness = std_rggb+.3*mean_rggb
-            all_loss.append(-colorfullness*args.saturation/5.0)
+            all_loss.append(-colorfullness*args.saturation_weight/5.0)
 
         return all_loss
