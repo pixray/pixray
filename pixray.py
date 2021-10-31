@@ -809,7 +809,7 @@ def do_init(args):
             args = loss.parse_settings(args)
 
     #adding globals for loss
-    if len(args.custom_loss)>0:
+    if args.custom_loss is not None and len(args.custom_loss)>0:
         for loss in args.custom_loss:
             lossGlobals.update(loss.add_globals(args))
     
@@ -1108,7 +1108,7 @@ def ascend_txt(args):
         'cur_iteration':cur_iteration,
     }
     
-    if len(args.custom_loss)>0:
+    if args.custom_loss is not None and len(args.custom_loss)>0:
         for lossclass in args.custom_loss:
             new_losses = lossclass.get_loss(cur_cutouts, out, args, globals = needed_globals, lossGlobals = lossGlobals)
             if type(new_losses) is not list and type(new_losses) is not tuple:
