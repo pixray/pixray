@@ -1,5 +1,6 @@
 import argparse
 import math
+
 from urllib.request import urlopen
 import sys
 import os
@@ -80,6 +81,19 @@ try:
 except ImportError:
     # only needed for palette stuff
     pass
+
+from Losses.LossInterface import LossInterface
+from Losses.PaletteLoss import PaletteLoss
+from Losses.SaturationLoss import SaturationLoss
+from Losses.SymmetryLoss import SymmetryLoss
+from Losses.SmoothnessLoss import SmoothnessLoss
+
+loss_class_table = {
+    "palette": PaletteLoss,
+    "saturation": SaturationLoss,
+    "symmetry": SymmetryLoss,
+    "smoothness": SmoothnessLoss,
+}
 
 
 # this is enabled when not in the master branch
@@ -454,6 +468,7 @@ def do_init(args):
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer, color_mapper
+    global lossGlobals
 
     reset_session_globals()
 
@@ -694,6 +709,8 @@ def do_init(args):
             txt, weight, stop = parse_prompt(prompt)
             embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
             pMs.append(Prompt(embed, weight, stop).to(device))
+    
+
 
     for vect_prompt in args.vector_prompts:
         f1, weight, stop = parse_prompt(vect_prompt)
@@ -768,6 +785,39 @@ def do_init(args):
         embed = torch.empty([1, perceptor.visual.output_dim]).normal_(generator=gen)
         pMs.append(Prompt(embed, weight).to(device))
 
+    #custom loss 
+
+    if type(args.custom_loss) != list and type(args.custom_loss) != tuple and args.custom_loss is not None:
+        args.custom_loss = [args.custom_loss]
+
+    if args.custom_loss:
+        custom_loss_names = args.custom_loss
+        lossClasses = []
+        for loss in args.custom_loss:
+            lossClass = loss_class_table[loss]
+            # do special initializations here
+            if loss=='edge':
+                customloss = EdgeLoss(custom_init = "custom initialization",device=device)
+                lossClasses.append(customloss)
+                continue
+            try:
+                lossClasses.append(lossClass(device=device))
+            except TypeError as e:
+                print(f'error in initializing {lossClass} - this message is to provide information')
+                raise TypeError(e)
+        args.custom_loss = lossClasses
+
+    #Loss args parse
+    if args.custom_loss:
+        for loss in args.custom_loss:
+            args = loss.parse_settings(args)
+
+    #adding globals for loss
+    if len(args.custom_loss)>0:
+        for loss in args.custom_loss:
+            lossGlobals.update(loss.add_globals(args))
+    
+    
     opts = rebuild_optimisers(args)
 
     # Output for the user
@@ -786,6 +836,8 @@ def do_init(args):
         print(f'Using initial image {args.init_image} ({len(init_image_rgba_list)})')
     if args.noise_prompt_weights:
         print('Noise prompt weights:', args.noise_prompt_weights)
+    if args.custom_loss:
+        print(f'using custom losses: {str(custom_loss_names)}')
 
     cur_iteration = 0
 
@@ -830,6 +882,8 @@ cutoutSizeTable = {}
 perceptors = {}
 device=None
 
+#loss globals
+lossGlobals = {}
 
 # on re-runs this should reset most important globals
 def reset_session_globals():
@@ -924,6 +978,7 @@ def ascend_txt(args):
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
     global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode
     global pmsTargetTable
+    global lossGlobals
 
     out = drawer.synth(cur_iteration);
 
@@ -1013,42 +1068,6 @@ def ascend_txt(args):
         for prompt in transient_pMs:
             result.append(prompt(iii))
 
-    if args.enforce_palette_annealing and args.target_palette:
-        target_palette = torch.FloatTensor(args.target_palette).requires_grad_(False).to(device)
-        _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
-        palette_dists = torch.cdist(target_palette, _pixels, p=2)
-        best_guesses = palette_dists.argmin(axis=0)
-        diffs = _pixels - target_palette[best_guesses]
-        palette_loss = torch.mean( torch.norm( diffs, 2, dim=1 ) )*cur_cutouts[cutoutSize].shape[0]
-        result.append( palette_loss*cur_iteration/args.enforce_palette_annealing )
-
-    if args.smoothness > 0 and args.smoothness_type:
-        _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,cur_cutouts[cutoutSize].shape[2],3)
-        gyr, gxr = torch.gradient(_pixels[:,:,0])
-        gyg, gxg = torch.gradient(_pixels[:,:,1])
-        gyb, gxb = torch.gradient(_pixels[:,:,2])
-        sharpness = torch.sqrt(gyr**2 + gxr**2+ gyg**2 + gxg**2 + gyb**2 + gxb**2)
-        if args.smoothness_type=='clipped':
-            sharpness = torch.clamp( sharpness, max=0.5 )
-        elif args.smoothness_type=='log':
-            sharpness = torch.log( torch.ones_like(sharpness)+sharpness )
-        sharpness = torch.mean( sharpness )
-
-        result.append( sharpness*args.smoothness )
-
-    if args.saturation:
-        # based on the old "percepted colourfulness" heuristic from Hasler and Süsstrunk’s 2003 paper
-        # https://www.researchgate.net/publication/243135534_Measuring_Colourfulness_in_Natural_Images
-        _pixels = cur_cutouts[cutoutSize].permute(0,2,3,1).reshape(-1,3)
-        rg = _pixels[:,0]-_pixels[:,1]
-        yb = 0.5*(_pixels[:,0]+_pixels[:,1])-_pixels[:,2]
-        rg_std, rg_mean = torch.std_mean(rg)
-        yb_std, yb_mean = torch.std_mean(yb)
-        std_rggb = torch.sqrt(rg_std**2 + yb_std**2)
-        mean_rggb = torch.sqrt(rg_mean**2 + yb_mean**2)
-        colorfullness = std_rggb+.3*mean_rggb
-
-        result.append( -colorfullness*args.saturation/5.0 )
 
     for cutoutSize in cutoutsTable:
         # clear the transform "cache"
@@ -1087,6 +1106,19 @@ def ascend_txt(args):
         y = torch.ones_like(f[0])
         cur_loss = F.cosine_embedding_loss(f, f2, y) * args.init_weight_cos
         result.append(cur_loss)
+    
+    needed_globals = {
+        # for palette loss
+        'cur_iteration':cur_iteration,
+    }
+    
+    if len(args.custom_loss)>0:
+        for lossclass in args.custom_loss:
+            new_losses = lossclass.get_loss(cur_cutouts, out, args, globals = needed_globals, lossGlobals = lossGlobals)
+            if type(new_losses) is not list and type(new_losses) is not tuple:
+                result.append(new_losses)
+            else:
+                result += new_losses
 
     if args.make_video:    
         img = np.array(out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8))[:,:,:]
@@ -1416,12 +1448,8 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("-cm",   "--color_mapper", type=str, help="Color Mapping", default=None, dest='color_mapper')
-    vq_parser.add_argument("-epw",  "--enforce_palette_annealing", type=int, help="enforce palette annealing, 0 -- skip", default=5000, dest='enforce_palette_annealing')
-    vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
-    vq_parser.add_argument("-tpl",  "--target_palette_length", type=int, help="target palette length", default=16, dest='target_palette_length')
-    vq_parser.add_argument("-smo",  "--smoothness", type=float, help="encourage smoothness, 0 -- skip", default=0, dest='smoothness')
-    vq_parser.add_argument("-est",  "--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
-    vq_parser.add_argument("-sat",  "--saturation", type=float, help="encourage saturation, 0 -- skip", default=0, dest='saturation')
+
+    vq_parser.add_argument("-loss",  "--custom_loss", type=float, help="implement a custom loss type through LossInterface. example: ['edge']", default=[], dest='custom_loss')
 
     return vq_parser
 
@@ -1566,8 +1594,8 @@ def process_args(vq_parser, namespace=None):
         # print("----> NO VECTOR PROMPT")
         args.vector_prompts = []
 
-    if args.target_palette is not None:
-        args.target_palette = palette_from_string(args.target_palette)
+    # if args.target_palette is not None:
+    #     args.target_palette = palette_from_string(args.target_palette)
 
     if args.overlay_image is not None and args.overlay_every <= 0:
         args.overlay_image = None
@@ -1634,6 +1662,9 @@ def apply_settings():
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
 
+    for n,l in loss_class_table.items():
+        l.add_settings(vq_parser)
+
     if len(global_pixray_settings) > 0:
         # check for any bogus entries in the settings
         dests = [d.dest for d in vq_parser._actions]
@@ -1648,6 +1679,13 @@ def apply_settings():
 
     settings = process_args(vq_parser, settingsDict)
     return settings
+
+def add_custom_loss(name, customloss):
+    # unfortunately this way it cannot access globals when initializing 
+    assert issubclass(customloss,LossInterface)
+    loss_class_table.update({
+        name: customloss,
+    })
 
 def command_line_override():
     global global_pixray_settings
