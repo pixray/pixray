@@ -22,7 +22,7 @@ from torchvision.transforms import functional as TF
 torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead to OOM. False is more deterministic.
 #torch.use_deterministic_algorithms(True)		# NR: grid_sampler_2d_backward_cuda does not have a deterministic implementation
 
-from torch_optimizer import DiffGrad, AdamP, RAdam
+from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
 
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
@@ -420,8 +420,8 @@ def rebuild_optimisers(args):
             opt = DiffGrad(to_optimize, lr=dropped_learning_rate)      # LR=2+?
         elif args.optimiser == "AdamP":
             opt = AdamP(to_optimize, lr=dropped_learning_rate)     # LR=2+?
-        elif args.optimiser == "RAdam":
-            opt = RAdam(to_optimize, lr=dropped_learning_rate)     # LR=2+?
+        # elif args.optimiser == "RAdam":
+        #     opt = RAdam(to_optimize, lr=dropped_learning_rate)     # LR=2+?
 
         new_opts = [opt]
 
@@ -1411,7 +1411,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=1, dest='batches')
     vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
     vq_parser.add_argument("-sd",   "--seed", type=int, help="Seed", default=None, dest='seed')
-    vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, AdamP or RAdam)", default='Adam', dest='optimiser')
+    vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
