@@ -14,36 +14,39 @@ class GenesisPredictor(cog.Predictor):
         print("---> GenesisPredictor Setup")
 
     # Define the input types for a prediction
-    @cog.input("prompt", type=str, help="say anything", default="")
-    @cog.input("style", type=str, options=["image", "pixels"], default="image")
-    @cog.input("version", type=str, options=["practice", "final"], default="practice")
-    @cog.input("settings", type=str, help="(optional)", default="\n")
-    def predict(self, prompt, style, version, settings):
+    @cog.input("title", type=str, default="")
+    @cog.input("drawing_style", type=str, options=["image", "pixels"], default="image")
+    @cog.input("quality", type=str, options=["draft", "mintable"], default="draft")
+    @cog.input("advanced_settings", type=str, default="\n")
+    def predict(self, title, drawing_style, quality, advanced_settings):
         """Run a single prediction on the model"""
-        print("---> GenesisPredictor Predict")
+        print("---> Pixray Genesis Init")
 
         pixray.reset_settings()
 
-        if(version=="practice"):
+        if(quality=="draft"):
             pixray.add_settings(output="outputs/genesis_draft.png", quality="draft", scale=2.5, iterations=100)
         else:
             pixray.add_settings(output="outputs/genesis.png", quality="best", scale=4, iterations=300)
 
         empty_settings = True
         # apply settings in order
-        prompt = prompt.strip()
-        if prompt != "":
-            pixray.add_settings(prompts=prompt)
+        title = title.strip()
+        if title != "":
+            if drawing_style == "pixels":
+                pixray.add_settings(prompts=f"{title} #pixelart")
+            else:
+                pixray.add_settings(prompts=title)
             empty_settings = False
 
-        if style == "image":
+        if drawing_style == "image":
             pixray.add_settings(drawer="vqgan")
         else:
             pixray.add_settings(drawer="pixel")
 
-        settings = settings.strip()
-        if settings != "":
-            ydict = yaml.safe_load(settings)
+        advanced_settings = advanced_settings.strip()
+        if advanced_settings != "":
+            ydict = yaml.safe_load(advanced_settings)
             if ydict is not None:
                 pixray.add_settings(**ydict)
                 empty_settings = False
