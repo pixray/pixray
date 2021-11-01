@@ -80,7 +80,7 @@ class Text2Pixel(BasePixrayPredictor):
 
 class PixrayRaw(BasePixrayPredictor):
     @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #pixelart")
-    @cog.input("settings", type=str, help="yaml settings", default='drawer: pixel\nscale: 2.5\nquality: better')
+    @cog.input("settings", type=str, help="yaml settings", default='\n')
     def predict(self, prompts, settings):
         ydict = yaml.safe_load(settings)
         yield from super().predict(settings="pixrayraw", prompts=prompts, **ydict)
