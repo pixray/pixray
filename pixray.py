@@ -786,10 +786,13 @@ def do_init(args):
         pMs.append(Prompt(embed, weight).to(device))
 
     #custom loss 
-    if args.custom_loss:
+    if args.custom_loss is not None:
+        custom_losses = args.custom_loss.split(",")
+        custom_losses = [loss.strip() for loss in custom_losses]
+
         custom_loss_names = args.custom_loss
         lossClasses = []
-        for loss in args.custom_loss:
+        for loss in custom_losses:
             lossClass = loss_class_table[loss]
             # do special initializations here
             if loss=='edge':
@@ -1445,7 +1448,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-d",    "--deterministic", type=bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("-cm",   "--color_mapper", type=str, help="Color Mapping", default=None, dest='color_mapper')
     vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
-    vq_parser.add_argument("-loss", "--custom_loss", action="append", help="implement a custom loss type through LossInterface. example: edge", dest='custom_loss')
+    vq_parser.add_argument("-loss", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
 
     return vq_parser
 
