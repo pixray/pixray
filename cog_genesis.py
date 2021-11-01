@@ -17,8 +17,8 @@ class GenesisPredictor(cog.Predictor):
     @cog.input("title", type=str, default="")
     @cog.input("drawing_style", type=str, options=["image", "pixels"], default="image")
     @cog.input("quality", type=str, options=["draft", "mintable"], default="draft")
-    @cog.input("advanced_settings", type=str, default="\n")
-    def predict(self, title, drawing_style, quality, advanced_settings):
+    @cog.input("optional_settings", type=str, default="\n")
+    def predict(self, title, drawing_style, quality, optional_settings):
         """Run a single prediction on the model"""
         print("---> Pixray Genesis Init")
 
@@ -45,9 +45,9 @@ class GenesisPredictor(cog.Predictor):
         else:
             pixray.add_settings(drawer="pixel")
 
-        advanced_settings = advanced_settings.strip()
-        if advanced_settings != "":
-            ydict = yaml.safe_load(advanced_settings)
+        optional_settings = optional_settings.strip()
+        if optional_settings != "":
+            ydict = yaml.safe_load(optional_settings)
             if ydict is not None:
                 pixray.add_settings(**ydict)
                 empty_settings = False
