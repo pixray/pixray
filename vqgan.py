@@ -91,6 +91,7 @@ class VqganDrawer(DrawingInterface):
 
     def __init__(self, settings):
         super(DrawingInterface, self).__init__()
+        torch.hub.set_dir("models")
         self.vqgan_model = settings.vqgan_model
 
     def load_model(self, settings, device):
