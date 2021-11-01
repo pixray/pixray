@@ -16,13 +16,18 @@ class GenesisPredictor(cog.Predictor):
     # Define the input types for a prediction
     @cog.input("prompt", type=str, help="say anything", default="")
     @cog.input("style", type=str, options=["image", "pixels"], default="image")
+    @cog.input("version", type=str, options=["practice", "final"], default="practice")
     @cog.input("settings", type=str, help="(optional)", default="\n")
-    def predict(self, prompt, style, settings):
+    def predict(self, prompt, style, version, settings):
         """Run a single prediction on the model"""
         print("---> GenesisPredictor Predict")
 
         pixray.reset_settings()
-        pixray.add_settings(output="outputs/genesis.png")
+
+        if(version=="practice"):
+            pixray.add_settings(output="outputs/genesis_draft.png", quality="draft", scale=2.5, iterations=100)
+        else:
+            pixray.add_settings(output="outputs/genesis.png", quality="best", scale=4, iterations=300)
 
         empty_settings = True
         # apply settings in order
@@ -45,7 +50,7 @@ class GenesisPredictor(cog.Predictor):
 
         # TODO: something if empty_settings?
 
-        if empty_settings:
+        if empty_settings == True:
             pixray.add_settings(prompts="Wow, that looks amazing!|Trending on Artstation")
             pixray.add_settings(custom_loss='saturation')
 

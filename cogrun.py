@@ -83,5 +83,7 @@ class PixrayRaw(BasePixrayPredictor):
     @cog.input("settings", type=str, help="yaml settings", default='\n')
     def predict(self, prompts, settings):
         ydict = yaml.safe_load(settings)
+        if ydict == None:
+            # no settings
+            ydict = {}
         yield from super().predict(settings="pixrayraw", prompts=prompts, **ydict)
-

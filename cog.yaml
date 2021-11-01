@@ -11,5 +11,5 @@ build:
 # predict: "cogrun.py:PixrayPixel"
 # predict: "cogrun.py:Text2Image"
 # predict: "cogrun.py:Text2Pixel"
-# predict: "cogrun.py:PixrayRaw"
-predict: "cog_genesis.py:GenesisPredictor"
+predict: "cogrun.py:PixrayRaw"
+# predict: "cog_genesis.py:GenesisPredictor"
