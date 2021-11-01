@@ -29,15 +29,16 @@ class GenesisPredictor(cog.Predictor):
         else:
             pixray.add_settings(output="outputs/genesis.png", quality="best", scale=4, iterations=300)
 
-        empty_settings = True
         # apply settings in order
         title = title.strip()
-        if title != "":
-            if drawing_style == "pixels":
-                pixray.add_settings(prompts=f"{title} #pixelart")
-            else:
-                pixray.add_settings(prompts=title)
-            empty_settings = False
+        if title == "" or title == "(untitled)":
+            title = "Wow, that looks amazing!|Trending on Artstation"
+            pixray.add_settings(custom_loss='saturation')
+
+        if drawing_style == "pixels":
+            pixray.add_settings(prompts=f"{title} #pixelart")
+        else:
+            pixray.add_settings(prompts=title)
 
         if drawing_style == "image":
             pixray.add_settings(drawer="vqgan")
@@ -50,12 +51,6 @@ class GenesisPredictor(cog.Predictor):
             if ydict is not None:
                 pixray.add_settings(**ydict)
                 empty_settings = False
-
-        # TODO: something if empty_settings?
-
-        if empty_settings == True:
-            pixray.add_settings(prompts="Wow, that looks amazing!|Trending on Artstation")
-            pixray.add_settings(custom_loss='saturation')
 
         pixray.add_settings(skip_args=True)
         settings = pixray.apply_settings()
