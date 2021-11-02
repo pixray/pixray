@@ -16,7 +16,7 @@ class GenesisPredictor(cog.Predictor):
     # Define the input types for a prediction
     @cog.input("title", type=str, default="")
     @cog.input("quality", type=str, options=["draft", "mintable"], default="draft")
-    @cog.input("optional_settings", type=str, default="\n")
+    @cog.input("optional_settings", type=str, default="seed: 42\n")
     def predict(self, title, quality, optional_settings):
         """Run a single prediction on the model"""
         print("---> Pixray Genesis Init")
