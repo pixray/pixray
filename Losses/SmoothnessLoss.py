@@ -82,6 +82,8 @@ class SmoothnessLoss(LossInterface):
         parser.add_argument("--smoothness_type", type=str, help="enforce smoothness type: default/clipped/log", default='default', dest='smoothness_type')
         parser.add_argument("--smoothness_gaussian_kernel", type=float, help="enforce smoothness aux gaussian blur kernel", default=0, dest='smoothness_gaussian_kernel')
         parser.add_argument("--smoothness_gaussian_std", type=float, help="enforce smoothness aux gaussian blur std", default=1, dest='smoothness_gaussian_std')
+        parser.add_argument("--smoothness_spacing", type=int, help="enforce smoothness spacing", default=1, dest='smoothness_spacing')
+        parser.add_argument("--smoothness_edge_order", type=int, help="enforce smoothness edge order", default=1, dest='smoothness_edge_order')
         return parser
     
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
@@ -92,9 +94,9 @@ class SmoothnessLoss(LossInterface):
                 cutouts = smoothing(cutouts)
 
             _pixels = cutouts.permute(0,2,3,1).reshape(-1,cutouts.shape[2],3)
-            gyr, gxr = torch.gradient(_pixels[:,:,0])
-            gyg, gxg = torch.gradient(_pixels[:,:,1])
-            gyb, gxb = torch.gradient(_pixels[:,:,2])
+            gyr, gxr = torch.gradient(_pixels[:,:,0], spacing=args.smoothness_spacing, edge_order=args.smoothness_edge_order)
+            gyg, gxg = torch.gradient(_pixels[:,:,1], spacing=args.smoothness_spacing, edge_order=args.smoothness_edge_order)
+            gyb, gxb = torch.gradient(_pixels[:,:,2], spacing=args.smoothness_spacing, edge_order=args.smoothness_edge_order)
             sharpness = torch.sqrt(gyr**2 + gxr**2+ gyg**2 + gxg**2 + gyb**2 + gxb**2)
             if args.smoothness_type=='clipped':
                 sharpness = torch.clamp( sharpness, max=0.5 )
