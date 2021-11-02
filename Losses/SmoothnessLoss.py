@@ -88,7 +88,7 @@ class SmoothnessLoss(LossInterface):
         cur_loss = []
         for _,cutouts in cur_cutouts.items():
             if args.smoothness_gaussian_kernel:
-                smoothing = GaussianSmoothing(3, args.smoothness_gaussian_kernel, args.smoothness_gaussian_std)
+                smoothing = GaussianSmoothing(3, args.smoothness_gaussian_kernel, args.smoothness_gaussian_std).to(self.device)
                 cutouts = smoothing(cutouts)
 
             _pixels = cutouts.permute(0,2,3,1).reshape(-1,cutouts.shape[2],3)
