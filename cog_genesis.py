@@ -26,7 +26,7 @@ class GenesisPredictor(cog.Predictor):
         if(quality=="draft"):
             pixray.add_settings(output="outputs/genesis_draft.png", quality="draft", scale=2.5, iterations=100)
         else:
-            pixray.add_settings(output="outputs/genesis.png", quality="best", scale=4.25, iterations=350)
+            pixray.add_settings(output="outputs/genesis.png", quality="best", scale=4, iterations=350)
 
         # apply settings in order
         title = title.strip()
