@@ -979,7 +979,10 @@ def ascend_txt(args):
     global pmsTargetTable
     global lossGlobals
 
-    out = drawer.synth(cur_iteration);
+    if args.transparency:
+        out, alpha = drawer.synth(cur_iteration, return_transparency=True)
+    else:
+        out = drawer.synth(cur_iteration)
 
     result = []
 
@@ -1110,6 +1113,9 @@ def ascend_txt(args):
         # used to be for palette loss - now left as an example
         'cur_iteration':cur_iteration,
     }
+
+    if args.transparency:
+        result.append(torch.mean(alpha))
     
     if args.custom_loss is not None and len(args.custom_loss)>0:
         for lossclass in args.custom_loss:
@@ -1637,7 +1643,7 @@ def reset_settings():
 def add_settings(**kwargs):
     global global_pixray_settings
     for k, v in kwargs.items():
-        if v is None:
+        if v is None or v == "None":
             # just remove the key if it is there
             global_pixray_settings.pop(k, None)
         else:

@@ -16,6 +16,8 @@ import PIL.Image
 
 from util import str2bool
 
+from perlin_numpy import generate_fractal_noise_3d
+
 def rect_from_corners(p0, p1):
     x1, y1 = p0
     x2, y2 = p1
@@ -101,6 +103,7 @@ class PixelDrawer(DrawingInterface):
         parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri, diamond, knit", default="rect", dest='pixel_type')
         parser.add_argument("--pixel_edge_check", type=str2bool, help="ensure grid is symmetric", default=True, dest='pixel_edge_check')
         parser.add_argument("--pixel_iso_check", type=str2bool, help="ensure tri and hex shapes are w/h scaled", default=True, dest='pixel_iso_check')
+        parser.add_argument("--transparent", type=bool, help="enforce transparency", default=False, dest='transparency')
         return parser
 
     def __init__(self, settings):
@@ -161,6 +164,8 @@ class PixelDrawer(DrawingInterface):
                     self.num_cols = self.num_cols + 1
                 if self.num_rows % 2 == 1:
                     self.num_rows = self.num_rows + 1
+
+        self.transparency = settings.transparency
 
     def load_model(self, settings, device):
         # gamma = 1.0
@@ -302,7 +307,12 @@ class PixelDrawer(DrawingInterface):
     def get_num_resolutions(self):
         return None
 
-    def synth(self, cur_iteration):
+    def synth(self, cur_iteration: int, return_transparency: bool=False):
+        """Uses pydiffvg to render the image.
+
+        Returns synthesized RGB image when return_transparency is False.
+        Returns synthesized (RGB,A) tuple when return_transparency is True.
+        """
         if cur_iteration < 0:
             return self.img
 
@@ -311,16 +321,27 @@ class PixelDrawer(DrawingInterface):
             self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)
         img = render(self.canvas_width, self.canvas_height, 2, 2, cur_iteration, None, *scene_args)
         img_h, img_w = img.shape[0], img.shape[1]
-        img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(img.shape[0], img.shape[1], 3, device = self.device) * (1 - img[:, :, 3:4])
-        img = img[:, :, :3]
+        alpha = img[:, :, 3:4]
 
+        if return_transparency:
+            res = [1,2,4,8,16][random.randint(0,4)] # resolution of the perlin noise
+            noise = generate_fractal_noise_3d((img_h, img_w, 3), (res, res, 1))
+            img = alpha * img[:, :, :3] + (1 - alpha) * torch.tensor(noise, device = self.device)
+        else:
+            img = alpha * img[:, :, :3]
+        
+        img = img[:, :, :3]
         img = img.unsqueeze(0)
         img = img.permute(0, 3, 1, 2) # NHWC -> NCHW
         # if cur_iteration == 0:
         #     print("SHAPE", img.shape)
 
         self.img = img
-        return img
+
+        if return_transparency:
+            return img, alpha
+        else:
+            return img
 
     @torch.no_grad()
     def to_image(self):
@@ -335,7 +356,7 @@ class PixelDrawer(DrawingInterface):
         with torch.no_grad():
             for group in self.shape_groups:
                 group.fill_color.data[:3].clamp_(0.0, 1.0)
-                group.fill_color.data[3].clamp_(1.0, 1.0)
+                group.fill_color.data[3].clamp_(0.0 if self.transparency else 1.0, 1.0)
 
     def get_z(self):
         return None
