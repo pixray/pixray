@@ -34,22 +34,19 @@ class GenesisPredictor(cog.Predictor):
             title = "Wow, that looks amazing!|Trending on Artstation"
             pixray.add_settings(custom_loss='saturation')
 
+        # initially assume prompt is title (this can be overridden)
+        pixray.add_settings(prompts=title)
+
         optional_settings = optional_settings.strip()
         if optional_settings != "":
             ydict = yaml.safe_load(optional_settings)
             if ydict is not None:
                 print(ydict)
-                if not "prompts" in ydict:
-                    if ("drawer" in ydict) and ydict["drawer"] == "pixel":
-                        pixray.add_settings(prompts=f"{title} #pixelart")
-                    else:
-                        pixray.add_settings(prompts=title)
-
+                # add #pixelart to pixel drawer items
+                if ("drawer" in ydict) and ydict["drawer"] == "pixel":
+                    pixray.add_settings(prompts=f"{title} #pixelart")
+                # note settings might explicitly set prompts as well
                 pixray.add_settings(**ydict)
-                empty_settings = False
-        else:
-            pixray.add_settings(prompts=title)
-
 
         pixray.add_settings(skip_args=True)
         settings = pixray.apply_settings()
