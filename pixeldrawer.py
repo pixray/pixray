@@ -325,7 +325,7 @@ class PixelDrawer(DrawingInterface):
         if return_transparency:
             res = [1,2,4,8,16][random.randint(0,4)] # resolution of the perlin noise
             noise = generate_fractal_noise_3d((img_h, img_w, 3), (res, res, 1))
-            img = alpha * img[:, :, :3] + (1 - alpha) * torch.tensor(noise, device = self.device)
+            img = alpha * img[:, :, :3] + (1 - alpha) * torch.tensor(noise, dtype=torch.float32, device = self.device)
         else:
             img = alpha * img[:, :, :3]
         
