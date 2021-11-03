@@ -103,7 +103,6 @@ class PixelDrawer(DrawingInterface):
         parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri, diamond, knit", default="rect", dest='pixel_type')
         parser.add_argument("--pixel_edge_check", type=str2bool, help="ensure grid is symmetric", default=True, dest='pixel_edge_check')
         parser.add_argument("--pixel_iso_check", type=str2bool, help="ensure tri and hex shapes are w/h scaled", default=True, dest='pixel_iso_check')
-        parser.add_argument("--transparent", type=bool, help="enforce transparency", default=False, dest='transparency')
         return parser
 
     def __init__(self, settings):

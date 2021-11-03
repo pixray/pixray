@@ -25,6 +25,7 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 
 from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
+from util import str2bool
 
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
@@ -1455,6 +1456,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-cm",   "--color_mapper", type=str, help="Color Mapping", default=None, dest='color_mapper')
     vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
     vq_parser.add_argument("-loss", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
+    vq_parser.add_argument("--transparent", type=str2bool, help="enable transparency", default=False, dest='transparency')
 
     return vq_parser
 
