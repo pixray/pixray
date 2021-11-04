@@ -1116,7 +1116,7 @@ def ascend_txt(args):
     }
 
     if args.transparency:
-        result.append(torch.mean(alpha))
+        result.append(args.alpha_weight*torch.mean(alpha))
     
     if args.custom_loss is not None and len(args.custom_loss)>0:
         for lossclass in args.custom_loss:
@@ -1457,6 +1457,8 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
     vq_parser.add_argument("-loss", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     vq_parser.add_argument("--transparent", type=str2bool, help="enable transparency", default=False, dest='transparency')
+    vq_parser.add_argument("--alpha_weight", type=float, help="strenght of alpha loss", default=1., dest='alpha_weight')
+    vq_parser.add_argument("--alpha_gamma", type=float, help="width-relative sigma for the alpha gaussian", default=4., dest='alpha_gamma')
 
     return vq_parser
 

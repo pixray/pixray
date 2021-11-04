@@ -94,6 +94,18 @@ def knit_from_corners(p0, p1):
     return pts
 
 shift_pixel_types = ["hex", "rectshift", "diamond"]
+   
+def gkern(size, gamma):
+    """
+    creates gaussian kernel with side length `l` and a sigma of `sig`
+    https://stackoverflow.com/a/43346070/6028830
+    """
+    sig = size/gamma
+    ax = np.linspace(-(size - 1) / 2., (size - 1) / 2., size)
+    gauss = np.exp(-0.5 * np.square(ax) / np.square(sig))
+    kernel = -np.outer(gauss, gauss)
+    kernel = (kernel-kernel.min()) / (kernel.max()-kernel.min())
+    return kernel * (size**2) / np.sum(kernel) # normalize such that the sum of pixel was the same as the original
 
 class PixelDrawer(DrawingInterface):
     @staticmethod
@@ -165,6 +177,8 @@ class PixelDrawer(DrawingInterface):
                     self.num_rows = self.num_rows + 1
 
         self.transparency = settings.transparency
+        if self.transparency:
+            self.gkern = torch.tensor(gkern(self.canvas_width, settings.alpha_gamma))
 
     def load_model(self, settings, device):
         # gamma = 1.0
@@ -325,7 +339,7 @@ class PixelDrawer(DrawingInterface):
         if return_transparency:
             res = [1,2,4,8,16][random.randint(0,4)] # resolution of the perlin noise
             noise = generate_fractal_noise_3d((img_h, img_w, 3), (res, res, 1))
-            img = alpha * img[:, :, :3] + (1 - alpha) * torch.tensor(noise, dtype=torch.float32, device = self.device)
+            img = alpha * img[:, :, :3] + (1 - alpha) * torch.tensor(noise, dtype=torch.float32, device=self.device)
         else:
             img = alpha * img[:, :, :3]
         
@@ -338,7 +352,7 @@ class PixelDrawer(DrawingInterface):
         self.img = img
 
         if return_transparency:
-            return img, alpha
+            return img, alpha*self.gkern.to(self.device)
         else:
             return img
 
