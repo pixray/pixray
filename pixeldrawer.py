@@ -178,7 +178,10 @@ class PixelDrawer(DrawingInterface):
 
         self.transparency = settings.transparency
         if self.transparency:
-            self.gkern = torch.tensor(gkern(self.canvas_width, settings.alpha_gamma))
+            if settings.alpha_use_g:
+                self.gkern = torch.tensor(gkern(self.canvas_width, settings.alpha_gamma))
+            else:
+                self.gkern = None
 
     def load_model(self, settings, device):
         # gamma = 1.0
@@ -352,7 +355,10 @@ class PixelDrawer(DrawingInterface):
         self.img = img
 
         if return_transparency:
-            return img, alpha*self.gkern.to(self.device)
+            if self.gkern:
+                return img, alpha*self.gkern.to(self.device) # weight by the gaussian mask
+            else:
+                return img, alpha
         else:
             return img
 
