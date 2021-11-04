@@ -355,7 +355,7 @@ class PixelDrawer(DrawingInterface):
         self.img = img
 
         if return_transparency:
-            if self.gkern:
+            if self.gkern is not None:
                 return img, alpha*self.gkern.to(self.device) # weight by the gaussian mask
             else:
                 return img, alpha
