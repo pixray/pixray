@@ -492,9 +492,10 @@ def do_init(args):
     drawer.load_model(args, device)
     num_resolutions = drawer.get_num_resolutions()
     # print("-----------> NUMR ", num_resolutions)
+    #as of torch 1.8, jit produces errors. The below code no longer works with 1.10
+    #jit = True if float(torch.__version__[:3]) < 1.8 else False
+    jit = False
 
-    jit = True if float(torch.__version__[:3]) < 1.8 else False
-    
     if num_resolutions!=None:
         f = 2**(num_resolutions - 1)
         toksX, toksY = args.size[0] // f, args.size[1] // f
