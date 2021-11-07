@@ -180,7 +180,7 @@ class PixelDrawer(DrawingInterface):
     def rand_init(self, toksX, toksY):
         self.init_from_tensor(None)
 
-    def init_from_tensor(self, init_tensor):
+    def encode_image(self, init_tensor):
         # print("----> SHAPE", self.num_rows, self.num_cols)
         canvas_width, canvas_height = self.canvas_width, self.canvas_height
         num_rows, num_cols = self.num_rows, self.num_cols
@@ -250,6 +250,7 @@ class PixelDrawer(DrawingInterface):
                         print("WTF", error)
                         mono_color = random.random()
                         cell_color = torch.tensor([mono_color, mono_color, mono_color, 1.0])
+                        raise error
                 colors.append(cell_color)
                 p0 = [cur_x, cur_y]
                 p1 = [cur_x+cell_width, cur_y+cell_height]
@@ -283,11 +284,12 @@ class PixelDrawer(DrawingInterface):
             group.fill_color.requires_grad = True
             color_vars.append(group.fill_color)
 
-        self.color_vars = color_vars
+        return color_vars, img, shapes, shape_groups
 
-        self.img = img
-        self.shapes = shapes 
-        self.shape_groups  = shape_groups
+    def init_from_tensor(self, init_tensor):
+        self.color_vars, self.img, self.shapes, self.shape_groups = (
+            self.encode_image(init_tensor)
+        )
 
     def get_opts(self, decay_divisor=1):
         # Optimizers
@@ -298,7 +300,9 @@ class PixelDrawer(DrawingInterface):
         return self.opts
 
     def reapply_from_tensor(self, new_tensor):
-        self.init_from_tensor(new_tensor)
+        color_vars, *_ = self.encode_image(new_tensor)
+        for old_color_var, new_color_var in zip(self.color_vars, color_vars):
+            old_color_var.data = new_color_var.data
 
     def get_z_from_tensor(self, ref_tensor):
         return None
