@@ -799,10 +799,6 @@ def do_init(args):
             loss_name, weight, stop = parse_prompt(loss)
             lossClass = loss_class_table[loss_name]
             # do special initializations here
-            if loss_name=='edge':
-                customloss = EdgeLoss(custom_init = "custom initialization",device=device)
-                lossClasses.append({"loss":customloss, "weight": weight})
-                continue
             try:
                 lossClasses.append({"loss":lossClass(device=device), "weight": weight})
             except TypeError as e:

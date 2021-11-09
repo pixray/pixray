@@ -7,9 +7,7 @@ from torch import nn, optim
 from Losses.LossInterface import LossInterface
 
 class EdgeLoss(LossInterface):
-    def __init__(self,custom_init,**kwargs):
-        print(kwargs)
-        print(custom_init,"custom init 0 message :)")
+    def __init__(self,**kwargs):
         super().__init__(**kwargs)
     
     @staticmethod
@@ -26,19 +24,14 @@ class EdgeLoss(LossInterface):
             args.edge_color = (255,255,255)
         return args
     
-    def forward(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
+    def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         zers = torch.zeros(out.size()).cuda()
-        # print(out.size())
-        # print(out.size()[1])
         lmax = out.size()[2]
         rmax = out.size()[3]
-        # print(rmax,lmax)
-        # r,g,b
         Rval,Gval,Bval = args.edge_color
         zers[:,0,:,:] = Rval/255
         zers[:,1,:,:] = Gval/255
         zers[:,2,:,:] = Bval/255
-        # print(zers)
         mseloss = nn.MSELoss()
         left, right, upper, lower = args.edge_thickness
         cur_loss = torch.tensor(0.0).cuda()
@@ -46,7 +39,6 @@ class EdgeLoss(LossInterface):
         rloss = mseloss(out[:,:,:,rmax-right:], zers[:,:,:,rmax-right:])
         uloss = mseloss(out[:,:,:upper,left:rmax-right], zers[:,:,:upper,left:rmax-right]) 
         dloss = mseloss(out[:,:,lmax-lower:,left:rmax-right], zers[:,:,lmax-lower:,left:rmax-right]) 
-        # print(lloss, rloss, uloss, dloss)
         if left!=0:
             cur_loss+=lloss
         if right!=0:
@@ -59,6 +51,4 @@ class EdgeLoss(LossInterface):
             gloss = mseloss(out[:,:,:,:], zers[:,:,:,:]) * args.global_color_weight
             cur_loss+=gloss
         cur_loss *= args.edge_color_weight
-        # print(cur_loss,'lsiz')
-        # print(cur_loss,'loss1')
         return cur_loss
