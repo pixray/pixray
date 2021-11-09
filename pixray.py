@@ -88,12 +88,14 @@ from Losses.PaletteLoss import PaletteLoss
 from Losses.SaturationLoss import SaturationLoss
 from Losses.SymmetryLoss import SymmetryLoss
 from Losses.SmoothnessLoss import SmoothnessLoss
+from Losses.EdgeLoss import EdgeLoss
 
 loss_class_table = {
     "palette": PaletteLoss,
     "saturation": SaturationLoss,
     "symmetry": SymmetryLoss,
     "smoothness": SmoothnessLoss,
+    "edge": EdgeLoss,
 }
 
 
