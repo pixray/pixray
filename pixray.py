@@ -795,12 +795,22 @@ def do_init(args):
         custom_losses = [loss.strip() for loss in custom_losses]
         custom_loss_names = args.custom_loss
         lossClasses = []
-        for loss in custom_losses:
+        for loss_chunk in custom_losses:
+            # check for special delimiter
+            if loss_chunk.find('->') > 0:
+                parts = loss_chunk.split('->')
+                loss = parts[0]
+                instance_args = parts[1:]
+            else:
+                loss = loss_chunk
+                instance_args = []
             loss_name, weight, stop = parse_prompt(loss)
             lossClass = loss_class_table[loss_name]
             # do special initializations here
             try:
-                lossClasses.append({"loss":lossClass(device=device), "weight": weight})
+                lossInstance = lossClass(device=device)
+                lossInstance.instance_settings(instance_args)
+                lossClasses.append({"loss":lossInstance, "weight": weight})
             except TypeError as e:
                 print(f'error in initializing {lossClass} - this message is to provide information')
                 raise TypeError(e)

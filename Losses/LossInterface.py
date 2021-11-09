@@ -4,6 +4,10 @@ import argparse
 class LossInterface():
     def __init__(self, device=None):
         self.device = device
+
+    # a list of optional strings
+    def instance_settings(self, arglist):
+        pass
     
     @staticmethod
     def add_settings(parser):
