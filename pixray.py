@@ -791,18 +791,18 @@ def do_init(args):
     if args.custom_loss is not None:
         custom_losses = args.custom_loss.split(",")
         custom_losses = [loss.strip() for loss in custom_losses]
-
         custom_loss_names = args.custom_loss
         lossClasses = []
         for loss in custom_losses:
-            lossClass = loss_class_table[loss]
+            loss_name, weight, stop = parse_prompt(loss)
+            lossClass = loss_class_table[loss_name]
             # do special initializations here
-            if loss=='edge':
+            if loss_name=='edge':
                 customloss = EdgeLoss(custom_init = "custom initialization",device=device)
-                lossClasses.append(customloss)
+                lossClasses.append({"loss":customloss, "weight": weight})
                 continue
             try:
-                lossClasses.append(lossClass(device=device))
+                lossClasses.append({"loss":lossClass(device=device), "weight": weight})
             except TypeError as e:
                 print(f'error in initializing {lossClass} - this message is to provide information')
                 raise TypeError(e)
@@ -810,13 +810,13 @@ def do_init(args):
 
     #Loss args parse
     if args.custom_loss:
-        for loss in args.custom_loss:
-            args = loss.parse_settings(args)
+        for t in args.custom_loss:
+            args = t["loss"].parse_settings(args)
 
     #adding globals for loss
     if args.custom_loss is not None and len(args.custom_loss)>0:
-        for loss in args.custom_loss:
-            lossGlobals.update(loss.add_globals(args))
+        for t in args.custom_loss:
+            lossGlobals.update(t["loss"].add_globals(args))
     
     
     opts = rebuild_optimisers(args)
@@ -1120,12 +1120,16 @@ def ascend_txt(args):
         result.append(torch.mean(alpha))
     
     if args.custom_loss is not None and len(args.custom_loss)>0:
-        for lossclass in args.custom_loss:
+        for t in args.custom_loss:
+            lossclass = t["loss"]
+            lossweight = t["weight"]
             new_losses = lossclass.get_loss(cur_cutouts, out, args, globals = needed_globals, lossGlobals = lossGlobals)
             if type(new_losses) is not list and type(new_losses) is not tuple:
-                result.append(new_losses)
+                result.append(lossweight * new_losses)
             else:
-                result += new_losses
+                # warning: this path might be untested by current losses?
+                weighted_losses = [(lossweight * l) for l in new_losses]
+                result += weighted_losses
 
     if args.make_video:    
         img = np.array(out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8))[:,:,:]
