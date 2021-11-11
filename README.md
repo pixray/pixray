@@ -11,7 +11,7 @@ Pixray is an image generation system. It combines previous ideas including:
 
 pixray it itself a python library and command line utility, but is also friendly to running on line in Google Colab notebooks.
 
-The system is currently lacking documentation. Instead plese checkout [THE DEMO NOTEBOOKS](https://github.com/dribnet/clipit/tree/master/demos) - especially the super simple "Start Here" colab or join in the [discussion on discord](https://discord.gg/x2g9TWrNKe).
+There is currently [some documentation on options](https://dazhizhong.gitbook.io/pixray-docs/docs). Also checkout [THE DEMO NOTEBOOKS](https://github.com/dribnet/clipit/tree/master/demos) - especially the super simple "Start Here" colab or join in the [discussion on discord](https://discord.gg/x2g9TWrNKe).
 
 ## Usage
 
