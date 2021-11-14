@@ -2,6 +2,7 @@ import re
 import argparse
 import glob
 from braceexpand import braceexpand
+from codecs import encode
 
 try:
     import matplotlib.colors
@@ -140,6 +141,26 @@ def palette_from_section(s):
             pal = expand_colors(pal, num_steps)
 
         return pal
+    elif s[0] == '@':
+        # pull from a file or URL
+        if s.endswith(".act"):
+            # https://stackoverflow.com/a/48873783/1010653
+            with open(s[1:], 'rb') as act:
+                raw_data = act.read()                           # Read binary data
+            hex_data = encode(raw_data, 'hex')                  # Convert it to hexadecimal values
+            total_colors_count = (int(hex_data[-7:-4], 16))     # Get last 3 digits to get number of colors total
+            misterious_count = (int(hex_data[-4:-3], 16))       # I have no idea what does it do
+            colors_count = (int(hex_data[-3:], 16))             # Get last 3 digits to get number of nontransparent colors
+
+            # Decode colors from hex to string and split it by 6 (because colors are #1c1c1c)
+            colors = [hex_data[i:i+6].decode() for i in range(0, total_colors_count*6, 6)]
+
+            # Add # to each item and filter empty items if there is a corrupted total_colors_count bit
+            colors = ['#'+i for i in colors if len(i)]
+            colors = [get_single_rgb(s) for s in colors]
+            return colors
+        else:
+            raise ValueError(f'Unknown file type: {s}')
     else:
         return get_rgb_range(s)
 
