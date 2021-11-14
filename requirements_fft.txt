@@ -1,0 +1,14 @@
+# these are IN ADDITION to the core requirements_vqgan.txt
+
+lpips
+sentence_transformers
+opencv-python
+PyWavelets==1.1.1
+git+https://github.com/fbcotter/pytorch_wavelets
+
+# not really needed for the aphantasia progress_bar, but whatever
+ipywidgets
+
+# main aphantasia library
+git+https://github.com/pixray/aphantasia@d7d43a8
+
