@@ -64,6 +64,14 @@ class_table = {
 }
 
 try:
+    from fftdrawer import FftDrawer
+    # update class_table if these import OK
+    class_table.update({"fft": FftDrawer})
+except ImportError as e:
+    print("--> Not running with fft support", e)
+    pass
+
+try:
     from clipdrawer import ClipDrawer
     from pixeldrawer import PixelDrawer
     from linedrawer import LineDrawer
@@ -73,8 +81,8 @@ try:
         "pixel": PixelDrawer,
         "clipdraw": ClipDrawer
     })
-except ImportError:
-    # diffvg is not strictly required
+except ImportError as e:
+    print("--> Not running with pydiffvg drawer support ", e)
     pass
 
 try:
