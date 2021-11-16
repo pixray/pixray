@@ -52,7 +52,7 @@ class FftDrawer(DrawingInterface):
 
     def get_opts(self, decay_divisor=1):
         # Optimizers
-        optimizer = torch.optim.AdamW(self.params, self.lrate, weight_decay=0.01, amsgrad=True)
+        optimizer = torch.optim.Adam(self.params, self.lrate / decay_divisor)
         self.opts = [optimizer]
         return self.opts
 
