@@ -1,0 +1,7 @@
+# diffvg: these are minimal requirements for just the pixeldraw / linedraw etc drawers
+
+cmake==3.21.3
+cssutils==2.3.0
+svgpathtools==1.4.2
+
+# DO THIS: "git clone https://github.com/pixray/diffvg && cd diffvg && git submodule update --init --recursive && CMAKE_PREFIX_PATH=$(pyenv prefix) DIFFVG_CUDA=1 python setup.py install"

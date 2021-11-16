@@ -24,4 +24,3 @@ torch-tools==0.1.5
 git+https://github.com/bfirsh/taming-transformers.git@7a6e64ee
 git+https://github.com/openai/CLIP@573315e
 git+https://github.com/pvigier/perlin-numpy@6f077f8
-

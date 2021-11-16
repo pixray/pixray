@@ -1,4 +1,4 @@
-# these are IN ADDITION to the core requirements_vqgan.txt
+# fft: these are IN ADDITION to the core requirements_vqgan.txt
 
 lpips
 sentence_transformers

@@ -1,3 +1,5 @@
+# these are minimal requirements for just the VQGAN drawer
+
 -f https://download.pytorch.org/whl/torch_stable.html
 torch==1.9.0+cu102
 torchvision==0.10.0+cu102
@@ -9,7 +11,7 @@ braceexpand==0.1.7
 einops==0.3.2
 imageio==2.9.0
 ipython==7.28.0
-kornia==0.5.11
+kornia==0.6.1
 omegaconf==2.1.1
 Pillow==8.3.2
 PyYAML==5.4.1
@@ -18,12 +20,30 @@ scikit-image==0.18.3
 torch_optimizer==0.1.0
 torch-tools==0.1.5
 
-# diffvg
+# can use CompVis/taming-transformers when https://github.com/CompVis/taming-transformers/pull/81 is merged
+git+https://github.com/bfirsh/taming-transformers.git@7a6e64ee
+git+https://github.com/openai/CLIP@573315e
+git+https://github.com/pvigier/perlin-numpy@6f077f8
+
+# diffvg: these are minimal requirements for just the pixeldraw / linedraw etc drawers
+
+# DO THIS: "git clone https://github.com/pixray/diffvg && cd diffvg && git submodule update --init --recursive && CMAKE_PREFIX_PATH=$(pyenv prefix) DIFFVG_CUDA=1 python setup.py install"
 cmake==3.21.3
 cssutils==2.3.0
 svgpathtools==1.4.2
 
-# can use CompVis/taming-transformers when https://github.com/CompVis/taming-transformers/pull/81 is merged
-git+https://github.com/bfirsh/taming-transformers.git@fefe15ac7d0abe69b8d935f1660fdce7567ce11d
-git+https://github.com/openai/CLIP@04f4dc2ca1ed0acc9893bd1a3b526a7e02c4bb10
-git+https://github.com/pvigier/perlin-numpy@6f077f811f5708e504732c26dee8f2015b95da0c
+
+# fft: these are IN ADDITION to the core requirements_vqgan.txt
+
+lpips
+sentence_transformers
+opencv-python
+PyWavelets==1.1.1
+git+https://github.com/fbcotter/pytorch_wavelets
+
+# not really needed for the aphantasia progress_bar, but whatever
+ipywidgets
+
+# main aphantasia library
+git+https://github.com/pixray/aphantasia@d7d43a8
+
