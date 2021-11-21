@@ -8,6 +8,8 @@ import glob
 from braceexpand import braceexpand
 from types import SimpleNamespace
 
+from filters.FilterInterface import FilterInterface
+
 import os.path
 
 from omegaconf import OmegaConf
@@ -60,14 +62,17 @@ default_color_table.append([116/255.0,  63/255.0,  57/255.0])
 
 from scipy.cluster.vq import kmeans2
 
-class ColorLookup(nn.Module):
+class ColorLookup(FilterInterface):
     """
     Maps to fixed color table
     """
-    def __init__(self, color_table, device, beta=10.0):
-        super().__init__()
+    def __init__(self, settings, device):
+        super().__init__(settings, device)
 
-        self.beta = beta
+        # TODO: make this a settable setting
+        self.beta = 10.0
+
+        color_table = settings.target_palette
 
         if color_table is None:
             print("WARNING: using built in palette")

@@ -45,7 +45,7 @@ import random
 
 from einops import rearrange
 
-from colorlookup import ColorLookup
+from filters.colorlookup import ColorLookup
 
 from PIL import ImageFile, Image, PngImagePlugin
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -538,7 +538,7 @@ def do_init(args):
 
     if args.color_mapper is not None:
         if args.color_mapper == "lookup":
-            color_mapper = ColorLookup(args.target_palette, device=device)
+            color_mapper = ColorLookup(args, device=device)
         else:
             print(f"Color mapper {args.color_mapper} not understood")
             sys.exit(1)
