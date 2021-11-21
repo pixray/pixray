@@ -19,11 +19,11 @@ class EdgeLoss(LossInterface):
     
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--edge_thickness", type=int, help="thickness of the edge area all the way around", default=10, dest='edge_thickness')
+        parser.add_argument("--edge_thickness", type=int, help="thickness of the edge area all the way around (percent)", default=5, dest='edge_thickness')
         parser.add_argument("--edge_margins", nargs=4, type=int, help="this is for the thickness of each edge (left, right, up, down) 0-pixel size", default=None, dest='edge_margins')
         parser.add_argument("--edge_color", type=str, help="this is the color of the specified region", default="white", dest='edge_color')
-        parser.add_argument("--edge_color_weight", type=float, help="how much edge color is enforced", default=2, dest='edge_color_weight')
-        parser.add_argument("--global_color_weight", type=float, help="how much global color is enforced ", default=0.5, dest='global_color_weight')
+        parser.add_argument("--edge_color_weight", type=float, help="how much edge color is enforced", default=0.1, dest='edge_color_weight')
+        parser.add_argument("--global_color_weight", type=float, help="how much global color is enforced ", default=0.05, dest='global_color_weight')
         parser.add_argument("--edge_input_image", type=str, help="TBD", default="", dest='edge_input_image')
         parser.add_argument("--edge_mask_image", type=str, help="TBD", default="", dest='edge_mask_image')
         return parser
@@ -80,6 +80,11 @@ class EdgeLoss(LossInterface):
             lmax = out.size()[2]
             rmax = out.size()[3]
             left, right, upper, lower = args.edge_margins
+            left = int(map_number(left, 0, 100, 0, rmax))
+            right = int(map_number(right, 0, 100, 0, rmax))
+            upper = int(map_number(upper, 0, 100, 0, lmax))
+            lower = int(map_number(lower, 0, 100, 0, lmax))
+            # print(left, right, upper, lower)
             lloss = mseloss(out[:,:,:,:left], zers[:,:,:,:left]) 
             rloss = mseloss(out[:,:,:,rmax-right:], zers[:,:,:,rmax-right:])
             uloss = mseloss(out[:,:,:upper,left:rmax-right], zers[:,:,:upper,left:rmax-right]) 
