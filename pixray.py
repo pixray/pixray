@@ -719,7 +719,16 @@ def do_init(args):
             pMs = pmsTable[clip_model]
             perceptor = perceptors[clip_model]
             txt, weight, stop = parse_prompt(prompt)
-            embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
+            if txt[0] == '=':
+                # hack for now to test pseudo encode shim
+                txt = txt[1:]
+                print(f"--> {clip_model} encoding {txt} with stops")
+                actual_tokens = clip.tokenize(txt).to(device)
+                stops = actual_tokens.argmax(dim=-1) - 1
+                embed = perceptor.encode_text(actual_tokens, stops).float()
+            else:
+                print(f"--> {clip_model} normal encoding {txt}")
+                embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
             pMs.append(Prompt(embed, weight, stop).to(device))
     
 
