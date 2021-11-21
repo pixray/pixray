@@ -46,6 +46,7 @@ import random
 from einops import rearrange
 
 from filters.colorlookup import ColorLookup
+from filters.wallpaper import WallpaperFilter
 
 from PIL import ImageFile, Image, PngImagePlugin
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -539,6 +540,8 @@ def do_init(args):
     if args.color_mapper is not None:
         if args.color_mapper == "lookup":
             color_mapper = ColorLookup(args, device=device)
+        elif args.color_mapper == "wallpaper":
+            color_mapper = WallpaperFilter(args, device=device)
         else:
             print(f"Color mapper {args.color_mapper} not understood")
             sys.exit(1)

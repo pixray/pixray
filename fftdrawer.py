@@ -16,7 +16,7 @@ class FftDrawer(DrawingInterface):
         parser.add_argument('--fft_wave',    default='coif2', help='wavelets: db[1..], coif[1..], haar, dmey', dest='fft_wave')
         parser.add_argument('--fft_sharp',   default=0.3, type=float, dest='fft_sharp')
         parser.add_argument('--fft_colors',  default=1.5, type=float, dest='fft_colors')
-        parser.add_argument('--fft_lrate',   default=0.05, type=float, help='Learning rate', dest='fft_lrate')
+        parser.add_argument('--fft_lrate',   default=0.2, type=float, help='Learning rate', dest='fft_lrate')
         return parser
 
     def __init__(self, settings):
