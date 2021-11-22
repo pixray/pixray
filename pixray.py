@@ -1716,6 +1716,7 @@ def apply_settings():
         custom_losses = settings_core.custom_loss.split(",")
         custom_losses = [loss.strip() for loss in custom_losses]
         for l in custom_losses:
+            l = l.split(':')[0]
             loss_class_table[l].add_settings(vq_parser)
 
     if len(global_pixray_settings) > 0:
