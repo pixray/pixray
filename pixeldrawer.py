@@ -382,13 +382,19 @@ class PixelDrawer(DrawingInterface):
                 group.fill_color.data[3].clamp_(0.0 if self.transparency else 1.0, 1.0)
 
     def get_z(self):
-        return None
+        groups = []
+        for g in self.shape_groups:
+            groups.append(g.fill_color.data)
+        groups =  torch.stack(groups)
+        groups.requires_grad_()
+        return groups
 
     def get_z_copy(self):
         shape_groups_copy = []
         for group in self.shape_groups:
             group_copy = torch.clone(group.fill_color.data)
             shape_groups_copy.append(group_copy)
+        shape_groups_copy = torch.stack(shape_groups_copy)
         return shape_groups_copy
 
     def set_z(self, new_z):
