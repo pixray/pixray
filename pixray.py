@@ -48,6 +48,11 @@ from einops import rearrange
 from filters.colorlookup import ColorLookup
 from filters.wallpaper import WallpaperFilter
 
+filters_class_table = {
+    "lookup": ColorLookup,
+    "wallpaper": WallpaperFilter,
+}
+
 from PIL import ImageFile, Image, PngImagePlugin
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -538,10 +543,8 @@ def do_init(args):
             cutoutsTable[cut_size] = make_cutouts
 
     if args.color_mapper is not None:
-        if args.color_mapper == "lookup":
-            color_mapper = ColorLookup(args, device=device)
-        elif args.color_mapper == "wallpaper":
-            color_mapper = WallpaperFilter(args, device=device)
+        if args.color_mapper in filters_class_table:
+            color_mapper = filters_class_table[args.color_mapper](args, device=device)
         else:
             print(f"Color mapper {args.color_mapper} not understood")
             sys.exit(1)
@@ -1486,9 +1489,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
-    vq_parser.add_argument("-cm",   "--color_mapper", type=str, help="Color Mapping", default=None, dest='color_mapper')
-    vq_parser.add_argument("-tp",   "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
-    vq_parser.add_argument("-loss", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
+    vq_parser.add_argument("--palette", "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
     vq_parser.add_argument("--transparent", type=str2bool, help="enable transparency", default=False, dest='transparency')
     vq_parser.add_argument("--alpha_weight", type=float, help="strenght of alpha loss", default=1., dest='alpha_weight')
     vq_parser.add_argument("--alpha_use_g", type=str2bool, help="use gaussian mask weighting", default=False, dest='alpha_use_g')
@@ -1695,20 +1696,27 @@ def apply_settings():
     global global_pixray_settings
     settingsDict = None
 
-    # first pass - just get the drawer
+    # first pass - only add things here that can trigger other parser additions (drawers, filters, losses)
     # Create the parser
     vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
     vq_parser.add_argument("--drawer", type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
+    vq_parser.add_argument("--filters", "--color_mapper", type=str, help="Image Filtering", default=None, dest='color_mapper')
+    vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = vq_parser.parse_known_args(namespace=settingsDict)
 
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
 
-    # TODO: this is slighly sloppy and better would be to add settings of loss functions
-    # actually used, not all of those available.
-    for n,l in loss_class_table.items():
-        l.add_settings(vq_parser)
+    if settings_core.color_mapper is not None:
+        filters_class_table[settings_core.color_mapper].add_settings(vq_parser)
+
+    if settings_core.custom_loss is not None:
+        # probably should DRY but...
+        custom_losses = settings_core.custom_loss.split(",")
+        custom_losses = [loss.strip() for loss in custom_losses]
+        for l in custom_losses:
+            loss_class_table[l].add_settings(vq_parser)
 
     if len(global_pixray_settings) > 0:
         # check for any bogus entries in the settings

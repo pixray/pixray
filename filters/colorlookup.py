@@ -1,46 +1,10 @@
-import argparse
-import math
-from urllib.request import urlopen
-import sys
-import os
-import subprocess
-import glob
-from braceexpand import braceexpand
-from types import SimpleNamespace
-
 from filters.FilterInterface import FilterInterface
-
-import os.path
-
-from omegaconf import OmegaConf
 
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
-from torchvision import transforms
-from torchvision.transforms import functional as TF
-torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead to OOM. False is more deterministic.
-#torch.use_deterministic_algorithms(True)		# NR: grid_sampler_2d_backward_cuda does not have a deterministic implementation
-
-from torch_optimizer import DiffGrad, AdamP, RAdam
-from perlin_numpy import generate_fractal_noise_2d
-
-# todo: fix this mess
-try:
-    # installed by adding github.com/openai/CLIP to sys.path
-    from CLIP import clip
-except ImportError:
-    # installed by doing `pip install git+https://github.com/openai/CLIP`
-    from clip import clip
-import kornia
-import kornia.augmentation as K
-import numpy as np
-import imageio
-import random
 
 from einops import rearrange
-
-from PIL import ImageFile, Image, PngImagePlugin
 
 default_color_table = []
 default_color_table.append([  0/255.0,   0/255.0,   0/255.0])
@@ -60,18 +24,19 @@ default_color_table.append([247/255.0, 118/255.0,  34/255.0])
 default_color_table.append([184/255.0, 111/255.0,  80/255.0])
 default_color_table.append([116/255.0,  63/255.0,  57/255.0])
 
-from scipy.cluster.vq import kmeans2
-
 class ColorLookup(FilterInterface):
     """
     Maps to fixed color table
     """
+    @staticmethod
+    def add_settings(parser):
+        parser.add_argument("--lookup_beta", type=float, help="loss scaling", default=10.0, dest='lookup_beta')
+        return parser
+
     def __init__(self, settings, device):
         super().__init__(settings, device)
 
-        # TODO: make this a settable setting
-        self.beta = 10.0
-
+        self.beta = settings.lookup_beta
         color_table = settings.target_palette
 
         if color_table is None:
