@@ -20,6 +20,7 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torchvision import transforms
 from torchvision.transforms import functional as TF
+from torchvision.utils import save_image
 torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead to OOM. False is more deterministic.
 #torch.use_deterministic_algorithms(True)		# NR: grid_sampler_2d_backward_cuda does not have a deterministic implementation
 
@@ -596,9 +597,13 @@ def do_init(args):
 
             starting_image = init_image_rgba_list[0]
 
+            save_image(init_image_tensor,"init_image_tensor.png")
+            drawer.init_from_tensor(init_image_tensor)
+            z_orig = drawer.get_z_copy()
+
         starting_image.save("starting_image.png")
         starting_tensor = TF.to_tensor(starting_image)
-        init_tensor = starting_tensor.to(device).unsqueeze(0) * 2 - 1
+        init_tensor = starting_tensor.to(device).unsqueeze(0) * 2 - 1 # im not sure why?
         drawer.init_from_tensor(init_tensor)
 
     else:
@@ -713,7 +718,8 @@ def do_init(args):
         image_embeddings /= image_embeddings.norm()
         z_labels.append(image_embeddings.unsqueeze(0))
 
-    z_orig = drawer.get_z_copy()
+    if z_orig is not None:
+        z_orig = drawer.get_z_copy()
 
     normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
                                       std=[0.26862954, 0.26130258, 0.27577711])
@@ -1121,11 +1127,11 @@ def ascend_txt(args):
         f = drawer.get_z().reshape(1,-1)
         f2 = z_orig.reshape(1,-1)
         cur_loss = spherical_dist_loss(f, f2) * args.init_weight
-        result.append(cur_loss)
+        result.append(cur_loss[0])
 
     # these three init_weight variants offer mse_loss, mse_loss in pixel space, and cos loss
     if args.init_weight_dist:
-        cur_loss = F.mse_loss(z, z_orig) * args.init_weight_dist / 2
+        cur_loss = F.mse_loss(drawer.get_z(), z_orig) * args.init_weight_dist / 2
         result.append(cur_loss)
 
     if args.init_weight_pix:
