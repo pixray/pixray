@@ -10,5 +10,5 @@ git+https://github.com/fbcotter/pytorch_wavelets
 ipywidgets
 
 # main aphantasia library
-git+https://github.com/pixray/aphantasia@d7d43a8
+git+https://github.com/pixray/aphantasia@b0c41ba
 
