@@ -97,3 +97,18 @@ class PixrayApi(BasePixrayPredictor):
             # no settings
             ydict = {}
         yield from super().predict(settings="pixrayapi", **ydict)
+
+class Tiler(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="text prompt", default="Beautiful marble texture")
+    @cog.input("pixelart", type=bool, help="pixelart style?", default=True)
+    @cog.input("settings", type=str, help="yaml settings", default='\n')
+    def predict(self, prompts, pixelart, settings):
+        ydict = yaml.safe_load(settings)
+        if ydict == None:
+            # no settings
+            ydict = {}
+        if pixelart:
+            yield from super().predict(prompts=f"{prompts} #pixelart", settings="tiler_pixel", **ydict)
+        else:
+            yield from super().predict(prompts=prompts, settings="tiler_fft", **ydict)    
+
