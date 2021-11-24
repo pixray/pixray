@@ -404,3 +404,7 @@ class PixelDrawer(DrawingInterface):
             new_group = new_z[l]
             active_group.fill_color.data.copy_(new_group)
         return None
+
+    @torch.no_grad()
+    def to_svg(self):
+        pydiffvg.save_svg("./pixels.svg", self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)

@@ -1758,6 +1758,8 @@ def main():
     settings = apply_settings()    
     do_init(settings)
     do_run(settings)
+    # global drawer
+    # drawer.to_svg()
 
 if __name__ == '__main__':
     main()
