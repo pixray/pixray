@@ -543,6 +543,7 @@ def do_init(args):
             make_cutouts = MakeCutouts(cut_size, args.num_cuts, cut_pow=args.cut_pow)
             cutoutsTable[cut_size] = make_cutouts
 
+    color_mapper = None
     if args.color_mapper is not None:
         if args.color_mapper in filters_class_table:
             color_mapper = filters_class_table[args.color_mapper](args, device=device)
