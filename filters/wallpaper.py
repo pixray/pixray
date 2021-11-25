@@ -28,12 +28,14 @@ class WallpaperFilter(FilterInterface):
             # rand_w = int(W/2)
             # rand_h = int(H/2)
             half_W = int(W / 2)
-            row1 = imgs.tile((1,1,1,2))
-            row2 = imgs.tile((1,1,1,2))
+            row1 = imgs.tile((1,1,1,1))
+            row2 = imgs.tile((1,1,1,1))
             row2 = torch.roll(row2, shifts=(half_W,), dims=(3,))
             two_rows = torch.cat([row1, row2], dim=2)
             # print(f"Went from {imgs.shape} to {two_rows.shape}")
-            imgs = two_rows[:,:,rand_h:(rand_h+H),rand_w:(rand_w+W)]
+            # imgs = two_rows[:,:,rand_h:(rand_h+H),rand_w:(rand_w+W)]
+            # imgs = two_rows[:,:,:,rand_w:(rand_w+W)]
+            imgs = torch.roll(two_rows, shifts=(rand_h, rand_w), dims=(2, 3))
         else:
             imgs = torch.roll(imgs, shifts=(rand_h, rand_w), dims=(2, 3))
         return imgs, torch.tensor(0, device=self.device)

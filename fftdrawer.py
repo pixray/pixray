@@ -1,6 +1,6 @@
 from DrawingInterface import DrawingInterface
 
-from aphantasia.clip_fft import to_valid_rgb, fft_image, dwt_image
+from aphantasia.image import to_valid_rgb, fft_image, dwt_image
 import torch
 from util import str2bool
 

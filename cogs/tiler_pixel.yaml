@@ -1,0 +1,7 @@
+drawer: pixel
+display_every: 10
+output: outputs/tiler_pixel.png
+quality: better
+color_mapper: wallpaper
+pixel_size: [64, 64]
+size: [256, 256]
