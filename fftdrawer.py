@@ -1,6 +1,8 @@
 from DrawingInterface import DrawingInterface
 
-from aphantasia.image import to_valid_rgb, fft_image, dwt_image
+from torchvision.utils import save_image
+
+from aphantasia.clip_fft import *
 import torch
 from util import str2bool
 
@@ -29,6 +31,7 @@ class FftDrawer(DrawingInterface):
         self.sharp = settings.fft_sharp
         self.colors = settings.fft_colors
         self.lrate = settings.fft_lrate
+        self.init_image = settings.init_image
         self.img = None
 
     def load_model(self, settings, device):
@@ -42,11 +45,15 @@ class FftDrawer(DrawingInterface):
 
     def init_from_tensor(self, init_tensor):
         shape = [1, 3, self.canvas_height, self.canvas_width]
+        resume = None
+        if self.init_image is not None:
+            save_image(init_tensor, "res_init.png")
+            resume = "res_init.png"
         if self.use_dwt:
             print("Using DWT instead of FFT")
-            params, image_f, sz = dwt_image(shape, self.wave, self.sharp, self.colors, resume=None)
+            params, image_f, sz = dwt_image(shape, self.wave, self.sharp, self.colors, resume=resume)
         else:
-            params, image_f, sz = fft_image(shape, sd=0.01, decay_power=self.decay, resume=None)            
+            params, image_f, sz = fft_image(shape, sd=0.01, decay_power=self.decay, resume=resume)            
         self.params = params
         self.image_f = to_valid_rgb(image_f, colors=1.5)
 
