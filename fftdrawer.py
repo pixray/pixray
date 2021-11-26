@@ -31,7 +31,6 @@ class FftDrawer(DrawingInterface):
         self.sharp = settings.fft_sharp
         self.colors = settings.fft_colors
         self.lrate = settings.fft_lrate
-        self.init_image = settings.init_image
         self.img = None
 
     def load_model(self, settings, device):
@@ -46,7 +45,7 @@ class FftDrawer(DrawingInterface):
     def init_from_tensor(self, init_tensor):
         shape = [1, 3, self.canvas_height, self.canvas_width]
         resume = None
-        if self.init_image is not None:
+        if init_tensor is not None:
             save_image(init_tensor, "res_init.png")
             resume = "res_init.png"
         if self.use_dwt:
