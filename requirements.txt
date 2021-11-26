@@ -43,4 +43,4 @@ PyWavelets==1.1.1
 git+https://github.com/fbcotter/pytorch_wavelets
 
 # main aphantasia library
-git+https://github.com/pixray/aphantasia@6c9f3d8
+git+https://github.com/pixray/aphantasia@bf893e0

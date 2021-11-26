@@ -2,7 +2,7 @@ from DrawingInterface import DrawingInterface
 
 from torchvision.utils import save_image
 
-from aphantasia.clip_fft import *
+from aphantasia.image import to_valid_rgb, fft_image, dwt_image
 import torch
 from util import str2bool
 
