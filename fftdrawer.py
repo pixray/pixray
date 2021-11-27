@@ -2,7 +2,7 @@ from DrawingInterface import DrawingInterface
 
 from torchvision.utils import save_image
 
-from aphantasia.image import to_valid_rgb, fft_image, dwt_image
+from aphantasia.image import to_valid_rgb, fft_image, dwt_image, pixel_image
 import torch
 from util import str2bool
 
@@ -13,7 +13,7 @@ def map_number(n, start1, stop1, start2, stop2):
 class FftDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--fft_use_dwt", type=str2bool, help="use dwt instead of fft", default=False, dest='fft_use_dwt')
+        parser.add_argument("--fft_use",     type=str, help="use fft or dwt or pixel", default="fft", dest='fft_use')
         parser.add_argument('--fft_decay',   default=1.5, type=float, dest='fft_decay')
         parser.add_argument('--fft_wave',    default='coif2', help='wavelets: db[1..], coif[1..], haar, dmey', dest='fft_wave')
         parser.add_argument('--fft_sharp',   default=0.3, type=float, dest='fft_sharp')
@@ -25,7 +25,7 @@ class FftDrawer(DrawingInterface):
         super(DrawingInterface, self).__init__()
         self.canvas_width = settings.size[0]
         self.canvas_height = settings.size[1]
-        self.use_dwt = settings.fft_use_dwt
+        self.fft_use = settings.fft_use
         self.decay = settings.fft_decay
         self.wave = settings.fft_wave
         self.sharp = settings.fft_sharp
@@ -48,11 +48,15 @@ class FftDrawer(DrawingInterface):
         if init_tensor is not None:
             save_image(init_tensor, "res_init.png")
             resume = "res_init.png"
-        if self.use_dwt:
+        if self.fft_use == "dwt":
             print("Using DWT instead of FFT")
             params, image_f, sz = dwt_image(shape, self.wave, self.sharp, self.colors, resume=resume)
-        else:
+        elif self.fft_use == "pixel":
+            params, image_f, sz = pixel_image(shape, sd=1, resume=resume)
+        elif self.fft_use == "fft":
             params, image_f, sz = fft_image(shape, sd=0.01, decay_power=self.decay, resume=resume)            
+        else:
+            raise ValueError(f"fft drawer does not know how to apply fft_use={self.fft_use}")
         self.params = params
         self.image_f = to_valid_rgb(image_f, colors=1.5)
 
