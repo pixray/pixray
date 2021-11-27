@@ -9,6 +9,7 @@ numpy==1.19.4
 tqdm==4.49.0
 matplotlib==3.3.4
 braceexpand==0.1.7
+colorgram.py==1.2.0
 einops==0.3.2
 imageio==2.9.0
 ipython==7.28.0

@@ -3,6 +3,9 @@ import argparse
 import glob
 from braceexpand import braceexpand
 from codecs import encode
+from PIL import Image
+import colorgram
+from urllib.request import urlopen
 
 try:
     import matplotlib.colors
@@ -141,12 +144,49 @@ def palette_from_section(s):
             pal = expand_colors(pal, num_steps)
 
         return pal
-    elif s[0] == '@':
+    elif s[0] == '@' or s[0:4] == 'http':
+
+        # look for a number of parts at the end
+        if s.find('\\') > 0:
+            stem, steps = s.split('\\')
+            s = stem
+            num_steps = int(steps)
+        else:
+            num_steps = None
+
         # pull from a file or URL
-        if s.endswith(".act"):
+        if s.endswith(".png") or s.endswith(".jpg"):
+            if num_steps is None:
+                # https://stackoverflow.com/a/22442212/1010653
+                if 'http' in s:
+                    img = Image.open(urlopen(s))
+                else:
+                    img = Image.open(s[1:])
+                img = img.convert('RGB')
+                color_pairs = img.getcolors(img.size[0]*img.size[1])
+                colors = [c[1] for c in color_pairs]
+                colors = [[c[0]/255.0, c[1]/255.0, c[2]/255.0] for c in colors]
+                print(f"Extracted all {len(colors)} colors from {s}")
+                return colors
+            else:
+                if 'http' in s:
+                    img = Image.open(urlopen(s))
+                else:
+                    img = Image.open(s[1:])
+                full_colors = colorgram.extract(img, num_steps)
+                print("WHY ONLY ", len(full_colors))
+                colors = [c.rgb for c in full_colors]
+                colors = [[c[0]/255.0, c[1]/255.0, c[2]/255.0] for c in colors]
+                print(f"Distilled {len(colors)} (max {num_steps}) colors from {s}")
+                return list(colors)
+
+        elif s.endswith(".act"):
             # https://stackoverflow.com/a/48873783/1010653
-            with open(s[1:], 'rb') as act:
-                raw_data = act.read()                           # Read binary data
+            if s[0] == '@':
+                with open(s[1:], 'rb') as act:
+                    raw_data = act.read()                           # Read binary data
+            else:
+                raw_data = urlopen(s).read()
             hex_data = encode(raw_data, 'hex')                  # Convert it to hexadecimal values
             total_colors_count = (int(hex_data[-7:-4], 16))     # Get last 3 digits to get number of colors total
             misterious_count = (int(hex_data[-4:-3], 16))       # I have no idea what does it do
