@@ -983,11 +983,12 @@ def checkdrop(args, iter, losses):
 
 # for a release just bake in the version to prevent git subprocess lookup
 git_official_release_version = None
+git_fallback_version = "v1.2-60+"
 
 # https://stackoverflow.com/a/40170206/1010653
 # Return the git revision as a string
 def git_version():
-    global git_official_release_version
+    global git_official_release_version, git_fallback_version
     if git_official_release_version is not None:
         return git_official_release_version
 
@@ -1009,7 +1010,7 @@ def git_version():
         out = _minimal_ext_cmd(['git', 'describe', '--always'])
         GIT_REVISION = out.strip().decode('ascii')
     except OSError:
-        GIT_REVISION = "Unknown"
+        GIT_REVISION = git_fallback_version
 
     return GIT_REVISION
 
