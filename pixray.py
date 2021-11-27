@@ -4,8 +4,8 @@ import math
 from urllib.request import urlopen
 import sys
 import os
-import json
 import subprocess
+import json
 import glob
 from braceexpand import braceexpand
 from types import SimpleNamespace
@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import os.path
 
 from omegaconf import OmegaConf
+import hashlib
 
 import time
 import torch
@@ -486,17 +487,24 @@ def do_init(args):
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
     global drawer, color_mapper
-    global lossGlobals
+    global lossGlobals, global_cached_png_info, global_seed_used
 
     reset_session_globals()
 
     # do seed first!
     if args.seed is None:
         seed = torch.seed()
+    elif args.seed.isdigit():
+        seed = int(args.seed)
     else:
-        seed = args.seed
+        # deterministic 32 bit int from string
+        # https://stackoverflow.com/a/44556106/1010653
+        e_str = args.seed.encode()
+        hash_digest = hashlib.sha512(e_str).digest()
+        seed = int.from_bytes(hash_digest, 'big') % 0x100000000
     int_seed = int(seed)%(2**30)
     print('Using seed:', seed)
+    global_seed_used = seed
     torch.manual_seed(seed)
     np.random.seed(int_seed)
     random.seed(int_seed)
@@ -608,8 +616,9 @@ def do_init(args):
         drawer.init_from_tensor(init_tensor)
 
     else:
-        # untested
-        drawer.rand_init(toksX, toksY)
+        drawer.init_from_tensor(init_tensor=None)
+        # this is the old vqgan version [need to patch vqgan to do this?]
+        # drawer.rand_init(toksX, toksY)
 
     if args.overlay_image is not None:
         # todo: maybe split this up on pipes and whatnot
@@ -628,6 +637,8 @@ def do_init(args):
             overlay_image_rgba_list.append(overlay_image_rgba)
 
         overlay_image_rgba_list[0].save('overlay_image0.png')
+
+    global_cached_png_info = None
 
     pmsTable = {}
     pmsImageTable = {}
@@ -970,6 +981,52 @@ def checkdrop(args, iter, losses):
             drop_loss_time = True
     return drop_loss_time
 
+# for a release just bake in the version to prevent git subprocess lookup
+git_official_release_version = None
+
+# https://stackoverflow.com/a/40170206/1010653
+# Return the git revision as a string
+def git_version():
+    global git_official_release_version
+    if git_official_release_version is not None:
+        return git_official_release_version
+
+    def _minimal_ext_cmd(cmd):
+        # construct minimal environment
+        env = {}
+        for k in ['SYSTEMROOT', 'PATH']:
+            v = os.environ.get(k)
+            if v is not None:
+                env[k] = v
+        # LANGUAGE is used on win32
+        env['LANGUAGE'] = 'C'
+        env['LANG'] = 'C'
+        env['LC_ALL'] = 'C'
+        out = subprocess.Popen(cmd, stdout = subprocess.PIPE, env=env).communicate()[0]
+        return out
+
+    try:
+        out = _minimal_ext_cmd(['git', 'describe', '--always'])
+        GIT_REVISION = out.strip().decode('ascii')
+    except OSError:
+        GIT_REVISION = "Unknown"
+
+    return GIT_REVISION
+
+global_cached_png_info=None
+def getPngInfo():
+    global global_cached_png_info
+    if global_cached_png_info is None:
+        git_v = git_version()
+        info = PngImagePlugin.PngInfo()
+        info.add_text("Software", f"pixray ({git_v})")
+        # print(global_given_args)
+        for k in global_given_args:
+            info.add_text(f"pixray_{k}", str(global_given_args[k]))
+        info.add_text("pixray_seed_used", str(global_seed_used))
+        global_cached_png_info = info
+    return global_cached_png_info 
+
 @torch.no_grad()
 def checkin(args, iter, losses):
     global drawer, color_mapper
@@ -987,8 +1044,6 @@ def checkin(args, iter, losses):
         writestr = f'anim: {cur_anim_index}/{len(anim_output_files)} {writestr}'
     else:
         writestr = f'{writestr} (-{num_cycles_not_best}=>{best_loss:2.4g})'
-    info = PngImagePlugin.PngInfo()
-    info.add_text('comment', f'{args.prompts}')
     timg = drawer.synth(cur_iteration)
     if color_mapper is not None:
         timg, closs = color_mapper(timg);
@@ -998,7 +1053,7 @@ def checkin(args, iter, losses):
         outfile = args.output
     else:
         outfile = anim_output_files[cur_anim_index]
-    img.save(outfile, pnginfo=info)
+    img.save(outfile, pnginfo=getPngInfo())
     if cur_anim_index == len(anim_output_files) - 1:
         # save gif
         gif_output = make_gif(args, iter)
@@ -1442,6 +1497,8 @@ def do_video(args):
 
 # this dictionary is used for settings in the notebook
 global_pixray_settings = {}
+# this dictionary documents all non-default args
+global_given_args = {}
 
 def setup_parser(vq_parser):
     # Create the parser
@@ -1491,7 +1548,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-cuts", "--num_cuts", type=int, help="Number of cuts", default=None, dest='num_cuts')
     vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=1, dest='batches')
     vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
-    vq_parser.add_argument("-sd",   "--seed", type=int, help="Seed", default=None, dest='seed')
+    vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest='seed')
     vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
@@ -1507,7 +1564,7 @@ def setup_parser(vq_parser):
 def process_args(vq_parser, namespace=None):
     global global_aspect_width
     global cur_iteration, cur_anim_index, anim_output_files, anim_cur_zs, anim_next_zs;
-    global global_spot_file
+    global global_spot_file, global_given_args
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
     if namespace == None:
@@ -1518,6 +1575,16 @@ def process_args(vq_parser, namespace=None):
     else:
         # sometimes there are both settings and cmd line
         args = vq_parser.parse_args(namespace=namespace)        
+
+    # https://stackoverflow.com/a/66765255/1010653
+    global_given_args = {
+            opt.dest: getattr(args, opt.dest)
+            for opt in vq_parser._option_string_actions.values()
+            if hasattr(args, opt.dest) and opt.default != getattr(args, opt.dest)
+        }
+    # print("NON DEFAULT ARGS ARE")
+    # print(global_given_args)
+    # sys.exit(0)
 
     if args.cudnn_determinism:
         torch.backends.cudnn.deterministic = True
