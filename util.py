@@ -4,7 +4,6 @@ import glob
 from braceexpand import braceexpand
 from codecs import encode
 from PIL import Image
-import colorgram
 from urllib.request import urlopen
 from colorthief import ColorThief
 
