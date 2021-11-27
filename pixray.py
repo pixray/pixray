@@ -1600,6 +1600,13 @@ def process_args(vq_parser, namespace=None):
             base_width = int(size_scale * base_size[0])
             base_height = int(size_scale * base_size[1])
             args.size = [base_width, base_height]
+        elif args.aspect =="retain" and args.init_image is not None:
+            img_pil = Image.open(real_glob(args.init_image)[0])
+            w,h = img_pil.size
+            asp = h/w #w is base
+            h = int(144*asp*size_scale)
+            w = int(144*size_scale)
+            args.size = [w,h]
         else:
             print("aspect not understood, aborting -> ", args.aspect)
             exit(1)
