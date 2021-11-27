@@ -429,7 +429,7 @@ def resize_image(image, out_size):
 
 def rebuild_optimisers(args):
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
-    global drawer, color_mapper
+    global drawer, filters
 
     drop_divisor = 10 ** num_loss_drop
     new_opts = drawer.get_opts(drop_divisor)
@@ -486,7 +486,7 @@ def do_init(args):
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
-    global drawer, color_mapper
+    global drawer, filters
     global lossGlobals, global_cached_png_info, global_seed_used
 
     reset_session_globals()
@@ -551,13 +551,24 @@ def do_init(args):
             make_cutouts = MakeCutouts(cut_size, args.num_cuts, cut_pow=args.cut_pow)
             cutoutsTable[cut_size] = make_cutouts
 
-    color_mapper = None
-    if args.color_mapper is not None:
-        if args.color_mapper in filters_class_table:
-            color_mapper = filters_class_table[args.color_mapper](args, device=device)
-        else:
-            print(f"Color mapper {args.color_mapper} not understood")
-            sys.exit(1)
+    filters = None
+    if args.filters is not None:
+        filter_names = args.filters.split(",")
+        filter_names = [f.strip() for f in filter_names]
+        filterClasses = []
+        for filt in filter_names:
+            filt_name, weight, stop = parse_prompt(filt)
+            if filt_name not in filters_class_table:
+                raise ValueError(f"Requested filter not found, aborting: {filt_name}")
+            filtClass = filters_class_table[filt_name]
+            # do special initializations here
+            try:
+                filtInstance = filtClass(args, device=device)
+                filterClasses.append({"filter":filtInstance, "weight": weight})
+            except TypeError as e:
+                print(f'error in initializing {filtClass} - this message is to provide information')
+                raise TypeError(e)
+        filters = filterClasses
 
     init_image_tensor = None
     target_image_tensor = None
@@ -898,7 +909,7 @@ im_targets = None
 z_labels = None
 opts = None
 drawer = None
-color_mapper = None
+filters = None
 normalize = None
 init_image_tensor = None
 target_image_tensor = None
@@ -1030,7 +1041,7 @@ def getPngInfo():
 
 @torch.no_grad()
 def checkin(args, iter, losses):
-    global drawer, color_mapper
+    global drawer, filters
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
     num_cycles_not_best = iter - best_iter
@@ -1046,8 +1057,11 @@ def checkin(args, iter, losses):
     else:
         writestr = f'{writestr} (-{num_cycles_not_best}=>{best_loss:2.4g})'
     timg = drawer.synth(cur_iteration)
-    if color_mapper is not None:
-        timg, closs = color_mapper(timg);
+    if filters is not None and len(filters)>0:
+        for f in filters:
+            filtclass = f["filter"]
+            timg, closs = filtclass(timg);
+
     img = TF.to_pil_image(timg[0].cpu())
     # img = drawer.to_image()
     if cur_anim_index is None:
@@ -1082,9 +1096,17 @@ def ascend_txt(args):
 
     result = []
 
-    if color_mapper is not None:
-        out, c_loss = color_mapper(out);
-        result.append(c_loss);
+    if filters is not None and len(filters)>0:
+        for f in filters:
+            filtclass = f["filter"]
+            filtweight = f["weight"]
+            out, new_losses = filtclass(out);
+            if type(new_losses) is not list and type(new_losses) is not tuple:
+                result.append(filtweight * new_losses)
+            else:
+                # warning: this path might be untested by current losses?
+                weighted_losses = [(filtweight * l) for l in new_losses]
+                result += weighted_losses
 
     if (cur_iteration%2 == 0):
         global_padding_mode = 'reflection'
@@ -1554,7 +1576,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
-    vq_parser.add_argument("--palette", "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
+    vq_parser.add_argument("--palette", type=str, help="target palette", default=None, dest='palette')
     vq_parser.add_argument("--transparent", type=str2bool, help="enable transparency", default=False, dest='transparency')
     vq_parser.add_argument("--alpha_weight", type=float, help="strenght of alpha loss", default=1., dest='alpha_weight')
     vq_parser.add_argument("--alpha_use_g", type=str2bool, help="use gaussian mask weighting", default=False, dest='alpha_use_g')
@@ -1713,8 +1735,8 @@ def process_args(vq_parser, namespace=None):
         # print("----> NO VECTOR PROMPT")
         args.vector_prompts = []
 
-    if args.target_palette is not None:
-        args.target_palette = palette_from_string(args.target_palette)
+    if args.palette is not None:
+        args.palette = palette_from_string(args.palette)
 
     if args.overlay_image is not None and args.overlay_every <= 0:
         args.overlay_image = None
@@ -1774,8 +1796,8 @@ def apply_settings():
     # first pass - only add things here that can trigger other parser additions (drawers, filters, losses)
     # Create the parser
     vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
-    vq_parser.add_argument("--drawer", type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
-    vq_parser.add_argument("--filters", "--color_mapper", type=str, help="Image Filtering", default=None, dest='color_mapper')
+    vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
+    vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = vq_parser.parse_known_args(namespace=settingsDict)
@@ -1783,8 +1805,13 @@ def apply_settings():
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
 
-    if settings_core.color_mapper is not None:
-        filters_class_table[settings_core.color_mapper].add_settings(vq_parser)
+    if settings_core.filters is not None:
+        # probably should DRY but...
+        filts = settings_core.filters.split(",")
+        filts = [f.strip() for f in filts]
+        for f in filts:
+            f = f.split(':')[0]
+            filters_class_table[f].add_settings(vq_parser)
 
     if settings_core.custom_loss is not None:
         # probably should DRY but...

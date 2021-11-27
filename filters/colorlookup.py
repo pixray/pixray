@@ -37,7 +37,7 @@ class ColorLookup(FilterInterface):
         super().__init__(settings, device)
 
         self.beta = settings.lookup_beta
-        color_table = settings.target_palette
+        color_table = settings.palette
 
         if color_table is None:
             print("WARNING: using built in palette")

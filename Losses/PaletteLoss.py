@@ -23,7 +23,7 @@ class PaletteLoss(LossInterface):
         return args
     
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
-        target_palette = torch.FloatTensor(args.target_palette).requires_grad_(False).to(self.device)
+        target_palette = torch.FloatTensor(args.palette).requires_grad_(False).to(self.device)
         all_loss = []
         for _,cutouts in cur_cutouts.items():
             _pixels = cutouts.permute(0,2,3,1).reshape(-1,3)
