@@ -762,7 +762,7 @@ def do_init(args):
                 stops = actual_tokens.argmax(dim=-1) - 1
                 embed = perceptor.encode_text(actual_tokens, stops).float()
             else:
-                print(f"--> {clip_model} normal encoding {txt}")
+                # print(f"--> {clip_model} normal encoding {txt}")
                 embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
             pMs.append(Prompt(embed, weight, stop).to(device))
     

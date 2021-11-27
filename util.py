@@ -6,6 +6,7 @@ from codecs import encode
 from PIL import Image
 import colorgram
 from urllib.request import urlopen
+from colorthief import ColorThief
 
 try:
     import matplotlib.colors
@@ -156,29 +157,34 @@ def palette_from_section(s):
 
         # pull from a file or URL
         if s.endswith(".png") or s.endswith(".jpg"):
+            if 'http' in s:
+                obj = urlopen(s)
+            else:
+                obj = s[1:]
+
             if num_steps is None:
-                # https://stackoverflow.com/a/22442212/1010653
-                if 'http' in s:
-                    img = Image.open(urlopen(s))
-                else:
-                    img = Image.open(s[1:])
-                img = img.convert('RGB')
-                color_pairs = img.getcolors(img.size[0]*img.size[1])
+                num_steps = 255
+
+            # https://stackoverflow.com/a/22442212/1010653
+            # try to get all the colors
+            img = Image.open(obj)
+            img = img.convert('RGB')
+            color_pairs = img.getcolors(img.size[0]*img.size[1])
+            print(f"Found {len(color_pairs)} colors in {s}")
+            if len(color_pairs) <= num_steps:
+                # not too many
                 colors = [c[1] for c in color_pairs]
                 colors = [[c[0]/255.0, c[1]/255.0, c[2]/255.0] for c in colors]
-                print(f"Extracted all {len(colors)} colors from {s}")
                 return colors
-            else:
-                if 'http' in s:
-                    img = Image.open(urlopen(s))
-                else:
-                    img = Image.open(s[1:])
-                full_colors = colorgram.extract(img, num_steps)
-                print("WHY ONLY ", len(full_colors))
-                colors = [c.rgb for c in full_colors]
-                colors = [[c[0]/255.0, c[1]/255.0, c[2]/255.0] for c in colors]
-                print(f"Distilled {len(colors)} (max {num_steps}) colors from {s}")
-                return list(colors)
+
+            # dumb: but colortheif can't deal with an Image, so reopen the url if need be
+            if 'http' in s:
+                obj = urlopen(s)
+            ct = ColorThief(obj)
+            colors = ct.get_palette(color_count=num_steps, quality=2)
+            colors = [[c[0]/255.0, c[1]/255.0, c[2]/255.0] for c in colors]
+            print(f"Distilled {len(colors)} (reqeusted {num_steps}) colors from {s}")
+            return list(colors)
 
         elif s.endswith(".act"):
             # https://stackoverflow.com/a/48873783/1010653
