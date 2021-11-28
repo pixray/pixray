@@ -494,7 +494,9 @@ def do_init(args):
     # do seed first!
     if args.seed is None:
         seed = torch.seed()
-    elif args.seed.isdigit():
+    elif isinstance(args.seed, int):
+        seed = args.seed
+    elif isinstance(args.seed, str) and args.seed.isdigit():
         seed = int(args.seed)
     else:
         # deterministic 32 bit int from string
