@@ -1779,11 +1779,12 @@ def reset_settings():
 def add_settings(**kwargs):
     global global_pixray_settings
     for k, v in kwargs.items():
-        if v is None or v == "None":
-            # just remove the key if it is there
-            global_pixray_settings.pop(k, None)
-        else:
-            global_pixray_settings[k] = v
+        # TODO: is None / "None" a special case or not?
+        global_pixray_settings[k] = v
+        # if v is None or v == "None":
+        #     # just remove the key if it is there
+        #     global_pixray_settings.pop(k, None)
+        # else:
 
 def get_settings():
     global global_pixray_settings
