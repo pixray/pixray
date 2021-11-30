@@ -1,8 +1,8 @@
 build:
   gpu: true
-  cuda: "11.1"
+  cuda: "10.2"
   python_version: "3.8"
-  python_requirements: "requirements.txt"
+  python_requirements: "requirements_cog.txt"
   run:
     # CMAKE_PREFIX_PATH fix is from https://github.com/readthedocs/readthedocs.org/issues/5867
     - "apt-get update"
