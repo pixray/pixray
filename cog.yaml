@@ -11,9 +11,9 @@ build:
 # predict: "cogrun.py:BasePixrayPredictor"
 # predict: "cogrun.py:PixrayVqgan"
 # predict: "cogrun.py:PixrayPixel"
-# predict: "cogrun.py:Text2Image"
+predict: "cogrun.py:Text2Image"
 # predict: "cogrun.py:Text2Pixel"
 # predict: "cogrun.py:PixrayRaw"
-predict: "cog_genesis.py:GenesisPredictor"
+# predict: "cog_genesis.py:GenesisPredictor" 1.4b1
 # predict: "cogrun.py:PixrayApi"
 # predict: "cogrun.py:Tiler"
