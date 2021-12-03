@@ -248,10 +248,19 @@ class Prompt(nn.Module):
 
 
 def parse_prompt(prompt):
+    """Prompts can either just be text, be a text:weight pair, or a text:weight:stop triple"""
     vals = prompt.rsplit(':', 2)
-    vals = vals + ['', '1', '-inf'][len(vals):]
+
+    textPrompt = vals[0]
+    try:
+        weight = float(vals[1]) if len(vals) > 1 else 1
+        stop = float(vals[2]) if len(vals) > 2 else float('-inf')
+    except ValueError:
+        print('Warning, failed to parse prompt weights, assuming prompt does not contain weights.')
+        return prompt, 1, float('-inf')
+
     # print(f"parsed vals is {vals}")
-    return vals[0], float(vals[1]), float(vals[2])
+    return textPrompt, weight, stop
 
 from typing import cast, Dict, List, Optional, Tuple, Union
 
