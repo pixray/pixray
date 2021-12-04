@@ -13,18 +13,18 @@ class WallpaperFilter(FilterInterface):
     """
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--wallpaper_shift", type=str2bool, help="shift offset rows", default=False, dest='wallpaper_shift')
+        parser.add_argument("--wallpaper_type", type=str, help="none, shift, horizontal", default=None, dest='wallpaper_type')
         return parser
 
     def __init__(self, settings, device):
         super().__init__(settings, device)
-        self.wallpaper_shift = settings.wallpaper_shift
+        self.wallpaper_type = settings.wallpaper_type
 
     def forward(self, imgs):
         B, C, H, W = imgs.size()
         rand_w = torch.randint(0, W, (1,))
         rand_h = torch.randint(0, H, (1,))
-        if self.wallpaper_shift:
+        if self.wallpaper_type == "shift":
             # rand_w = int(W/2)
             # rand_h = int(H/2)
             half_W = int(W / 2)
@@ -36,6 +36,8 @@ class WallpaperFilter(FilterInterface):
             # imgs = two_rows[:,:,rand_h:(rand_h+H),rand_w:(rand_w+W)]
             # imgs = two_rows[:,:,:,rand_w:(rand_w+W)]
             imgs = torch.roll(two_rows, shifts=(rand_h, rand_w), dims=(2, 3))
+        elif self.wallpaper_type == "horizontal":
+            imgs = torch.roll(imgs, shifts=(rand_w,), dims=(3,))
         else:
             imgs = torch.roll(imgs, shifts=(rand_h, rand_w), dims=(2, 3))
         return imgs, torch.tensor(0, device=self.device)
