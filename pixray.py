@@ -257,17 +257,35 @@ class Prompt(nn.Module):
 
 def parse_prompt(prompt):
     """Prompts can either just be text, be a text:weight pair, or a text:weight:stop triple"""
-    vals = prompt.rsplit(':', 2)
 
-    textPrompt = vals[0]
-    try:
-        weight = float(vals[1]) if len(vals) > 1 else 1
-        stop = float(vals[2]) if len(vals) > 2 else float('-inf')
-    except ValueError:
-        print('Warning, failed to parse prompt weights, assuming prompt does not contain weights.')
-        return prompt, 1, float('-inf')
+    # defaults
+    textPrompt = prompt
+    weight = 1
+    stop = float('-inf')
 
-    # print(f"parsed vals is {vals}")
+    # try to parse numbers from the right but stop as soon as that fails
+    extra_numbers = []
+    keep_going = True
+
+    while len(extra_numbers) < 2 and keep_going:
+        vals = textPrompt.rsplit(':', 1)
+        if len(vals) > 1 and vals[1].isnumeric():
+            extra_numbers.append(float(vals[1]))
+            textPrompt = vals[0]
+        else:
+            keep_going = False
+
+    # print(f"parsed nums is {textPrompt}, {extra_numbers}")
+
+    # if there is only 1 number, that becomes the weight
+    if len(extra_numbers) == 1:
+        weight = extra_numbers[0]
+    # if there are two numbers it is weight and stop (stored backwards)
+    elif len(extra_numbers) == 2:
+        weight = extra_numbers[1]
+        stop = extra_numbers[0]
+
+    # print(f"parsed vals is {textPrompt}, {weight}, {stop}")
     return textPrompt, weight, stop
 
 from typing import cast, Dict, List, Optional, Tuple, Union
