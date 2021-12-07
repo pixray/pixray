@@ -1,6 +1,9 @@
-drawer: fft
+drawer: vqgan
 display_every: 10
 output: outputs/tiler_fft.png
 quality: better
 filters: wallpaper
-size: [720, 720]
+wallpaper_edge_match: 32
+custom_loss: smoothness:1
+smoothness_type: clipped
+size: [416, 416]

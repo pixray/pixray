@@ -100,8 +100,8 @@ class PixrayApi(BasePixrayPredictor):
 
 class Tiler(BasePixrayPredictor):
     @cog.input("prompts", type=str, help="text prompt", default="Beautiful marble texture")
-    @cog.input("pixelart", type=bool, help="pixelart style?", default=True)
-    @cog.input("mirror", type=bool, help="shifted pattern?", default=True)
+    @cog.input("pixelart", type=bool, help="pixelart style?", default=False)
+    @cog.input("mirror", type=bool, help="shifted pattern?", default=False)
     @cog.input("settings", type=str, help="yaml settings", default='\n')
     def predict(self, prompts, pixelart, mirror, settings):
         ydict = yaml.safe_load(settings)
