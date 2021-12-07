@@ -254,6 +254,13 @@ class Prompt(nn.Module):
         dists = dists * self.weight.sign()
         return self.weight.abs() * replace_grad(dists, torch.maximum(dists, self.stop)).mean()
 
+# https://stackoverflow.com/q/354038
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 def parse_prompt(prompt):
     """Prompts can either just be text, be a text:weight pair, or a text:weight:stop triple"""
@@ -269,7 +276,7 @@ def parse_prompt(prompt):
 
     while len(extra_numbers) < 2 and keep_going:
         vals = textPrompt.rsplit(':', 1)
-        if len(vals) > 1 and vals[1].isnumeric():
+        if len(vals) > 1 and is_number(vals[1]):
             extra_numbers.append(float(vals[1]))
             textPrompt = vals[0]
         else:
