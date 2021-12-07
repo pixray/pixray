@@ -3,7 +3,7 @@ display_every: 10
 output: outputs/tiler_fft.png
 quality: better
 filters: wallpaper
-wallpaper_edge_match: 32
-custom_loss: smoothness:1
+wallpaper_edge_match: 4
+custom_loss: smoothness:0.5
 smoothness_type: clipped
 size: [416, 416]
