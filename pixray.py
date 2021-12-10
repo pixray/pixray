@@ -747,7 +747,7 @@ def do_init(args):
                     if 'http' in f1:
                         # note: this is currently untested...
                         infile = urlopen(f1)
-                        input_files.apped(infile)
+                        input_files.append(infile)
                     else:
                         infiles = real_glob(f1)
                         input_files.extend(infiles)
