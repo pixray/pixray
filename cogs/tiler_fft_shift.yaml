@@ -1,9 +1,9 @@
 drawer: fft
-fft_use_dwt: 1
+fft_use: dwt
 fft_wave: dmey
 display_every: 10
 output: outputs/tiler_fft.png
 quality: better
-color_mapper: wallpaper
+filters: wallpaper
 size: [720, 360]
 wallpaper_shift: True

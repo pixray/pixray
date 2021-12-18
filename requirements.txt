@@ -1,14 +1,17 @@
+### THIS IS THE SAME AS REQUIREMENTS.TXT but with a different version of cuda (102) for cog
+
 # these are minimal requirements for just the VQGAN drawer
 
 -f https://download.pytorch.org/whl/torch_stable.html
-torch==1.10.0+cu111
-torchvision==0.11.1+cu111
-torchtext==0.11.0
+torch==1.9.0+cu102
+torchvision==0.10.0+cu102
+torchtext==0.10.0
 
 numpy==1.19.4
 tqdm==4.49.0
 matplotlib==3.3.4
 braceexpand==0.1.7
+colorthief==0.2.1
 einops==0.3.2
 imageio==2.9.0
 ipython==7.28.0
@@ -43,4 +46,4 @@ PyWavelets==1.1.1
 git+https://github.com/fbcotter/pytorch_wavelets
 
 # main aphantasia library
-git+https://github.com/pixray/aphantasia@6c9f3d8
+git+https://github.com/pixray/aphantasia@7e6b3bb

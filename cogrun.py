@@ -67,7 +67,7 @@ class PixrayPixel(BasePixrayPredictor):
 
 class Text2Image(BasePixrayPredictor):
     @cog.input("prompts", type=str, help="description of what to draw", default="Robots skydiving high above the city")
-    @cog.input("quality", type=str, help="speed vs quality", default="better", options=["draft", "normal", "better", "best"])
+    @cog.input("quality", type=str, help="speed vs quality", default="normal", options=["draft", "normal", "better", "best"])
     @cog.input("aspect", type=str, help="wide or narrow", default="widescreen", options=["widescreen", "square", "portrait"])
     def predict(self, **kwargs):
         yield from super().predict(settings="text2image", **kwargs)
@@ -100,8 +100,8 @@ class PixrayApi(BasePixrayPredictor):
 
 class Tiler(BasePixrayPredictor):
     @cog.input("prompts", type=str, help="text prompt", default="Beautiful marble texture")
-    @cog.input("pixelart", type=bool, help="pixelart style?", default=True)
-    @cog.input("mirror", type=bool, help="shifted pattern?", default=True)
+    @cog.input("pixelart", type=bool, help="pixelart style?", default=False)
+    @cog.input("mirror", type=bool, help="shifted pattern?", default=False)
     @cog.input("settings", type=str, help="yaml settings", default='\n')
     def predict(self, prompts, pixelart, mirror, settings):
         ydict = yaml.safe_load(settings)

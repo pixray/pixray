@@ -4,8 +4,8 @@ import math
 from urllib.request import urlopen
 import sys
 import os
-import json
 import subprocess
+import json
 import glob
 from braceexpand import braceexpand
 from types import SimpleNamespace
@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import os.path
 
 from omegaconf import OmegaConf
+import hashlib
 
 import time
 import torch
@@ -253,12 +254,46 @@ class Prompt(nn.Module):
         dists = dists * self.weight.sign()
         return self.weight.abs() * replace_grad(dists, torch.maximum(dists, self.stop)).mean()
 
+# https://stackoverflow.com/q/354038
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 def parse_prompt(prompt):
-    vals = prompt.rsplit(':', 2)
-    vals = vals + ['', '1', '-inf'][len(vals):]
-    # print(f"parsed vals is {vals}")
-    return vals[0], float(vals[1]), float(vals[2])
+    """Prompts can either just be text, be a text:weight pair, or a text:weight:stop triple"""
+
+    # defaults
+    textPrompt = prompt
+    weight = 1
+    stop = float('-inf')
+
+    # try to parse numbers from the right but stop as soon as that fails
+    extra_numbers = []
+    keep_going = True
+
+    while len(extra_numbers) < 2 and keep_going:
+        vals = textPrompt.rsplit(':', 1)
+        if len(vals) > 1 and is_number(vals[1]):
+            extra_numbers.append(float(vals[1]))
+            textPrompt = vals[0]
+        else:
+            keep_going = False
+
+    # print(f"parsed nums is {textPrompt}, {extra_numbers}")
+
+    # if there is only 1 number, that becomes the weight
+    if len(extra_numbers) == 1:
+        weight = extra_numbers[0]
+    # if there are two numbers it is weight and stop (stored backwards)
+    elif len(extra_numbers) == 2:
+        weight = extra_numbers[1]
+        stop = extra_numbers[0]
+
+    # print(f"parsed vals is {textPrompt}, {weight}, {stop}")
+    return textPrompt, weight, stop
 
 from typing import cast, Dict, List, Optional, Tuple, Union
 
@@ -428,7 +463,7 @@ def resize_image(image, out_size):
 
 def rebuild_optimisers(args):
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
-    global drawer, color_mapper
+    global drawer, filters
 
     drop_divisor = 10 ** num_loss_drop
     new_opts = drawer.get_opts(drop_divisor)
@@ -485,18 +520,27 @@ def do_init(args):
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor
     global gside_X, gside_Y, overlay_image_rgba, overlay_image_rgba_list, init_image_rgba_list
     global pmsTable, pmsImageTable, pmsTargetTable, pImages, device, spotPmsTable, spotOffPmsTable
-    global drawer, color_mapper
-    global lossGlobals
+    global drawer, filters
+    global lossGlobals, global_cached_png_info, global_seed_used
 
     reset_session_globals()
 
     # do seed first!
     if args.seed is None:
         seed = torch.seed()
-    else:
+    elif isinstance(args.seed, int):
         seed = args.seed
+    elif isinstance(args.seed, str) and args.seed.isdigit():
+        seed = int(args.seed)
+    else:
+        # deterministic 32 bit int from string
+        # https://stackoverflow.com/a/44556106/1010653
+        e_str = args.seed.encode()
+        hash_digest = hashlib.sha512(e_str).digest()
+        seed = int.from_bytes(hash_digest, 'big') % 0x100000000
     int_seed = int(seed)%(2**30)
     print('Using seed:', seed)
+    global_seed_used = seed
     torch.manual_seed(seed)
     np.random.seed(int_seed)
     random.seed(int_seed)
@@ -543,12 +587,24 @@ def do_init(args):
             make_cutouts = MakeCutouts(cut_size, args.num_cuts, cut_pow=args.cut_pow)
             cutoutsTable[cut_size] = make_cutouts
 
-    if args.color_mapper is not None:
-        if args.color_mapper in filters_class_table:
-            color_mapper = filters_class_table[args.color_mapper](args, device=device)
-        else:
-            print(f"Color mapper {args.color_mapper} not understood")
-            sys.exit(1)
+    filters = None
+    if args.filters is not None:
+        filter_names = args.filters.split(",")
+        filter_names = [f.strip() for f in filter_names]
+        filterClasses = []
+        for filt in filter_names:
+            filt_name, weight, stop = parse_prompt(filt)
+            if filt_name not in filters_class_table:
+                raise ValueError(f"Requested filter not found, aborting: {filt_name}")
+            filtClass = filters_class_table[filt_name]
+            # do special initializations here
+            try:
+                filtInstance = filtClass(args, device=device)
+                filterClasses.append({"filter":filtInstance, "weight": weight})
+            except TypeError as e:
+                print(f'error in initializing {filtClass} - this message is to provide information')
+                raise TypeError(e)
+        filters = filterClasses
 
     init_image_tensor = None
     target_image_tensor = None
@@ -607,8 +663,9 @@ def do_init(args):
         drawer.init_from_tensor(init_tensor)
 
     else:
-        # untested
-        drawer.rand_init(toksX, toksY)
+        drawer.init_from_tensor(init_tensor=None)
+        # this is the old vqgan version [need to patch vqgan to do this?]
+        # drawer.rand_init(toksX, toksY)
 
     if args.overlay_image is not None:
         # todo: maybe split this up on pipes and whatnot
@@ -627,6 +684,8 @@ def do_init(args):
             overlay_image_rgba_list.append(overlay_image_rgba)
 
         overlay_image_rgba_list[0].save('overlay_image0.png')
+
+    global_cached_png_info = None
 
     pmsTable = {}
     pmsImageTable = {}
@@ -688,7 +747,7 @@ def do_init(args):
                     if 'http' in f1:
                         # note: this is currently untested...
                         infile = urlopen(f1)
-                        input_files.apped(infile)
+                        input_files.append(infile)
                     else:
                         infiles = real_glob(f1)
                         input_files.extend(infiles)
@@ -739,7 +798,7 @@ def do_init(args):
                 stops = actual_tokens.argmax(dim=-1) - 1
                 embed = perceptor.encode_text(actual_tokens, stops).float()
             else:
-                print(f"--> {clip_model} normal encoding {txt}")
+                # print(f"--> {clip_model} normal encoding {txt}")
                 embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
             pMs.append(Prompt(embed, weight, stop).to(device))
     
@@ -886,7 +945,7 @@ im_targets = None
 z_labels = None
 opts = None
 drawer = None
-color_mapper = None
+filters = None
 normalize = None
 init_image_tensor = None
 target_image_tensor = None
@@ -969,9 +1028,56 @@ def checkdrop(args, iter, losses):
             drop_loss_time = True
     return drop_loss_time
 
+# for a release just bake in the version to prevent git subprocess lookup
+git_official_release_version = "v1.4.1"
+git_fallback_version = "v1.4+"
+
+# https://stackoverflow.com/a/40170206/1010653
+# Return the git revision as a string
+def git_version():
+    global git_official_release_version, git_fallback_version
+    if git_official_release_version is not None:
+        return git_official_release_version
+
+    def _minimal_ext_cmd(cmd):
+        # construct minimal environment
+        env = {}
+        for k in ['SYSTEMROOT', 'PATH']:
+            v = os.environ.get(k)
+            if v is not None:
+                env[k] = v
+        # LANGUAGE is used on win32
+        env['LANGUAGE'] = 'C'
+        env['LANG'] = 'C'
+        env['LC_ALL'] = 'C'
+        out = subprocess.Popen(cmd, stdout = subprocess.PIPE, env=env).communicate()[0]
+        return out
+
+    try:
+        out = _minimal_ext_cmd(['git', 'describe', '--always'])
+        GIT_REVISION = out.strip().decode('ascii')
+    except OSError:
+        GIT_REVISION = git_fallback_version
+
+    return GIT_REVISION
+
+global_cached_png_info=None
+def getPngInfo():
+    global global_cached_png_info
+    if global_cached_png_info is None:
+        git_v = git_version()
+        info = PngImagePlugin.PngInfo()
+        info.add_text("Software", f"pixray ({git_v})")
+        # print(global_given_args)
+        for k in global_given_args:
+            info.add_text(f"pixray_{k}", str(global_given_args[k]))
+        info.add_text("pixray_seed_used", str(global_seed_used))
+        global_cached_png_info = info
+    return global_cached_png_info 
+
 @torch.no_grad()
 def checkin(args, iter, losses):
-    global drawer, color_mapper
+    global drawer, filters
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
     num_cycles_not_best = iter - best_iter
@@ -986,18 +1092,19 @@ def checkin(args, iter, losses):
         writestr = f'anim: {cur_anim_index}/{len(anim_output_files)} {writestr}'
     else:
         writestr = f'{writestr} (-{num_cycles_not_best}=>{best_loss:2.4g})'
-    info = PngImagePlugin.PngInfo()
-    info.add_text('comment', f'{args.prompts}')
     timg = drawer.synth(cur_iteration)
-    if color_mapper is not None:
-        timg, closs = color_mapper(timg);
+    if filters is not None and len(filters)>0:
+        for f in filters:
+            filtclass = f["filter"]
+            timg, closs = filtclass(timg);
+
     img = TF.to_pil_image(timg[0].cpu())
     # img = drawer.to_image()
     if cur_anim_index is None:
         outfile = args.output
     else:
         outfile = anim_output_files[cur_anim_index]
-    img.save(outfile, pnginfo=info)
+    img.save(outfile, pnginfo=getPngInfo())
     if cur_anim_index == len(anim_output_files) - 1:
         # save gif
         gif_output = make_gif(args, iter)
@@ -1025,9 +1132,17 @@ def ascend_txt(args):
 
     result = []
 
-    if color_mapper is not None:
-        out, c_loss = color_mapper(out);
-        result.append(c_loss);
+    if filters is not None and len(filters)>0:
+        for f in filters:
+            filtclass = f["filter"]
+            filtweight = f["weight"]
+            out, new_losses = filtclass(out);
+            if type(new_losses) is not list and type(new_losses) is not tuple:
+                result.append(filtweight * new_losses)
+            else:
+                # warning: this path might be untested by current losses?
+                weighted_losses = [(filtweight * l) for l in new_losses]
+                result += weighted_losses
 
     if (cur_iteration%2 == 0):
         global_padding_mode = 'reflection'
@@ -1441,6 +1556,8 @@ def do_video(args):
 
 # this dictionary is used for settings in the notebook
 global_pixray_settings = {}
+# this dictionary documents all non-default args
+global_given_args = {}
 
 def setup_parser(vq_parser):
     # Create the parser
@@ -1490,12 +1607,12 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-cuts", "--num_cuts", type=int, help="Number of cuts", default=None, dest='num_cuts')
     vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=1, dest='batches')
     vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
-    vq_parser.add_argument("-sd",   "--seed", type=int, help="Seed", default=None, dest='seed')
+    vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest='seed')
     vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
     vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
-    vq_parser.add_argument("--palette", "--target_palette", type=str, help="target palette", default=None, dest='target_palette')
+    vq_parser.add_argument("--palette", type=str, help="target palette", default=None, dest='palette')
     vq_parser.add_argument("--transparent", type=str2bool, help="enable transparency", default=False, dest='transparency')
     vq_parser.add_argument("--alpha_weight", type=float, help="strenght of alpha loss", default=1., dest='alpha_weight')
     vq_parser.add_argument("--alpha_use_g", type=str2bool, help="use gaussian mask weighting", default=False, dest='alpha_use_g')
@@ -1506,7 +1623,7 @@ def setup_parser(vq_parser):
 def process_args(vq_parser, namespace=None):
     global global_aspect_width
     global cur_iteration, cur_anim_index, anim_output_files, anim_cur_zs, anim_next_zs;
-    global global_spot_file
+    global global_spot_file, global_given_args
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
     if namespace == None:
@@ -1517,6 +1634,16 @@ def process_args(vq_parser, namespace=None):
     else:
         # sometimes there are both settings and cmd line
         args = vq_parser.parse_args(namespace=namespace)        
+
+    # https://stackoverflow.com/a/66765255/1010653
+    global_given_args = {
+            opt.dest: getattr(args, opt.dest)
+            for opt in vq_parser._option_string_actions.values()
+            if hasattr(args, opt.dest) and opt.default != getattr(args, opt.dest)
+        }
+    # print("NON DEFAULT ARGS ARE")
+    # print(global_given_args)
+    # sys.exit(0)
 
     if args.cudnn_determinism:
         torch.backends.cudnn.deterministic = True
@@ -1651,8 +1778,8 @@ def process_args(vq_parser, namespace=None):
         # print("----> NO VECTOR PROMPT")
         args.vector_prompts = []
 
-    if args.target_palette is not None:
-        args.target_palette = palette_from_string(args.target_palette)
+    if args.palette is not None:
+        args.palette = palette_from_string(args.palette)
 
     if args.overlay_image is not None and args.overlay_every <= 0:
         args.overlay_image = None
@@ -1695,11 +1822,12 @@ def reset_settings():
 def add_settings(**kwargs):
     global global_pixray_settings
     for k, v in kwargs.items():
-        if v is None or v == "None":
-            # just remove the key if it is there
-            global_pixray_settings.pop(k, None)
-        else:
-            global_pixray_settings[k] = v
+        # TODO: is None / "None" a special case or not?
+        global_pixray_settings[k] = v
+        # if v is None or v == "None":
+        #     # just remove the key if it is there
+        #     global_pixray_settings.pop(k, None)
+        # else:
 
 def get_settings():
     global global_pixray_settings
@@ -1712,8 +1840,8 @@ def apply_settings():
     # first pass - only add things here that can trigger other parser additions (drawers, filters, losses)
     # Create the parser
     vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
-    vq_parser.add_argument("--drawer", type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
-    vq_parser.add_argument("--filters", "--color_mapper", type=str, help="Image Filtering", default=None, dest='color_mapper')
+    vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
+    vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = vq_parser.parse_known_args(namespace=settingsDict)
@@ -1721,8 +1849,13 @@ def apply_settings():
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
 
-    if settings_core.color_mapper is not None:
-        filters_class_table[settings_core.color_mapper].add_settings(vq_parser)
+    if settings_core.filters is not None:
+        # probably should DRY but...
+        filts = settings_core.filters.split(",")
+        filts = [f.strip() for f in filts]
+        for f in filts:
+            f = f.split(':')[0]
+            filters_class_table[f].add_settings(vq_parser)
 
     if settings_core.custom_loss is not None:
         # probably should DRY but...
