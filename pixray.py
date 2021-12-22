@@ -1965,7 +1965,7 @@ def apply_settings():
 
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
-    
+
     if settings_core.filters is not None:
         # probably should DRY but...
         filts = settings_core.filters.split(",")
