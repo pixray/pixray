@@ -1,4 +1,5 @@
 import argparse
+import json
 import math
 
 from urllib.request import urlopen
@@ -1964,7 +1965,6 @@ def apply_settings():
 
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
-
     if settings_core.filters is not None:
         # probably should DRY but...
         filts = settings_core.filters.split(",")
@@ -2010,11 +2010,27 @@ def command_line_override():
     settings = process_args(vq_parser)
     return settings
 
+def create_settings_file(settings):
+    file_name = get_settings_file_name(settings.output)
+
+    if not file_name: return
+
+    file = open(file_name, 'w+')
+    settings_json = json.dumps(settings, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+    file.write(settings_json)
+
+def get_settings_file_name(outfile_name):
+    file_name, _ = os.path.splitext(outfile_name)
+    if not (file_name and file_name.strip()): return None
+
+    return file_name + '.json'
+
 def main():
     settings = apply_settings()
     print(f"Running with {settings.num_cuts}x{settings.batches} = {settings.num_cuts*settings.batches} cuts")
     do_init(settings)
     do_run(settings)
+    create_settings_file(settings)
     # global drawer
     # drawer.to_svg()
 
