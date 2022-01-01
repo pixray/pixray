@@ -66,9 +66,11 @@ global_spot_file = None
 from util import map_number, palette_from_string, real_glob
 
 from vqgan import VqganDrawer
+from vdiff import VdiffDrawer
 
 class_table = {
-    "vqgan": VqganDrawer
+    "vqgan": VqganDrawer,
+    "vdiff": VdiffDrawer
 }
 
 try:
