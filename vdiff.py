@@ -103,12 +103,10 @@ class VdiffDrawer(DrawingInterface):
 
     def synth(self, cur_iteration):
         pred, v, next_x = sampling.sample_step(self.sample_state, self.x, cur_iteration, self.pred, self.v)
-        # save a copy for the next iteration
-        self.pred = pred.detach().requires_grad_()
-        self.v = v.detach().requires_grad_()
-        self.set_z(next_x)
         pixels = clamp_with_grad(pred.add(1).div(2), 0, 1)
-        # print(pixels)
+        # save a copy for the next iteration
+        self.pred = pred.detach()
+        self.v = v.detach()
         return pixels
 
     @torch.no_grad()
