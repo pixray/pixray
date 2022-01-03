@@ -66,9 +66,11 @@ global_spot_file = None
 from util import map_number, palette_from_string, real_glob
 
 from vqgan import VqganDrawer
+from vdiff import VdiffDrawer
 
 class_table = {
-    "vqgan": VqganDrawer
+    "vqgan": VqganDrawer,
+    "vdiff": VdiffDrawer
 }
 
 try:
@@ -1029,7 +1031,7 @@ def checkdrop(args, iter, losses):
     return drop_loss_time
 
 # for a release just bake in the version to prevent git subprocess lookup
-git_official_release_version = "v1.4.1"
+git_official_release_version = None
 git_fallback_version = "v1.4+"
 
 # https://stackoverflow.com/a/40170206/1010653
