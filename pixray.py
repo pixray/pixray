@@ -1371,6 +1371,14 @@ def train(args, cur_it):
 
         drawer.clip_z()
 
+    if args.drawer == "vdiff" and cur_it>=1:
+        lr = drawer.sample_state[6][cur_it] / drawer.sample_state[5][cur_it]
+        drawer.x = drawer.makenoise(cur_it)
+        drawer.x.requires_grad_()
+        to_optimize = [ drawer.x ]
+        opt = optim.Adam(to_optimize, lr=min(lr*0.001,0.01))
+        opts = [opt]
+
     if cur_it == args.iterations:
         # this resetting to best is currently disabled
         # drawer.set_z(best_z)

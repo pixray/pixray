@@ -101,6 +101,9 @@ class VdiffDrawer(DrawingInterface):
     def get_num_resolutions(self):
         return None
 
+    def makenoise(self, cur_it):
+        return sampling.noise(self.sample_state, self.x, cur_it, self.pred, self.v).detach()
+
     def synth(self, cur_iteration):
         pred, v, next_x = sampling.sample_step(self.sample_state, self.x, cur_iteration, self.pred, self.v)
         pixels = clamp_with_grad(pred.add(1).div(2), 0, 1)
