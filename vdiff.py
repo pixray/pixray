@@ -10,6 +10,7 @@ import os.path
 import torch
 from torch.nn import functional as F
 from torchvision.transforms import functional as TF
+import math
 
 from omegaconf import OmegaConf
 from taming.models import cond_transformer, vqgan
@@ -41,6 +42,11 @@ class ClampWithGrad(torch.autograd.Function):
 
 clamp_with_grad = ClampWithGrad.apply
 
+ROUNDUP_SIZE = 128
+# https://stackoverflow.com/a/8866125/1010653
+def roundup(x, n):
+    return int(math.ceil(x / float(n))) * n
+
 class VdiffDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
@@ -54,6 +60,8 @@ class VdiffDrawer(DrawingInterface):
         self.vdiff_model = settings.vdiff_model
         self.canvas_width = settings.size[0]
         self.canvas_height = settings.size[1]
+        self.gen_width = roundup(self.canvas_width, ROUNDUP_SIZE)
+        self.gen_height = roundup(self.canvas_height, ROUNDUP_SIZE)
         self.iterations = settings.iterations
         self.eta = 1
 
@@ -69,7 +77,7 @@ class VdiffDrawer(DrawingInterface):
         self.device = device
         self.pred = None
         self.v = None
-        self.x = torch.randn([1, 3, self.canvas_height, self.canvas_width], device=self.device)
+        self.x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
         self.x.requires_grad_(True)
         self.t = torch.linspace(1, 0, self.iterations+2, device=self.device)[:-1]
         self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
@@ -87,7 +95,7 @@ class VdiffDrawer(DrawingInterface):
     def init_from_tensor(self, init_tensor):
         # self.z, *_ = self.model.encode(init_tensor)        
         # self.z.requires_grad_(True)
-        next_x = torch.randn([1, 3, self.canvas_height, self.canvas_width], device=self.device)
+        next_x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
         self.x.requires_grad_(True)
         self.pred = None 
         self.v = None 
@@ -106,10 +114,17 @@ class VdiffDrawer(DrawingInterface):
 
     def synth(self, cur_iteration):
         pred, v, next_x = sampling.sample_step(self.sample_state, self.x, cur_iteration, self.pred, self.v)
-        pixels = clamp_with_grad(pred.add(1).div(2), 0, 1)
-        # save a copy for the next iteration
         self.pred = pred.detach()
         self.v = v.detach()
+        pixels = clamp_with_grad(pred.add(1).div(2), 0, 1)
+
+        # center crop
+        margin_x = int((self.gen_width - self.canvas_width)/2)
+        margin_y = int((self.gen_height - self.canvas_height)/2)
+        if (margin_x != 0 or margin_y != 0):
+            pixels = pixels[:,:,margin_y:(margin_y+self.canvas_height),margin_x:(margin_x+self.canvas_width)]
+
+        # save a copy for the next iteration
         return pixels
 
     @torch.no_grad()
