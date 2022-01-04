@@ -41,6 +41,7 @@ vqgan_checkpoint_table = {
 
 def wget_file(url, out):
     try:
+        print(f"Downloading {out} from {url}, please wait")
         output = subprocess.check_output(['wget', '-O', out, url])
     except subprocess.CalledProcessError as cpe:
         output = cpe.output

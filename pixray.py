@@ -787,6 +787,8 @@ def do_init(args):
 
     # CLIP tokenize/encode
     # NR: Weights / blending
+    allpromptembeds = []
+    allweights = []
     for prompt in args.prompts:
         for clip_model in args.clip_models:
             pMs = pmsTable[clip_model]
@@ -802,8 +804,15 @@ def do_init(args):
             else:
                 # print(f"--> {clip_model} normal encoding {txt}")
                 embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
+            allpromptembeds.append(embed)
+            allweights.append(weight)
             pMs.append(Prompt(embed, weight, stop).to(device))
     
+    if args.drawer=="vdiff" and args.vdiff_model=="cc12m_1":
+        target_embeds = torch.cat(allpromptembeds)
+        allweights = torch.tensor(allweights, dtype=torch.float, device=device)
+        clip_embed = F.normalize(target_embeds.mul(allweights[:, None]).sum(0, keepdim=True), dim=-1)
+        drawer.sample_state[3] = {"clip_embed":clip_embed}
 
 
     for vect_prompt in args.vector_prompts:

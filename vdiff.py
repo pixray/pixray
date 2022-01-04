@@ -6,6 +6,7 @@ from DrawingInterface import DrawingInterface
 import sys
 import subprocess
 sys.path.append('v-diffusion-pytorch')
+import os
 import os.path
 import torch
 from torch.nn import functional as F
@@ -15,8 +16,17 @@ import math
 from omegaconf import OmegaConf
 from taming.models import cond_transformer, vqgan
 
+
+model_urls = {
+    "yfcc_2":"https://v-diffusion.s3.us-west-2.amazonaws.com/yfcc_2.pth",
+    "yfcc_1":"https://v-diffusion.s3.us-west-2.amazonaws.com/yfcc_1.pth",
+    "cc12m_1":"https://v-diffusion.s3.us-west-2.amazonaws.com/cc12m_1.pth",
+}
+
+
 def wget_file(url, out):
     try:
+        print(f"Downloading {out} from {url}, please wait")
         output = subprocess.check_output(['wget', '-O', out, url])
     except subprocess.CalledProcessError as cpe:
         output = cpe.output
@@ -50,13 +60,15 @@ def roundup(x, n):
 class VdiffDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--vdiff_model", type=str, help="VDIFF model", default='yfcc_2', dest='vdiff_model')
+        parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1]", default='yfcc_2', dest='vdiff_model')
         # parser.add_argument("--vqgan_config", type=str, help="VQGAN config", default=None, dest='vqgan_config')
         # parser.add_argument("--vqgan_checkpoint", type=str, help="VQGAN checkpoint", default=None, dest='vqgan_checkpoint')
         return parser
 
     def __init__(self, settings):
         super(DrawingInterface, self).__init__()
+        assert settings.vdiff_model != "cc12m_1" or ( "RN50x4" not in settings.clip_models and  "RN50" not in settings.clip_models), "try clip_models='RN101,ViT-B/32,ViT-B/16' or only RN50 or only RN50x4, the clip embedding of RN50 and RN50x4 is not suitable with the rest"
+        os.makedirs("models",exist_ok=True)
         self.vdiff_model = settings.vdiff_model
         self.canvas_width = settings.size[0]
         self.canvas_height = settings.size[1]
@@ -68,7 +80,11 @@ class VdiffDrawer(DrawingInterface):
     def load_model(self, settings, device):
         model = get_model(self.vdiff_model)()
         # checkpoint = MODULE_DIR / f'checkpoints/{self.vdiff_model}.pth'
-        checkpoint = f'checkpoints/{self.vdiff_model}.pth'
+        checkpoint = f'models/{self.vdiff_model}.pth'
+        
+        if not (os.path.exists(checkpoint) and os.path.isfile(checkpoint)):
+            wget_file(model_urls[self.vdiff_model],checkpoint)
+
         model.load_state_dict(torch.load(checkpoint, map_location='cpu'))
         if device.type == 'cuda':
             model = model.half()
