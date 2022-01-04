@@ -67,7 +67,8 @@ class VdiffDrawer(DrawingInterface):
 
     def load_model(self, settings, device):
         model = get_model(self.vdiff_model)()
-        checkpoint = MODULE_DIR / f'checkpoints/{self.vdiff_model}.pth'
+        # checkpoint = MODULE_DIR / f'checkpoints/{self.vdiff_model}.pth'
+        checkpoint = f'checkpoints/{self.vdiff_model}.pth'
         model.load_state_dict(torch.load(checkpoint, map_location='cpu'))
         if device.type == 'cuda':
             model = model.half()

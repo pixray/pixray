@@ -121,3 +121,13 @@ class Tiler(BasePixrayPredictor):
                 settings = "tiler_fft"
             yield from super().predict(prompts=prompts, settings=settings, **ydict)    
 
+class PixrayVdiff(BasePixrayPredictor):
+    @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #artstation 🌇")
+    @cog.input("settings", type=str, help="extra settings", default='\n')
+    def predict(self, prompts, settings):
+        ydict = yaml.safe_load(settings)
+        if ydict == None:
+            # no settings
+            ydict = {}
+        yield from super().predict(settings="pixray_vdiff", prompts=prompts, **ydict)
+
