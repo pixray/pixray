@@ -6,6 +6,7 @@ from DrawingInterface import DrawingInterface
 import sys
 import subprocess
 sys.path.append('v-diffusion-pytorch')
+import os
 import os.path
 import torch
 from torch.nn import functional as F
@@ -66,6 +67,8 @@ class VdiffDrawer(DrawingInterface):
 
     def __init__(self, settings):
         super(DrawingInterface, self).__init__()
+        assert settings.vdiff_model != "cc12m_1" or ( "RN50x4" not in settings.clip_models and  "RN50" not in settings.clip_models), "try clip_models='RN101,ViT-B/32,ViT-B/16' or only RN50 or only RN50x4, the clip embedding of RN50 and RN50x4 is not suitable with the rest"
+        os.makedirs("models",exist_ok=True)
         self.vdiff_model = settings.vdiff_model
         self.canvas_width = settings.size[0]
         self.canvas_height = settings.size[1]
