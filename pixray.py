@@ -1040,7 +1040,7 @@ def checkdrop(args, iter, losses):
     return drop_loss_time
 
 # for a release just bake in the version to prevent git subprocess lookup
-git_official_release_version = "v1.5"
+git_official_release_version = None
 git_fallback_version = "v1.5+"
 
 # https://stackoverflow.com/a/40170206/1010653
