@@ -3,7 +3,7 @@ from utils.fileutils import *
 
 class TestFileUtilMethods(unittest.TestCase):
 
-    def test_get_settings_file_name(self):
+    def test_get_file_name(self):
         # Happy path
         self.assertEqual(get_output_file_name('test.png', '.json'), 'test.json')
         
