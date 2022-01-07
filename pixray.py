@@ -2,7 +2,7 @@ import argparse
 import json
 import math
 import logging
-from utils import fileutils
+from utils.fileutils import *
 
 from urllib.request import urlopen
 import sys
@@ -1952,7 +1952,7 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     return arguments, unknown
 def initialize_logging(settings_core):
     if settings_core.debug:
-        logfile = fileutils.get_output_file_name(settings_core.output, '.log')
+        logfile = get_output_file_name(settings_core.output, '.log')
         logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
 
 def apply_settings():
