@@ -1,6 +1,8 @@
 import argparse
 import json
 import math
+import logging
+from utils import fileutils
 
 from urllib.request import urlopen
 import sys
@@ -1686,7 +1688,6 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
     vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest='seed')
     vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
-    vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("--palette", type=str, help="target palette", default=None, dest='palette')
@@ -1949,6 +1950,10 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
                 arg_dict[key] = value
     
     return arguments, unknown
+def initialize_logging(settings_core):
+    if settings_core.debug:
+        logfile = fileutils.get_output_file_name(settings_core.output, '.log')
+        logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
 
 def apply_settings():
     global global_pixray_settings
@@ -1960,9 +1965,13 @@ def apply_settings():
     vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
+    vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
+    vq_parser.add_argument("--debug", type=str2bool, help="Output a debug file", default=False, dest='debug')
+    
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
+    initialize_logging(settings_core)
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
 
@@ -1995,6 +2004,7 @@ def apply_settings():
         settingsDict = SimpleNamespace(**global_pixray_settings)
 
     settings = process_args(vq_parser, settingsDict)
+    logging.debug(json.dumps(settings, default=lambda o: o.__dict__, sort_keys=True, indent=4))
     return settings
 
 def add_custom_loss(name, customloss):
@@ -2011,27 +2021,11 @@ def command_line_override():
     settings = process_args(vq_parser)
     return settings
 
-def create_settings_file(settings):
-    file_name = get_settings_file_name(settings.output)
-
-    if not file_name: return
-
-    file = open(file_name, 'w+')
-    settings_json = json.dumps(settings, default=lambda o: o.__dict__, sort_keys=True, indent=4)
-    file.write(settings_json)
-
-def get_settings_file_name(outfile_name):
-    file_name, _ = os.path.splitext(outfile_name)
-    if not (file_name and file_name.strip()): return None
-
-    return file_name + '.json'
-
 def main():
     settings = apply_settings()
     print(f"Running with {settings.num_cuts}x{settings.batches} = {settings.num_cuts*settings.batches} cuts")
     do_init(settings)
     do_run(settings)
-    create_settings_file(settings)
     # global drawer
     # drawer.to_svg()
 
