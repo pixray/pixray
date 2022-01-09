@@ -29,6 +29,8 @@ from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
 from util import str2bool
 
+from slip import get_clip_perceptor
+
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
 try:
@@ -577,13 +579,13 @@ def do_init(args):
         # TODO: unload models?
         perceptors = {}
         for clip_model in args.clip_models:
-            perceptor = clip.load(clip_model, jit=jit, download_root="models")[0].eval().requires_grad_(False).to(device)
+            perceptor = get_clip_perceptor(clip_model, device)
             perceptors[clip_model] = perceptor
 
     # now separately setup cuts
     for clip_model in args.clip_models:
         perceptor = perceptors[clip_model]
-        cut_size = perceptor.visual.input_resolution
+        cut_size = perceptor.input_resolution
         cutoutSizeTable[clip_model] = cut_size
         if not cut_size in cutoutsTable:    
             make_cutouts = MakeCutouts(cut_size, args.num_cuts, cut_pow=args.cut_pow)
@@ -707,7 +709,7 @@ def do_init(args):
                 pmsTarget = pmsTargetTable[clip_model]
                 perceptor = perceptors[clip_model]
 
-                input_resolution = perceptor.visual.input_resolution
+                input_resolution = perceptor.input_resolution
                 # print(f"Running {clip_model} at {input_resolution}")
                 preprocess = Compose([
                     Resize(input_resolution, interpolation=Image.BICUBIC),
@@ -732,7 +734,7 @@ def do_init(args):
                 pMs = pmsTable[clip_model]
                 perceptor = perceptors[clip_model]
 
-                input_resolution = perceptor.visual.input_resolution
+                input_resolution = perceptor.input_resolution
                 # print(f"Running {clip_model} at {input_resolution}")
                 preprocess = Compose([
                     Resize(input_resolution, interpolation=Image.BICUBIC),
@@ -782,8 +784,8 @@ def do_init(args):
     if z_orig is not None:
         z_orig = drawer.get_z_copy()
 
-    normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
-                                      std=[0.26862954, 0.26130258, 0.27577711])
+    # normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
+    #                                   std=[0.26862954, 0.26130258, 0.27577711])
 
     # CLIP tokenize/encode
     # NR: Weights / blending
@@ -803,7 +805,7 @@ def do_init(args):
                 embed = perceptor.encode_text(actual_tokens, stops).float()
             else:
                 # print(f"--> {clip_model} normal encoding {txt}")
-                embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
+                embed = perceptor.encode_text(txt).float()
             allpromptembeds.append(embed)
             allweights.append(weight)
             pMs.append(Prompt(embed, weight, stop).to(device))
@@ -837,8 +839,8 @@ def do_init(args):
         for clip_model in args.clip_models:
             if clip_model not in vect_table:
                 print(f"WARNING: no vector for {clip_model} in {f1}!")
-                print("Continuing... (BUT THIS RESULT MIGHT NOT BE WHAT YOU WANT 😬)")
-                time.sleep(3)
+                print("Continuing without this vector... (BUT THIS RESULT MIGHT NOT BE WHAT YOU WANT 😬)")
+                # time.sleep(3)
                 continue
             pMs = pmsTable[clip_model]
             v = np.array(vect_table[clip_model])
@@ -850,7 +852,7 @@ def do_init(args):
             pMs = spotPmsTable[clip_model]
             perceptor = perceptors[clip_model]
             txt, weight, stop = parse_prompt(prompt)
-            embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
+            embed = perceptor.encode_text(txt).float()
             pMs.append(Prompt(embed, weight, stop).to(device))
 
     for prompt in args.spot_prompts_off:
@@ -858,7 +860,7 @@ def do_init(args):
             pMs = spotOffPmsTable[clip_model]
             perceptor = perceptors[clip_model]
             txt, weight, stop = parse_prompt(prompt)
-            embed = perceptor.encode_text(clip.tokenize(txt).to(device)).float()
+            embed = perceptor.encode_text(txt).float()
             pMs.append(Prompt(embed, weight, stop).to(device))
 
     for label in args.labels:
@@ -867,8 +869,8 @@ def do_init(args):
             perceptor = perceptors[clip_model]
             txt, weight, stop = parse_prompt(label)
             texts = [template.format(txt) for template in imagenet_templates] #format with class
-            print(f"Tokenizing all of {texts}")
-            texts = clip.tokenize(texts).to(device) #tokenize
+            # print(f"Tokenizing all of {texts}")
+            # texts = clip.tokenize(texts).to(device) #tokenize
             class_embeddings = perceptor.encode_text(texts) #embed with text encoder
             class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)
             class_embedding = class_embeddings.mean(dim=0)
@@ -885,7 +887,7 @@ def do_init(args):
 
     for seed, weight in zip(args.noise_prompt_seeds, args.noise_prompt_weights):
         gen = torch.Generator().manual_seed(seed)
-        embed = torch.empty([1, perceptor.visual.output_dim]).normal_(generator=gen)
+        embed = torch.empty([1, perceptor.output_dim]).normal_(generator=gen)
         pMs.append(Prompt(embed, weight).to(device))
 
     #custom loss 
@@ -957,7 +959,7 @@ z_labels = None
 opts = None
 drawer = None
 filters = None
-normalize = None
+# normalize = None
 init_image_tensor = None
 target_image_tensor = None
 pmsTable = None
@@ -1130,7 +1132,7 @@ def checkin(args, iter, losses):
     tqdm.write(writestr)
 
 def ascend_txt(args):
-    global cur_iteration, cur_anim_index, perceptors, normalize, cutoutsTable, cutoutSizeTable
+    global cur_iteration, cur_anim_index, perceptors, cutoutsTable, cutoutSizeTable # normalize, 
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
     global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode
     global pmsTargetTable
@@ -1181,18 +1183,18 @@ def ascend_txt(args):
         transient_pMs = []
 
         if args.spot_prompts:
-            iii_s = perceptor.encode_image(normalize( cur_spot_cutouts[cutoutSize] )).float()
+            iii_s = perceptor.encode_image(cur_spot_cutouts[cutoutSize]).float()
             spotPms = spotPmsTable[clip_model]
             for prompt in spotPms:
                 result.append(prompt(iii_s))
 
         if args.spot_prompts_off:
-            iii_so = perceptor.encode_image(normalize( cur_spot_off_cutouts[cutoutSize] )).float()
+            iii_so = perceptor.encode_image(cur_spot_off_cutouts[cutoutSize]).float()
             spotOffPms = spotOffPmsTable[clip_model]
             for prompt in spotOffPms:
                 result.append(prompt(iii_so))
 
-        iii = perceptor.encode_image(normalize( cur_cutouts[cutoutSize] )).float()
+        iii = perceptor.encode_image(cur_cutouts[cutoutSize]).float()
 
         pMs = pmsTable[clip_model]
         for prompt in pMs:
@@ -1226,7 +1228,7 @@ def ascend_txt(args):
             # print("Building throwaway image prompts")
             # new way builds throwaway Prompts
             batch = make_cutouts(timg)
-            embed = perceptor.encode_image(normalize(batch)).float()
+            embed = perceptor.encode_image(batch).float()
             if args.image_prompt_weight is not None:
                 transient_pMs.append(Prompt(embed, args.image_prompt_weight).to(device))
             else:
@@ -1669,10 +1671,10 @@ def process_args(vq_parser, namespace=None):
 
     quality_to_clip_models_table = {
         'draft': 'ViT-B/32',
-        'normal': 'ViT-B/32,ViT-B/16',
-        'better': 'RN50,ViT-B/32,ViT-B/16',
-        'best': 'RN50x4,ViT-B/32,ViT-B/16',
-        'supreme': 'RN50x4,RN101,ViT-B/32,ViT-B/16'
+        'normal': 'ViT-B/32,SLIP_VITB16',
+        'better': 'RN50,ViT-B/32,SLIP_VITB16',
+        'best': 'RN50x4,ViT-B/32,SLIP_VITB16',
+        'supreme': 'RN50x4,RN101,ViT-B/32,SLIP_VITB16'
     }
     quality_to_iterations_table = {
         'draft': 200,
