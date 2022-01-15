@@ -1,6 +1,7 @@
 # code adapted from https://github.com/facebookresearch/SLIP/issues/2#issuecomment-1001052198
 
 import sys
+import os
 from collections import OrderedDict
 
 import torch 
@@ -8,6 +9,13 @@ import torch.nn as nn
 from torchvision import transforms
 
 from CLIP import clip
+
+all_slip_models =  ["SLIP_VITS16", "SLIP_VITB16", "SLIP_VITL16",
+                    "SIMCLR_VITS16",
+                    "CLIP_VITS16", "CLIP_VITB16", "CLIP_VITL16"]
+
+
+from util import wget_file
 
 def normalize(img, input_range = None):
     if input_range is None:
@@ -41,8 +49,8 @@ class CLIP_Base():
         self.output_dim = self.model.visual.output_dim
 
         self.preprocess_transform = transforms.Compose([
-            transforms.Resize(224),
-            transforms.CenterCrop(224),
+            transforms.Resize(self.input_resolution),
+            transforms.CenterCrop(self.input_resolution),
             transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
             ])
 
@@ -77,19 +85,27 @@ class SLIP_Base():
         self.input_resolution = 224
 
         if model_name == "SLIP_VITS16":
-            ckpt_path = f"models/slip_small_100ep.pt"
+            ckpt_file = f"slip_small_100ep.pt"
         elif model_name == "SLIP_VITB16":
-            ckpt_path  = f"models/slip_base_100ep.pt"
+            ckpt_file  = f"slip_base_100ep.pt"
         elif model_name == "SLIP_VITL16":
-            ckpt_path = f"models/slip_large_100ep.pt"
+            ckpt_file = f"slip_large_100ep.pt"
         elif model_name == "SIMCLR_VITS16":
-            ckpt_path = f"models/simclr_small_25ep.pt"
+            ckpt_file = f"simclr_small_25ep.pt"
         elif model_name == "CLIP_VITS16":
-            ckpt_path = f"models/clip_small_25ep.pt"
+            ckpt_file = f"clip_small_25ep.pt"
         elif model_name == "CLIP_VITB16":
-            ckpt_path = f"models/clip_base_25ep.pt"
+            ckpt_file = f"clip_base_25ep.pt"
         elif model_name == "CLIP_VITL16":
-            ckpt_path = f"models/clip_large_25ep.pt"
+            ckpt_file = f"clip_large_25ep.pt"
+        else:
+            print(f"slip model {model_name} not known, aborting")
+            sys.exit(1)
+
+        ckpt_path = f"models/{ckpt_file}"
+        if not os.path.exists(ckpt_path):
+            url = f"https://dl.fbaipublicfiles.com/slip/{ckpt_file}"
+            wget_file(url, ckpt_path)
 
         self.preprocess_transform = transforms.Compose([
             transforms.Resize(224),

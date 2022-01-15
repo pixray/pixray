@@ -13,24 +13,27 @@ from CLIP import clip
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from PIL import Image
 
+from slip import get_clip_perceptor, all_slip_models
+
 perceptors = {}
 
 def init(args):
     global perceptors, resolutions
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    jit = True if float(torch.__version__[:3]) < 1.8 else False
 
     if args.models is not None:
+        # print("Running models ", args.models)
         models = args.models.split(",")
         args.models = [model.strip() for model in models]
     else:
         args.models = clip.available_models()
+        args.models =  args.models + all_slip_models
+        # print("using models ", args.models)
 
-    for clip_model in args.models:
-        model, preprocess = clip.load(clip_model, jit=jit)
-        perceptor = model.eval().requires_grad_(False).to(device)
-        perceptors[clip_model] = perceptor
+    for p_model in args.models:
+        perceptor = get_clip_perceptor(p_model, device)
+        perceptors[p_model] = perceptor
 
 def fetch_images(preprocess, image_files):
     images = []
@@ -41,10 +44,8 @@ def fetch_images(preprocess, image_files):
 
     return images
 
-def do_image_features(model, images, image_mean, image_std):
+def do_image_features(model, images):
     image_input = torch.tensor(np.stack(images)).cuda()
-    image_input -= image_mean[:, None, None]
-    image_input /= image_std[:, None, None]
 
     with torch.no_grad():
         image_features = model.encode_image(image_input).float()
@@ -58,19 +59,16 @@ def spew_vectors(args, inputs, outfile):
     save_table = {}
     for clip_model in args.models:
         perceptor = perceptors[clip_model]
-        input_resolution = perceptor.visual.input_resolution
+        input_resolution = perceptor.input_resolution
         print(f"Running {clip_model} at {input_resolution}")
         preprocess = Compose([
             Resize(input_resolution, interpolation=Image.BICUBIC),
             CenterCrop(input_resolution),
             ToTensor()
         ])
-        image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
-        image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
-
         images = fetch_images(preprocess, input_files);
 
-        features = do_image_features(perceptor, images, image_mean, image_std)
+        features = do_image_features(perceptor, images)
         print(f"saving {features.shape} to {clip_model}")
         save_table[clip_model] = features.tolist()
 
@@ -177,7 +175,6 @@ def main():
                         help="Output json file for vectors.")
     args = parser.parse_args()
 
-    init(args)
     if args.avg_diff:
         run_avg_diff(args)
         sys.exit(0)
@@ -186,6 +183,7 @@ def main():
         run_svm_diff(args)
         sys.exit(0)
 
+    init(args)
     spew_vectors(args, args.inputs, args.outfile)
 
 if __name__ == '__main__':

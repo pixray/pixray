@@ -6,6 +6,7 @@ from codecs import encode
 from PIL import Image
 from urllib.request import urlopen
 from colorthief import ColorThief
+import subprocess
 
 try:
     import matplotlib.colors
@@ -218,3 +219,11 @@ def palette_from_string(s):
     return pal
 
 
+# downloader
+def wget_file(url, out):
+    try:
+        print(f"Downloading {out} from {url}, please wait")
+        output = subprocess.check_output(['wget', '-O', out, url])
+    except subprocess.CalledProcessError as cpe:
+        output = cpe.output
+        print("Ignoring non-zero exit: ", output)

@@ -1603,7 +1603,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=10, dest='overlay_every')
     vq_parser.add_argument("-ovo",  "--overlay_offset", type=int, help="Overlay image iteration offset", default=0, dest='overlay_offset')
     vq_parser.add_argument("-ovi",  "--overlay_image", type=str, help="Overlay image (if not init)", default=None, dest='overlay_image')
-    vq_parser.add_argument("-qua",  "--quality", type=str, help="draft, normal, best", default="normal", dest='quality')
+    vq_parser.add_argument(         "--quality", type=str, help="draft, normal, better, best", default="normal", dest='quality')
     vq_parser.add_argument("-asp",  "--aspect", type=str, help="widescreen, square", default="widescreen", dest='aspect')
     vq_parser.add_argument("-ezs",  "--ezsize", type=str, help="small, medium, large", default=None, dest='ezsize')
     vq_parser.add_argument("-sca",  "--scale", type=float, help="scale (instead of ezsize)", default=None, dest='scale')
@@ -1619,7 +1619,8 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-iwd",  "--init_weight_dist", type=float, help="Initial weight dist loss", default=0., dest='init_weight_dist')
     vq_parser.add_argument("-iwc",  "--init_weight_cos", type=float, help="Initial weight cos loss", default=0., dest='init_weight_cos')
     vq_parser.add_argument("-iwp",  "--init_weight_pix", type=float, help="Initial weight pix loss", default=0., dest='init_weight_pix')
-    vq_parser.add_argument("-m",    "--clip_models", type=str, help="CLIP model", default=None, dest='clip_models')
+    vq_parser.add_argument(         "--perceptors", type=str, help="perceptors (clip/slip/mixed)", default="clip", dest='perceptors')
+    vq_parser.add_argument(         "--clip_models", type=str, help="CLIP model", default=None, dest='clip_models')
     vq_parser.add_argument("-nps",  "--noise_prompt_seeds", nargs="*", type=int, help="Noise prompt seeds", default=[], dest='noise_prompt_seeds')
     vq_parser.add_argument("-npw",  "--noise_prompt_weights", nargs="*", type=float, help="Noise prompt weights", default=[], dest='noise_prompt_weights')
     vq_parser.add_argument("-lr",   "--learning_rate", type=float, help="Learning rate", default=0.2, dest='learning_rate')
@@ -1670,12 +1671,29 @@ def process_args(vq_parser, namespace=None):
         torch.backends.cudnn.deterministic = True
 
     quality_to_clip_models_table = {
-        'draft': 'ViT-B/32',
-        'normal': 'ViT-B/32,SLIP_VITB16',
-        'better': 'RN50,ViT-B/32,SLIP_VITB16',
-        'best': 'RN50x4,ViT-B/32,SLIP_VITB16',
-        'supreme': 'RN50x4,RN101,ViT-B/32,SLIP_VITB16'
+        'clip': {
+            'draft': 'ViT-B/32',
+            'normal': 'ViT-B/32,ViT-B/16',
+            'better': 'RN50,ViT-B/32,ViT-B/16',
+            'best': 'RN50x4,ViT-B/32,ViT-B/16',
+            'supreme': 'RN50x4,RN101,ViT-B/32,ViT-B/16'
+        },
+        'slip': {
+            'draft': 'SLIP_VITS16',
+            'normal': 'SLIP_VITS16,SLIP_VITB16',
+            'better': 'SLIP_VITB16,SLIP_VITL16',
+            'best': 'SLIP_VITS16,SLIP_VITB16,SLIP_VITL16',
+            'supreme': 'CLIP_VITB16,SLIP_VITS16,SLIP_VITB16,SLIP_VITL16'
+        },
+        'mixed': {
+            'draft': 'ViT-B/32',
+            'normal': 'ViT-B/32,SLIP_VITB16',
+            'better': 'RN50,ViT-B/32,SLIP_VITB16',
+            'best': 'RN50x4,ViT-B/32,SLIP_VITB16',
+            'supreme': 'RN50x4,RN101,ViT-B/32,SLIP_VITB16'
+        }
     }
+
     quality_to_iterations_table = {
         'draft': 200,
         'normal': 250,
@@ -1708,12 +1726,12 @@ def process_args(vq_parser, namespace=None):
         'supreme': 12
     }
 
-    if args.quality not in quality_to_clip_models_table:
+    if args.quality not in quality_to_clip_models_table[args.perceptors]:
         print("Qualitfy setting not understood, aborting -> ", args.quality)
         exit(1)
 
     if args.clip_models is None:
-        args.clip_models = quality_to_clip_models_table[args.quality]
+        args.clip_models = quality_to_clip_models_table[args.perceptors][args.quality]
     if args.iterations is None:
         args.iterations = quality_to_iterations_table[args.quality]
     if args.num_cuts is None:
