@@ -48,4 +48,5 @@ git+https://github.com/fbcotter/pytorch_wavelets
 # main aphantasia library
 git+https://github.com/pixray/aphantasia@7e6b3bb
 
-#Fix v-diffussion module not found error: "git clone https://github.com/pixray/v-diffusion-pytorch"
+# slip
+timm
