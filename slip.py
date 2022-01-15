@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 
-from CLIP import clip
+from clip import clip
 
 all_slip_models =  ["SLIP_VITS16", "SLIP_VITB16", "SLIP_VITL16",
                     "SIMCLR_VITS16",
