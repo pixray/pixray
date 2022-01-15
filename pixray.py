@@ -309,6 +309,38 @@ class MyRandomPerspective(K.RandomPerspective):
             align_corners=self.flags["align_corners"], padding_mode=global_padding_mode
         )
 
+global_fill_color=None;
+# override class to get fill color
+class MyRandomAffine(K.RandomAffine):
+    def apply_transform(
+        self, input: torch.Tensor, params: Dict[str, torch.Tensor], transform: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        _, _, height, width = input.shape
+        transform = cast(torch.Tensor, transform)
+        return kornia.geometry.transform.warp_affine(
+            input,
+            transform[:, :2, :],
+            (height, width),
+            self.flags["resample"].name.lower(),
+            align_corners=self.flags["align_corners"],
+            padding_mode="fill",
+            fill_value=global_fill_color
+        )
+
+class MyRandomPerspectivePadded(K.RandomPerspective):
+    def apply_transform(
+        self, input: torch.Tensor, params: Dict[str, torch.Tensor], transform: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        _, _, height, width = input.shape
+        transform = cast(torch.Tensor, transform)
+        return kornia.geometry.transform.warp_perspective(
+            input, transform, (height, width), mode=self.flags["resample"].name.lower(),
+            align_corners=self.flags["align_corners"],
+            padding_mode="fill",
+            fill_value=global_fill_color
+        )
+
+
 cached_spot_indexes = {}
 def fetch_spot_indexes(sideX, sideY):
     global global_spot_file
@@ -363,19 +395,19 @@ class MakeCutouts(nn.Module):
         if global_aspect_width == 1:
             n_s = 0.95
             n_t = (1-n_s)/2
-            augmentations.append(K.RandomAffine(degrees=0, translate=(n_t, n_t), scale=(n_s, n_s), p=1.0, return_transform=True))
+            augmentations.append(MyRandomAffine(degrees=0, translate=(n_t, n_t), scale=(n_s, n_s), p=1.0, return_transform=True))
         elif global_aspect_width > 1:
             n_s = 1/global_aspect_width
             n_t = (1-n_s)/2
-            augmentations.append(K.RandomAffine(degrees=0, translate=(0, n_t), scale=(0.9*n_s, n_s), p=1.0, return_transform=True))
+            augmentations.append(MyRandomAffine(degrees=0, translate=(0, n_t), scale=(0.9*n_s, n_s), p=1.0, return_transform=True))
         else:
             n_s = global_aspect_width
             n_t = (1-n_s)/2
-            augmentations.append(K.RandomAffine(degrees=0, translate=(n_t, 0), scale=(0.9*n_s, n_s), p=1.0, return_transform=True))
+            augmentations.append(MyRandomAffine(degrees=0, translate=(n_t, 0), scale=(0.9*n_s, n_s), p=1.0, return_transform=True))
 
         # augmentations.append(K.CenterCrop(size=(self.cut_size,self.cut_size), p=1.0, cropping_mode="resample", return_transform=True))
         augmentations.append(K.CenterCrop(size=self.cut_size, cropping_mode='resample', p=1.0, return_transform=True))
-        augmentations.append(K.RandomPerspective(distortion_scale=0.20, p=0.7, return_transform=True))
+        augmentations.append(MyRandomPerspectivePadded(distortion_scale=0.20, p=0.7, return_transform=True))
         augmentations.append(K.ColorJitter(hue=0.1, saturation=0.1, p=0.8, return_transform=True))
         self.augs_wide = nn.Sequential(*augmentations)
 
@@ -425,7 +457,7 @@ class MakeCutouts(nn.Module):
             batch1 = kornia.geometry.transform.warp_perspective(torch.cat(cutouts[:self.cutn_zoom], dim=0), self.transforms[:self.cutn_zoom],
                 (self.cut_size, self.cut_size), padding_mode=global_padding_mode)
             batch2 = kornia.geometry.transform.warp_perspective(torch.cat(cutouts[self.cutn_zoom:], dim=0), self.transforms[self.cutn_zoom:],
-                (self.cut_size, self.cut_size), padding_mode='zeros')
+                (self.cut_size, self.cut_size), padding_mode="fill", fill_value=global_fill_color)
             batch = torch.cat([batch1, batch2])
             # if cur_iteration < 2:
             #     for j in range(4):
@@ -1129,7 +1161,7 @@ def checkin(args, iter, losses):
 def ascend_txt(args):
     global cur_iteration, cur_anim_index, perceptors, cutoutsTable, cutoutSizeTable # normalize, 
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
-    global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode
+    global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode, global_fill_color
     global pmsTargetTable
     global lossGlobals
 
@@ -1156,6 +1188,11 @@ def ascend_txt(args):
         global_padding_mode = 'reflection'
     else:
         global_padding_mode = 'border'
+
+    color_fill = random.random()
+    # print("Color fill is ", color_fill)
+    # color_fill = 1.0
+    global_fill_color =torch.tensor([color_fill,color_fill,color_fill], device=device, dtype=torch.float)
 
     cur_cutouts = {}
     cur_spot_cutouts = {}
