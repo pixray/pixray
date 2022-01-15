@@ -72,8 +72,9 @@ class CLIP_Base():
         text_embeddings = torch.stack([self.model.encode_text(clip.tokenize(text).to(self.device)).detach().clone() for text in texts])
         return text_embeddings / text_embeddings.norm(dim=-1, keepdim=True)
 
-# TODO: this is very hacky, must fix this later
-SLIP_PATH = 'SLIP'
+# TODO: this is very hacky, must fix this later (submodule dependency)
+SLIP_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'SLIP')
+# print("APPENDING PATH ", SLIP_PATH)
 sys.path.append(SLIP_PATH)
 import models
 from tokenizer import SimpleTokenizer

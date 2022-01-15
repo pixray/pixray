@@ -4,10 +4,13 @@
 from DrawingInterface import DrawingInterface
 
 import sys
-import subprocess
-sys.path.append('v-diffusion-pytorch')
 import os
-import os.path
+import subprocess
+
+# TODO: this is very hacky, must fix this later (submodule dependency)
+VDIFF_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'v-diffusion-pytorch')
+sys.path.append(VDIFF_PATH)
+
 import torch
 from torch.nn import functional as F
 from torchvision.transforms import functional as TF
@@ -15,6 +18,7 @@ import math
 
 from omegaconf import OmegaConf
 from taming.models import cond_transformer, vqgan
+from util import wget_file
 
 
 model_urls = {
@@ -24,16 +28,7 @@ model_urls = {
 }
 
 
-def wget_file(url, out):
-    try:
-        print(f"Downloading {out} from {url}, please wait")
-        output = subprocess.check_output(['wget', '-O', out, url])
-    except subprocess.CalledProcessError as cpe:
-        output = cpe.output
-        print("Ignoring non-zero exit: ", output)
-
 from pathlib import Path
-MODULE_DIR = Path(__file__).resolve().parent
 
 from diffusion import get_model, get_models, sampling, utils
 
@@ -79,7 +74,6 @@ class VdiffDrawer(DrawingInterface):
 
     def load_model(self, settings, device):
         model = get_model(self.vdiff_model)()
-        # checkpoint = MODULE_DIR / f'checkpoints/{self.vdiff_model}.pth'
         checkpoint = f'models/{self.vdiff_model}.pth'
         
         if not (os.path.exists(checkpoint) and os.path.isfile(checkpoint)):
