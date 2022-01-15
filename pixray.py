@@ -379,15 +379,15 @@ class MakeCutouts(nn.Module):
         super().__init__()
         self.cut_size = cut_size
         self.cutn = cutn
-        self.cutn_zoom = int(2*cutn/3)
+        self.cutn_zoom = int(0.6*cutn)
         self.cut_pow = cut_pow
         self.transforms = None
 
         augmentations = []
-        if global_aspect_width != 1:
-            augmentations.append(K.RandomCrop(size=(self.cut_size,self.cut_size), p=1.0, cropping_mode="resample", return_transform=True))
+        # if global_aspect_width != 1:
+        #     augmentations.append(K.RandomCrop(size=(self.cut_size,self.cut_size), p=1.0, cropping_mode="resample", return_transform=True))
         augmentations.append(MyRandomPerspective(distortion_scale=0.40, p=0.7, return_transform=True))
-        augmentations.append(K.RandomResizedCrop(size=(self.cut_size,self.cut_size), scale=(0.1,0.75),  ratio=(0.85,1.2), cropping_mode='resample', p=0.7, return_transform=True))
+        augmentations.append(K.RandomResizedCrop(size=(self.cut_size,self.cut_size), scale=(0.25,0.95),  ratio=(0.85,1.2), cropping_mode='resample', p=1.0, return_transform=True))
         augmentations.append(K.ColorJitter(hue=0.1, saturation=0.1, p=0.8, return_transform=True))
         self.augs_zoom = nn.Sequential(*augmentations)
 
@@ -472,7 +472,7 @@ class MakeCutouts(nn.Module):
             # print(batch.shape)
             self.transforms = torch.cat([transforms1, transforms2])
             ## batch, self.transforms = self.augs(torch.cat(cutouts, dim=0))
-            # if cur_iteration < 2:
+            # if cur_iteration < 4:
             #     for j in range(4):
             #         TF.to_pil_image(batch[j].cpu()).save(f"live_im_{cur_iteration:02d}_{j:02d}_{spot}.png")
             #         j_wide = j + self.cutn_zoom
