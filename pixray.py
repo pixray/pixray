@@ -304,11 +304,10 @@ class MyRandomPerspective(K.RandomPerspective):
     ) -> torch.Tensor:
         _, _, height, width = input.shape
         transform = cast(torch.Tensor, transform)
-        return kornia.geometry.warp_perspective(
-            input, transform, (height, width),
-             mode=self.resample.name.lower(), align_corners=self.align_corners, padding_mode=global_padding_mode
+        return kornia.geometry.transform.warp_perspective(
+            input, transform, (height, width), mode=self.flags["resample"].name.lower(),
+            align_corners=self.flags["align_corners"], padding_mode=global_padding_mode
         )
-
 
 cached_spot_indexes = {}
 def fetch_spot_indexes(sideX, sideY):
