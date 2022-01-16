@@ -837,12 +837,11 @@ def do_init(args):
             allweights.append(weight)
             pMs.append(Prompt(embed, weight, stop).to(device))
     
-    if args.drawer=="vdiff" and args.vdiff_model=="cc12m_1":
+    if args.drawer=="vdiff" and args.vdiff_model[:7] == "cc12m_1":
         target_embeds = torch.cat(allpromptembeds)
         allweights = torch.tensor(allweights, dtype=torch.float, device=device)
         clip_embed = F.normalize(target_embeds.mul(allweights[:, None]).sum(0, keepdim=True), dim=-1)
         drawer.sample_state[3] = {"clip_embed":clip_embed}
-
 
     for vect_prompt in args.vector_prompts:
         f1, weight, stop = parse_prompt(vect_prompt)
