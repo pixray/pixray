@@ -56,7 +56,7 @@ def roundup(x, n):
 class VdiffDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1, cc12m_1_cfg]", default='cc12m_1', dest='vdiff_model')
+        parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1, cc12m_1_cfg]", default='yfcc_2', dest='vdiff_model')
         parser.add_argument("--vdiff_schedule", type=str, help="VDIFF schedule [default, log]", default="default", dest='vdiff_schedule')
         return parser
 
