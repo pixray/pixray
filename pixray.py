@@ -1081,7 +1081,7 @@ def checkdrop(args, iter, losses):
 
 # for a release just bake in the version to prevent git subprocess lookup
 git_official_release_version = None
-git_fallback_version = "v1.6.1+"
+git_fallback_version = "v1.6.2+"
 
 # https://stackoverflow.com/a/40170206/1010653
 # Return the git revision as a string
