@@ -22,9 +22,10 @@ from util import wget_file
 
 
 model_urls = {
-    "yfcc_2":"https://v-diffusion.s3.us-west-2.amazonaws.com/yfcc_2.pth",
-    "yfcc_1":"https://v-diffusion.s3.us-west-2.amazonaws.com/yfcc_1.pth",
-    "cc12m_1":"https://v-diffusion.s3.us-west-2.amazonaws.com/cc12m_1.pth",
+    "yfcc_2":      "https://v-diffusion.s3.us-west-2.amazonaws.com/yfcc_2.pth",
+    "yfcc_1":      "https://v-diffusion.s3.us-west-2.amazonaws.com/yfcc_1.pth",
+    "cc12m_1":     "https://v-diffusion.s3.us-west-2.amazonaws.com/cc12m_1.pth",
+    "cc12m_1_cfg": "https://v-diffusion.s3.us-west-2.amazonaws.com/cc12m_1_cfg.pth"
 }
 
 
@@ -55,14 +56,12 @@ def roundup(x, n):
 class VdiffDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1]", default='yfcc_2', dest='vdiff_model')
-        # parser.add_argument("--vqgan_config", type=str, help="VQGAN config", default=None, dest='vqgan_config')
-        # parser.add_argument("--vqgan_checkpoint", type=str, help="VQGAN checkpoint", default=None, dest='vqgan_checkpoint')
+        parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1, cc12m_1_cfg]", default='cc12m_1', dest='vdiff_model')
+        parser.add_argument("--vdiff_schedule", type=str, help="VDIFF schedule [default, log]", default="default", dest='vdiff_schedule')
         return parser
 
     def __init__(self, settings):
         super(DrawingInterface, self).__init__()
-        assert settings.vdiff_model != "cc12m_1" or ( "RN50x4" not in settings.clip_models and  "RN50" not in settings.clip_models), "try clip_models='RN101,ViT-B/32,ViT-B/16' or only RN50 or only RN50x4, the clip embedding of RN50 and RN50x4 is not suitable with the rest"
         os.makedirs("models",exist_ok=True)
         self.vdiff_model = settings.vdiff_model
         self.canvas_width = settings.size[0]
@@ -70,6 +69,8 @@ class VdiffDrawer(DrawingInterface):
         self.gen_width = roundup(self.canvas_width, ROUNDUP_SIZE)
         self.gen_height = roundup(self.canvas_height, ROUNDUP_SIZE)
         self.iterations = settings.iterations
+        self.schedule = settings.vdiff_schedule
+        self.active_clip_models = settings.clip_models
         self.eta = 1
 
     def load_model(self, settings, device):
@@ -84,6 +85,12 @@ class VdiffDrawer(DrawingInterface):
             model = model.half()
         model = model.to(device).eval().requires_grad_(False)
 
+        if hasattr(model, 'clip_model'):
+            self.clip_model = model.clip_model
+            assert self.clip_model in self.active_clip_models, f"try adding {self.clip_model} to clip_models settings - vdiff model {self.vdiff_model} needs it but it is not active"
+        else:
+            self.clip_model = None
+
         self.model = model
         self.device = device
         self.pred = None
@@ -91,7 +98,10 @@ class VdiffDrawer(DrawingInterface):
         self.x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
         self.x.requires_grad_(True)
         self.t = torch.linspace(1, 0, self.iterations+2, device=self.device)[:-1]
-        self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
+        if self.schedule == 'log':
+            self.steps = utils.get_log_schedule(self.t)
+        else:
+            self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
 
         self.sample_state = sampling.sample_setup(self.model, self.x, self.steps, self.eta, {})
 

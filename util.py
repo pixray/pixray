@@ -4,7 +4,7 @@ import glob
 from braceexpand import braceexpand
 from codecs import encode
 from PIL import Image
-from urllib.request import urlopen
+import urllib.request
 from colorthief import ColorThief
 import subprocess
 
@@ -13,6 +13,10 @@ try:
 except ImportError:
     # only needed for palette stuff
     pass
+
+# https://stackoverflow.com/a/31758803/1010653
+class AppURLopener(urllib.request.FancyURLopener):
+    version = "Mozilla/5.0"
 
 # file helpers
 def real_glob(rglob):
@@ -158,7 +162,8 @@ def palette_from_section(s):
         # pull from a file or URL
         if s.endswith(".png") or s.endswith(".jpg"):
             if 'http' in s:
-                obj = urlopen(s)
+                opener = AppURLopener()
+                obj = opener.open(s)
             else:
                 obj = s[1:]
 
@@ -179,7 +184,8 @@ def palette_from_section(s):
 
             # dumb: but colortheif can't deal with an Image, so reopen the url if need be
             if 'http' in s:
-                obj = urlopen(s)
+                opener = AppURLopener()
+                obj = opener.open(s)
             ct = ColorThief(obj)
             colors = ct.get_palette(color_count=num_steps, quality=2)
             colors = [[c[0]/255.0, c[1]/255.0, c[2]/255.0] for c in colors]
@@ -192,7 +198,9 @@ def palette_from_section(s):
                 with open(s[1:], 'rb') as act:
                     raw_data = act.read()                           # Read binary data
             else:
-                raw_data = urlopen(s).read()
+                opener = AppURLopener()
+                obj = opener.open(s)
+                raw_data = obj.read()
             hex_data = encode(raw_data, 'hex')                  # Convert it to hexadecimal values
             total_colors_count = (int(hex_data[-7:-4], 16))     # Get last 3 digits to get number of colors total
             misterious_count = (int(hex_data[-4:-3], 16))       # I have no idea what does it do
