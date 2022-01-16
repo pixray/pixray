@@ -583,6 +583,7 @@ def do_init(args):
     drawer = class_table[args.drawer](args)
     drawer.load_model(args, device)
     num_resolutions = drawer.get_num_resolutions()
+
     # print("-----------> NUMR ", num_resolutions)
     #as of torch 1.8, jit produces errors. The below code no longer works with 1.10
     #jit = True if float(torch.__version__[:3]) < 1.8 else False
@@ -730,6 +731,14 @@ def do_init(args):
         spotPmsTable[clip_model] = []
         spotOffPmsTable[clip_model] = []
 
+    drawer_clip_target = None
+    if hasattr(drawer, 'clip_model') and drawer.clip_model is not None:
+        print(f"drawer {drawer} needs {drawer.clip_model}")
+        drawer_clip_target = drawer.clip_model
+    # NR: Weights / blending
+    allpromptembeds = []
+    allweights = []
+
     if args.target_images is not None:
         if args.animation_dir is not None:
             for clip_model in args.clip_models:
@@ -787,6 +796,9 @@ def do_init(args):
                 images = fetch_images(preprocess, input_files);
 
                 features = do_image_features(perceptor, images, image_mean, image_std)
+                if clip_model == drawer_clip_target:
+                    allpromptembeds.append(features)
+                    allweights.append(weight)
                 pMs.append(Prompt(features, weight, stop).to(device))
 
     if args.image_labels is not None:
@@ -815,9 +827,6 @@ def do_init(args):
     #                                   std=[0.26862954, 0.26130258, 0.27577711])
 
     # CLIP tokenize/encode
-    # NR: Weights / blending
-    allpromptembeds = []
-    allweights = []
     for prompt in args.prompts:
         for clip_model in args.clip_models:
             pMs = pmsTable[clip_model]
@@ -833,15 +842,18 @@ def do_init(args):
             else:
                 # print(f"--> {clip_model} normal encoding {txt}")
                 embed = perceptor.encode_text(txt).float()
-            allpromptembeds.append(embed)
-            allweights.append(weight)
+            if clip_model == drawer_clip_target:
+                allpromptembeds.append(embed)
+                allweights.append(weight)
             pMs.append(Prompt(embed, weight, stop).to(device))
-    
-    if args.drawer=="vdiff" and args.vdiff_model[:7] == "cc12m_1":
-        target_embeds = torch.cat(allpromptembeds)
-        allweights = torch.tensor(allweights, dtype=torch.float, device=device)
-        clip_embed = F.normalize(target_embeds.mul(allweights[:, None]).sum(0, keepdim=True), dim=-1)
-        drawer.sample_state[3] = {"clip_embed":clip_embed}
+
+    if drawer_clip_target is not None:
+        if args.drawer=="vdiff" and args.vdiff_model[:7] == "cc12m_1":
+            target_embeds = torch.cat(allpromptembeds)
+            allweights = torch.tensor(allweights, dtype=torch.float, device=device)
+            clip_embed = F.normalize(target_embeds.mul(allweights[:, None]).sum(0, keepdim=True), dim=-1)
+            print(f"clip_embed for drawer {drawer} is {clip_embed.shape}")
+            drawer.sample_state[3] = {"clip_embed":clip_embed}
 
     for vect_prompt in args.vector_prompts:
         f1, weight, stop = parse_prompt(vect_prompt)
@@ -1703,7 +1715,7 @@ def process_args(vq_parser, namespace=None):
 
     quality_to_clip_models_table = {
         'clip': {
-            'draft': 'ViT-B/32',
+            'draft': 'ViT-B/16',
             'normal': 'ViT-B/32,ViT-B/16',
             'better': 'RN50,ViT-B/32,ViT-B/16',
             'best': 'RN50x4,ViT-B/32,ViT-B/16',
@@ -1717,11 +1729,11 @@ def process_args(vq_parser, namespace=None):
             'supreme': 'CLIP_VITB16,SLIP_VITS16,SLIP_VITB16,SLIP_VITL16'
         },
         'mixed': {
-            'draft': 'ViT-B/32',
-            'normal': 'ViT-B/32,SLIP_VITB16',
-            'better': 'RN50,ViT-B/32,SLIP_VITB16',
-            'best': 'RN50x4,ViT-B/32,SLIP_VITB16',
-            'supreme': 'RN50x4,RN101,ViT-B/32,SLIP_VITB16'
+            'draft': 'ViT-B/16',
+            'normal': 'ViT-B/16,SLIP_VITB16',
+            'better': 'RN50,ViT-B/16,SLIP_VITB16',
+            'best': 'RN50x4,ViT-B/16,SLIP_VITB16',
+            'supreme': 'RN50x4,RN101,ViT-B/16,SLIP_VITB16'
         }
     }
 
