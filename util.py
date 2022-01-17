@@ -217,7 +217,7 @@ def palette_from_section(s):
             raise ValueError(f'Unknown file type: {s}')
     else:
         return get_rgb_range(s)
-
+ 
 def palette_from_string(s):
     s = s.strip()
     pal = []
