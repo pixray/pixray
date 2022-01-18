@@ -105,6 +105,7 @@ from Losses.SaturationLoss import SaturationLoss
 from Losses.SymmetryLoss import SymmetryLoss
 from Losses.SmoothnessLoss import SmoothnessLoss
 from Losses.EdgeLoss import EdgeLoss
+from Losses.StyleLoss import StyleLoss
 
 loss_class_table = {
     "palette": PaletteLoss,
@@ -112,6 +113,7 @@ loss_class_table = {
     "symmetry": SymmetryLoss,
     "smoothness": SmoothnessLoss,
     "edge": EdgeLoss,
+    "style": StyleLoss,
 }
 
 
@@ -503,6 +505,10 @@ def rebuild_optimisers(args):
 
         dropped_learning_rate = args.learning_rate/drop_divisor;
         # print(f"Optimizing with {args.optimiser} set to {dropped_learning_rate}")
+
+        #temporary hack
+        if args.init_image and args.drawer=="vdiff":
+            dropped_learning_rate = 0.01/drop_divisor
 
         # Set the optimiser
         to_optimize = [ drawer.get_z() ]
@@ -1432,7 +1438,8 @@ def train(args, cur_it):
         to_optimize = [ drawer.x ]
         opt = optim.Adam(to_optimize, lr=min(lr*0.001,0.01))
         opts = [opt]
-
+        if cur_it >= drawer.total_its:
+            return False
     if cur_it == args.iterations:
         # this resetting to best is currently disabled
         # drawer.set_z(best_z)

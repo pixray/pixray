@@ -58,6 +58,7 @@ class VdiffDrawer(DrawingInterface):
     def add_settings(parser):
         parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1, cc12m_1_cfg]", default='yfcc_2', dest='vdiff_model')
         parser.add_argument("--vdiff_schedule", type=str, help="VDIFF schedule [default, log]", default="default", dest='vdiff_schedule')
+        parser.add_argument("--vdiff_init_skip", type=float, help="skip steps (step power) when init", default=0.9, dest='vdiff_init_skip')
         return parser
 
     def __init__(self, settings):
@@ -72,6 +73,9 @@ class VdiffDrawer(DrawingInterface):
         self.schedule = settings.vdiff_schedule
         self.active_clip_models = settings.clip_models
         self.eta = 1
+        self.init_image = settings.init_image
+        self.vdiff_init_skip = settings.vdiff_init_skip
+        self.total_its = settings.iterations
 
     def load_model(self, settings, device):
         model = get_model(self.vdiff_model)()
@@ -95,15 +99,6 @@ class VdiffDrawer(DrawingInterface):
         self.device = device
         self.pred = None
         self.v = None
-        self.x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
-        self.x.requires_grad_(True)
-        self.t = torch.linspace(1, 0, self.iterations+2, device=self.device)[:-1]
-        if self.schedule == 'log':
-            self.steps = utils.get_log_schedule(self.t)
-        else:
-            self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
-
-        self.sample_state = sampling.sample_setup(self.model, self.x, self.steps, self.eta, {})
 
 
     def get_opts(self, decay_divisor):
@@ -114,9 +109,22 @@ class VdiffDrawer(DrawingInterface):
         return None
 
     def init_from_tensor(self, init_tensor):
-        # self.z, *_ = self.model.encode(init_tensor)        
-        # self.z.requires_grad_(True)
-        next_x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
+        self.x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
+        self.t = torch.linspace(1, 0, self.iterations+2, device=self.device)[:-1]
+        if self.schedule == 'log':
+            self.steps = utils.get_log_schedule(self.t)
+        else:
+            self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
+        # self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
+        # [model, steps, eta, extra_args, ts, alphas, sigmas]
+        self.sample_state = sampling.sample_setup(self.model, self.x, self.steps, self.eta, {})
+        if self.init_image is not None:
+            self.steps = self.steps[self.steps < self.vdiff_init_skip]
+            alpha, sigma = utils.t_to_alpha_sigma(self.steps)
+            self.x = init_tensor * alpha[0] + self.x * sigma[0]
+            self.sample_state[5], self.sample_state[6] = alpha, sigma
+            self.sample_state[1] = self.steps
+            self.total_its = len(self.steps)-1
         self.x.requires_grad_(True)
         self.pred = None 
         self.v = None 
