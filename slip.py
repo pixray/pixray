@@ -11,6 +11,7 @@ from torchvision import transforms
 from clip import clip
 
 all_slip_models =  ["SLIP_VITS16", "SLIP_VITB16", "SLIP_VITL16",
+                    "SLIP_CC3M", "SLIP_CC12M",
                     "SIMCLR_VITS16",
                     "CLIP_VITS16", "CLIP_VITB16", "CLIP_VITL16"]
 
@@ -85,6 +86,7 @@ class SLIP_Base():
         self.device = device
         self.input_resolution = 224
 
+        # HA HA HA, this could be a lookup table but I'm too lazy to change it
         if model_name == "SLIP_VITS16":
             ckpt_file = f"slip_small_100ep.pt"
         elif model_name == "SLIP_VITB16":
@@ -99,6 +101,10 @@ class SLIP_Base():
             ckpt_file = f"clip_base_25ep.pt"
         elif model_name == "CLIP_VITL16":
             ckpt_file = f"clip_large_25ep.pt"
+        elif model_name == "SLIP_CC3M":
+            ckpt_file  = f"slip_base_cc3m_40ep.pt"
+        elif model_name == "SLIP_CC12M":
+            ckpt_file  = f"slip_base_cc12m_35ep.pt"
         else:
             print(f"slip model {model_name} not known, aborting")
             sys.exit(1)
@@ -124,6 +130,9 @@ class SLIP_Base():
         # create model
         old_args = ckpt['args']
         old_args.model = model_name
+        # these two are the same model on different training data...
+        if old_args.model == "SLIP_CC3M" or old_args.model == "SLIP_CC12M":
+            old_args.model = "SLIP_VITB16"
 
         model = getattr(models, old_args.model)(rand_embed=False,
             ssl_mlp_dim=old_args.ssl_mlp_dim, ssl_emb_dim=old_args.ssl_emb_dim)

@@ -1722,11 +1722,11 @@ def process_args(vq_parser, namespace=None):
             'supreme': 'RN50x4,RN101,ViT-B/32,ViT-B/16'
         },
         'slip': {
-            'draft': 'SLIP_VITS16',
-            'normal': 'SLIP_VITS16,SLIP_VITB16',
-            'better': 'SLIP_VITB16,SLIP_VITL16',
-            'best': 'SLIP_VITS16,SLIP_VITB16,SLIP_VITL16',
-            'supreme': 'CLIP_VITB16,SLIP_VITS16,SLIP_VITB16,SLIP_VITL16'
+            'draft': 'SLIP_VITB16',
+            'normal': 'SLIP_VITB16,SLIP_CC3M',
+            'better': 'SLIP_VITB16,SLIP_CC3M,SLIP_CC12M',
+            'best': 'SLIP_VITB16,SLIP_CC3M,SLIP_CC12M,SLIP_VITS16',
+            'supreme': 'SLIP_VITB16,SLIP_CC3M,SLIP_CC12M,SLIP_VITS16,SLIP_VITL16'
         },
         'mixed': {
             'draft': 'ViT-B/16',

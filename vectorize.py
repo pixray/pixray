@@ -9,7 +9,7 @@ from tqdm import tqdm
 from util import real_glob
 
 import torch
-from CLIP import clip
+from clip import clip
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from PIL import Image
 
