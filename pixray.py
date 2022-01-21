@@ -184,20 +184,20 @@ def contrast_noise(n):
 def random_noise_image(w,h):
     # scale up roughly as power of 2
     if (w>1024 or h>1024):
-        side, octp = 2048, 7
+        side, octp = 2048, 6
     elif (w>512 or h>512):
-        side, octp = 1024, 6
+        side, octp = 1024, 5
     elif (w>256 or h>256):
-        side, octp = 512, 5
+        side, octp = 512, 4
     else:
-        side, octp = 256, 4
+        side, octp = 256, 3
 
     nr = NormalizeData(generate_fractal_noise_2d((side, side), (32, 32), octp))
     ng = NormalizeData(generate_fractal_noise_2d((side, side), (32, 32), octp))
     nb = NormalizeData(generate_fractal_noise_2d((side, side), (32, 32), octp))
     stack = np.dstack((contrast_noise(nr),contrast_noise(ng),contrast_noise(nb)))
     substack = stack[:h, :w, :]
-    im = Image.fromarray((255.9 * stack).astype('uint8'))
+    im = Image.fromarray((255.999 * substack).astype('uint8'))
     return im
 
 # testing
@@ -1438,8 +1438,6 @@ def train(args, cur_it):
         to_optimize = [ drawer.x ]
         opt = optim.Adam(to_optimize, lr=min(lr*0.001,0.01))
         opts = [opt]
-        if cur_it >= drawer.total_its:
-            return False
     if cur_it == args.iterations:
         # this resetting to best is currently disabled
         # drawer.set_z(best_z)

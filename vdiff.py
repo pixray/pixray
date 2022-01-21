@@ -73,9 +73,7 @@ class VdiffDrawer(DrawingInterface):
         self.schedule = settings.vdiff_schedule
         self.active_clip_models = settings.clip_models
         self.eta = 1
-        self.init_image = settings.init_image
         self.vdiff_init_skip = settings.vdiff_init_skip
-        self.total_its = settings.iterations
 
     def load_model(self, settings, device):
         model = get_model(self.vdiff_model)()
@@ -111,20 +109,26 @@ class VdiffDrawer(DrawingInterface):
     def init_from_tensor(self, init_tensor):
         self.x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
         self.t = torch.linspace(1, 0, self.iterations+2, device=self.device)[:-1]
+
         if self.schedule == 'log':
             self.steps = utils.get_log_schedule(self.t)
         else:
             self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
-        # self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
+
+        # todo: maybe scheduld should adjust better due to init_skip?
+            # reverse-center crop
+            new_x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
+            margin_x = int((self.gen_width - self.canvas_width)/2)
+            margin_y = int((self.gen_height - self.canvas_height)/2)
+            if (margin_x != 0 or margin_y != 0):
+                new_x[:,:,margin_y:(margin_y+self.canvas_height),margin_x:(margin_x+self.canvas_width)] = init_tensor
+            else:
+                new_x = init_tensor
+            # by default the image is 99% based on init_tensor (for now)
+            self.x = new_x * 0.99 + self.x * 0.01
+
         # [model, steps, eta, extra_args, ts, alphas, sigmas]
         self.sample_state = sampling.sample_setup(self.model, self.x, self.steps, self.eta, {})
-        if self.init_image is not None:
-            self.steps = self.steps[self.steps < self.vdiff_init_skip]
-            alpha, sigma = utils.t_to_alpha_sigma(self.steps)
-            self.x = init_tensor * alpha[0] + self.x * sigma[0]
-            self.sample_state[5], self.sample_state[6] = alpha, sigma
-            self.sample_state[1] = self.steps
-            self.total_its = len(self.steps)-1
         self.x.requires_grad_(True)
         self.pred = None 
         self.v = None 
