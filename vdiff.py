@@ -116,6 +116,7 @@ class VdiffDrawer(DrawingInterface):
             self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
 
         # todo: maybe scheduld should adjust better due to init_skip?
+        if init_tensor is not None:
             # reverse-center crop
             new_x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
             margin_x = int((self.gen_width - self.canvas_width)/2)
