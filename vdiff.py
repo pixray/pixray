@@ -18,7 +18,7 @@ import math
 
 from omegaconf import OmegaConf
 from taming.models import cond_transformer, vqgan
-from util import wget_file
+from util import wget_file, map_number
 
 
 model_urls = {
@@ -58,7 +58,7 @@ class VdiffDrawer(DrawingInterface):
     def add_settings(parser):
         parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1, cc12m_1_cfg]", default='yfcc_2', dest='vdiff_model')
         parser.add_argument("--vdiff_schedule", type=str, help="VDIFF schedule [default, log]", default="default", dest='vdiff_schedule')
-        parser.add_argument("--vdiff_init_skip", type=float, help="skip steps (step power) when init", default=0.9, dest='vdiff_init_skip')
+        parser.add_argument("--vdiff_skip", type=float, help="skip a percentage of the way into the decay schedule", default=0, dest='vdiff_skip')
         return parser
 
     def __init__(self, settings):
@@ -73,7 +73,7 @@ class VdiffDrawer(DrawingInterface):
         self.schedule = settings.vdiff_schedule
         self.active_clip_models = settings.clip_models
         self.eta = 1
-        self.vdiff_init_skip = settings.vdiff_init_skip
+        self.vdiff_skip = settings.vdiff_skip
 
     def load_model(self, settings, device):
         model = get_model(self.vdiff_model)()
@@ -98,7 +98,6 @@ class VdiffDrawer(DrawingInterface):
         self.pred = None
         self.v = None
 
-
     def get_opts(self, decay_divisor):
         return None
 
@@ -107,8 +106,14 @@ class VdiffDrawer(DrawingInterface):
         return None
 
     def init_from_tensor(self, init_tensor):
+
+        # compute self.t based on vdiff_skip
+        top_val = map_number(self.vdiff_skip, 0, 100, 1, 0)
+        # print("Using a max for vdiff skip of ", top_val)
+        self.t = torch.linspace(top_val, 0, self.iterations+2, device=self.device)[:-1]
+        # print("self.t is ", self.t)
+
         self.x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
-        self.t = torch.linspace(1, 0, self.iterations+2, device=self.device)[:-1]
 
         if self.schedule == 'log':
             self.steps = utils.get_log_schedule(self.t)
