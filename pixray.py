@@ -1375,6 +1375,11 @@ def init_anim_z(args, init_rgba):
 
 # torch.autograd.set_detect_anomaly(True)
 
+def apply_overlay(args, cur_it):
+    return args.overlay_image is not None and \
+            (cur_it % args.overlay_every) == args.overlay_offset and \
+            (cur_it < args.overlay_until)
+
 def train(args, cur_it):
     global drawer, opts
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
@@ -1396,10 +1401,7 @@ def train(args, cur_it):
                 num_anim_frames = len(init_image_rgba_list)
                 init_anim_z(args, init_image_rgba_list[cur_anim_index % num_anim_frames])
 
-        # if args.overlay_every and cur_it != 0 and \
-        #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
-        if args.overlay_image is not None and \
-            (cur_it % args.overlay_every) == args.overlay_offset:
+        if apply_overlay:
             if cur_anim_index is not None:
                 num_anim_frames = len(overlay_image_rgba_list)
                 overlay_image_rgba = overlay_image_rgba_list[cur_anim_index % num_anim_frames]
@@ -1650,6 +1652,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=10, dest='overlay_every')
     vq_parser.add_argument("-ovo",  "--overlay_offset", type=int, help="Overlay image iteration offset", default=0, dest='overlay_offset')
+    vq_parser.add_argument("-ovu",  "--overlay_until", type=int, help="Last iteration to continue applying overlay image", default=sys.maxint, dest='overlay_until')
     vq_parser.add_argument("-ovi",  "--overlay_image", type=str, help="Overlay image (if not init)", default=None, dest='overlay_image')
     vq_parser.add_argument(         "--quality", type=str, help="draft, normal, better, best", default="normal", dest='quality')
     vq_parser.add_argument("-asp",  "--aspect", type=str, help="widescreen, square", default="widescreen", dest='aspect')
