@@ -1759,19 +1759,19 @@ def process_args(vq_parser, namespace=None):
     # this should be replaced with logic that does somethings
     # smart based on available memory (eg: size, num_models, etc)
     quality_to_num_cuts_table = {
-        'draft': 32,
-        'normal': 48,
-        'better': 32,
-        'best': 10,
+        'draft': 24,
+        'normal': 30,
+        'better': 36,
+        'best': 12,
         'supreme': 8
     }
 
     quality_to_batches_table = {
         'draft': 1,
         'normal': 1,
-        'better': 2,
-        'best': 8,
-        'supreme': 12
+        'better': 1,
+        'best': 2,
+        'supreme': 4
     }
 
     if args.quality not in quality_to_clip_models_table[args.perceptors]:
