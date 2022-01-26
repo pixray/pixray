@@ -1675,7 +1675,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=float, help="When to drop learning rate (relative to iterations)", default=[75], dest='learning_rate_drops')
     vq_parser.add_argument("-as",   "--auto_stop", type=str2bool, help="Auto stopping", default=False, dest='auto_stop')
     vq_parser.add_argument("-cuts", "--num_cuts", type=int, help="Number of cuts", default=None, dest='num_cuts')
-    vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=1, dest='batches')
+    vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=None, dest='batches')
     vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
     vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest='seed')
     vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
@@ -1982,7 +1982,8 @@ def command_line_override():
     return settings
 
 def main():
-    settings = apply_settings()    
+    settings = apply_settings()
+    print(f"Running with {settings.num_cuts}x{settings.batches} = {settings.num_cuts*settings.batches} cuts")
     do_init(settings)
     do_run(settings)
     # global drawer
