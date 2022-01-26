@@ -176,7 +176,8 @@ def get_clip_perceptor(clip_model_name, device):
         perceptor = perceptor.requires_grad_(False).eval().to(device)
 
         n_params = sum(p.numel() for p in perceptor.parameters())
-        print("Loaded CLIP %s: %.2fM params" %(clip_model_name, (n_params/1000000)))
+        in_res = perceptor.visual.input_resolution
+        print(f"Loaded CLIP {clip_model_name}: {in_res}x{in_res} and {n_params/1000000:.2f}M params")
         clip_perceptor = CLIP_Base(perceptor, preprocess, device)
 
     else:
