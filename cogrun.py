@@ -123,7 +123,7 @@ class Tiler(BasePixrayPredictor):
 
 class PixrayVdiff(BasePixrayPredictor):
     @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #artstation 🌇")
-    @cog.input("settings", type=str, help="extra settings", default='\n')
+    @cog.input("settings", type=str, help="extra settings in `name: value` format. reference: https://dazhizhong.gitbook.io/pixray-docs/docs/primary-settings", default='\n')
     def predict(self, prompts, settings):
         ydict = yaml.safe_load(settings)
         if ydict == None:
