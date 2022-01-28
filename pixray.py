@@ -1378,7 +1378,7 @@ def init_anim_z(args, init_rgba):
 def apply_overlay(args, cur_it):
     return args.overlay_image is not None and \
             (cur_it % args.overlay_every) == args.overlay_offset and \
-            (cur_it < args.overlay_until)
+            ((args.overlay_until is None) or (cur_it < args.overlay_until))
 
 def train(args, cur_it):
     global drawer, opts
@@ -1652,7 +1652,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=10, dest='overlay_every')
     vq_parser.add_argument("-ovo",  "--overlay_offset", type=int, help="Overlay image iteration offset", default=0, dest='overlay_offset')
-    vq_parser.add_argument("-ovu",  "--overlay_until", type=int, help="Last iteration to continue applying overlay image", default=sys.maxsize, dest='overlay_until')
+    vq_parser.add_argument("-ovu",  "--overlay_until", type=int, help="Last iteration to continue applying overlay image", default=None, dest='overlay_until')
     vq_parser.add_argument("-ovi",  "--overlay_image", type=str, help="Overlay image (if not init)", default=None, dest='overlay_image')
     vq_parser.add_argument(         "--quality", type=str, help="draft, normal, better, best", default="normal", dest='quality')
     vq_parser.add_argument("-asp",  "--aspect", type=str, help="widescreen, square", default="widescreen", dest='aspect')
