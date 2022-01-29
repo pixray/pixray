@@ -6,6 +6,7 @@ import sys
 import os
 import subprocess
 import json
+import yaml
 import glob
 from braceexpand import braceexpand
 from types import SimpleNamespace
@@ -1925,6 +1926,29 @@ def get_settings():
     global global_pixray_settings
     return global_pixray_settings.copy()
 
+
+def parse_known_args_with_optional_yaml(parser, namespace=None):
+    parser.add_argument(
+        '--config-file',
+        dest='config_file',
+        type=argparse.FileType(mode='r'))
+    
+    arguments, unknown = parser.parse_known_args(namespace=namespace)
+    if arguments.config_file:
+        data = yaml.load(arguments.config_file, Loader=yaml.SafeLoader)
+        delattr(arguments, 'config_file')
+        arg_dict = arguments.__dict__
+        for key, value in data.items():
+            if isinstance(value, list):
+                if(key not in arg_dict or arg_dict[key] is None):
+                    arg_dict[key] = []
+                for v in value:
+                    arg_dict[key].append(v)
+            else:
+                arg_dict[key] = value
+    
+    return arguments, unknown
+
 def apply_settings():
     global global_pixray_settings
     settingsDict = None
@@ -1936,7 +1960,7 @@ def apply_settings():
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     settingsDict = SimpleNamespace(**global_pixray_settings)
-    settings_core, unknown = vq_parser.parse_known_args(namespace=settingsDict)
+    settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
