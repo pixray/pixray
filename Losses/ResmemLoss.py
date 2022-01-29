@@ -13,7 +13,7 @@ recenter = transforms.Compose((
     )
 )
 
-from util import wget_file
+from util import wget_file, map_number
 resmem_url = 'https://github.com/pixray/resmem/releases/download/1.1.3_model/model.pt'
 
 class ResmemLoss(LossInterface):
@@ -63,7 +63,8 @@ class ResmemLoss(LossInterface):
         # print(prediction)
         # print(prediction.shape)
         mean = torch.mean(prediction)
-        # print(mean)
-        the_loss = 0.1 * (1.0 - mean)
+        # loss seems to bottom out at 0.4? ¯\_(ツ)_/¯
+        mapped_mean = map_number(mean, 0.4, 1.0, 0, 1)
+        the_loss = 0.05 * mapped_mean
 
         return the_loss
