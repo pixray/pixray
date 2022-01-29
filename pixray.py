@@ -106,6 +106,7 @@ from Losses.SymmetryLoss import SymmetryLoss
 from Losses.SmoothnessLoss import SmoothnessLoss
 from Losses.EdgeLoss import EdgeLoss
 from Losses.StyleLoss import StyleLoss
+from Losses.ResmemLoss import ResmemLoss
 
 loss_class_table = {
     "palette": PaletteLoss,
@@ -114,6 +115,7 @@ loss_class_table = {
     "smoothness": SmoothnessLoss,
     "edge": EdgeLoss,
     "style": StyleLoss,
+    "resmem": ResmemLoss,
 }
 
 
