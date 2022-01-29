@@ -1929,7 +1929,7 @@ def get_settings():
 
 def parse_known_args_with_optional_yaml(parser, namespace=None):
     parser.add_argument(
-        '--config-file',
+        '--config_file',
         dest='config_file',
         type=argparse.FileType(mode='r'))
     
