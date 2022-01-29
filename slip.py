@@ -171,12 +171,13 @@ class SLIP_Base():
         
 
 def get_clip_perceptor(clip_model_name, device):
-    if clip_model_name in ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'ViT-B/32', 'ViT-B/16']:
+    if clip_model_name in ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']:
         perceptor, preprocess = clip.load(clip_model_name, download_root="models")
         perceptor = perceptor.requires_grad_(False).eval().to(device)
 
         n_params = sum(p.numel() for p in perceptor.parameters())
-        print("Loaded CLIP %s: %.2fM params" %(clip_model_name, (n_params/1000000)))
+        in_res = perceptor.visual.input_resolution
+        print(f"Loaded CLIP {clip_model_name}: {in_res}x{in_res} and {n_params/1000000:.2f}M params")
         clip_perceptor = CLIP_Base(perceptor, preprocess, device)
 
     else:

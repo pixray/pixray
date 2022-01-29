@@ -1088,8 +1088,8 @@ def checkdrop(args, iter, losses):
     return drop_loss_time
 
 # for a release just bake in the version to prevent git subprocess lookup
-git_official_release_version = None
-git_fallback_version = "v1.7.0+"
+git_official_release_version = "v1.7.1"
+git_fallback_version = "v1.7.1+"
 
 # https://stackoverflow.com/a/40170206/1010653
 # Return the git revision as a string
@@ -1677,7 +1677,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=float, help="When to drop learning rate (relative to iterations)", default=[75], dest='learning_rate_drops')
     vq_parser.add_argument("-as",   "--auto_stop", type=str2bool, help="Auto stopping", default=False, dest='auto_stop')
     vq_parser.add_argument("-cuts", "--num_cuts", type=int, help="Number of cuts", default=None, dest='num_cuts')
-    vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=1, dest='batches')
+    vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=None, dest='batches')
     vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
     vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest='seed')
     vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
@@ -1761,19 +1761,19 @@ def process_args(vq_parser, namespace=None):
     # this should be replaced with logic that does somethings
     # smart based on available memory (eg: size, num_models, etc)
     quality_to_num_cuts_table = {
-        'draft': 32,
-        'normal': 48,
-        'better': 32,
-        'best': 10,
+        'draft': 24,
+        'normal': 30,
+        'better': 36,
+        'best': 12,
         'supreme': 8
     }
 
     quality_to_batches_table = {
         'draft': 1,
         'normal': 1,
-        'better': 2,
-        'best': 8,
-        'supreme': 12
+        'better': 1,
+        'best': 2,
+        'supreme': 4
     }
 
     if args.quality not in quality_to_clip_models_table[args.perceptors]:
@@ -1984,7 +1984,8 @@ def command_line_override():
     return settings
 
 def main():
-    settings = apply_settings()    
+    settings = apply_settings()
+    print(f"Running with {settings.num_cuts}x{settings.batches} = {settings.num_cuts*settings.batches} cuts")
     do_init(settings)
     do_run(settings)
     # global drawer
