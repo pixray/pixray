@@ -1,4 +1,5 @@
 import argparse
+import pathvalidate
 import json
 import math
 import logging
@@ -1965,7 +1966,8 @@ def apply_settings():
     vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
-    vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
+    vq_parser.add_argument("-o",    "--output", type=validate_filename_arg, help="Output file name", default="output.png", dest='output')
+    vq_parser.add_argument("-od", "--output_dir", type=validate_filepath_arg, help="Output file directory", default="/output", dest='output_dir')
     vq_parser.add_argument("--debug", type=str2bool, help="Output a debug file", default=False, dest='debug')
     
     settingsDict = SimpleNamespace(**global_pixray_settings)

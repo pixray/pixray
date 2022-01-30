@@ -23,6 +23,7 @@ scikit_learn==1.0
 scikit-image==0.18.3
 torch_optimizer==0.1.0
 torch-tools==0.1.5
+pathvalidate
 
 # can use CompVis/taming-transformers when https://github.com/CompVis/taming-transformers/pull/81 is merged
 git+https://github.com/bfirsh/taming-transformers.git@7a6e64ee
