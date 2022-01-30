@@ -1950,7 +1950,7 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     return arguments, unknown
 def initialize_logging(settings_core):
     if settings_core.debug:
-        logfile = get_file_path(args.output_dir, args.outfile, '.log')
+        logfile = get_file_path(settings_core.output_dir, settings_core.outfile, '.log')
         logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
 
 def apply_settings():
