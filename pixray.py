@@ -1609,7 +1609,7 @@ def do_video(args):
     fps = np.clip(total_frames/length,min_fps,max_fps)
 
     from subprocess import Popen, PIPE
-    output_file = get_file_path(args.output_dir, args.outfile, '.mp4')
+    output_file = get_file_path(args.output_dir, args.output, '.mp4')
     p = Popen(['ffmpeg',
                '-y',
                '-f', 'image2pipe',
@@ -1950,7 +1950,7 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     return arguments, unknown
 def initialize_logging(settings_core):
     if settings_core.debug:
-        logfile = get_file_path(settings_core.output_dir, settings_core.outfile, '.log')
+        logfile = get_file_path(settings_core.output_dir, settings_core.output, '.log')
         logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
 
 def apply_settings():
