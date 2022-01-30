@@ -14,6 +14,8 @@ from torchvision.transforms import functional as TF
 from omegaconf import OmegaConf
 from taming.models import cond_transformer, vqgan
 
+from util import wget_file
+
 vqgan_config_table = {
     "imagenet_f16_1024": 'http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_1024.yaml',
     "imagenet_f16_16384": 'https://heibox.uni-heidelberg.de/d/a7530b09fed84f80a887/files/?p=%2Fconfigs%2Fmodel.yaml&dl=1',
@@ -21,9 +23,11 @@ vqgan_config_table = {
     "openimages_f16_8192": 'https://heibox.uni-heidelberg.de/d/2e5662443a6b4307b470/files/?p=%2Fconfigs%2Fmodel.yaml&dl=1',
     "coco": 'https://dl.nmkd.de/ai/clip/coco/coco.yaml',
     "faceshq": 'https://drive.google.com/uc?export=download&id=1fHwGx_hnBtC8nsq7hesJvs-Klv-P0gzT',
-    "wikiart_1024": 'http://mirror.io.community/blob/vqgan/wikiart.yaml',
-    "wikiart_16384": 'http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.yaml',
-    "wikiart_16384m": 'http://mirror.io.community/blob/vqgan/wikiart_16384.yaml',
+    "wikiart_1024": 'https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_1024.yaml',
+    "wikiart_1024m": 'http://mirror.io.community/blob/vqgan/wikiart.yaml',
+    "wikiart_16384": 'https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_16384.yaml',
+    "wikiart_16384m": 'http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.yaml',
+    "wikiart_16384m2": 'http://mirror.io.community/blob/vqgan/wikiart_16384.yaml',
     "sflckr": 'https://heibox.uni-heidelberg.de/d/73487ab6e5314cb5adba/files/?p=%2Fconfigs%2F2020-11-09T13-31-51-project.yaml&dl=1',
 }
 vqgan_checkpoint_table = {
@@ -33,19 +37,13 @@ vqgan_checkpoint_table = {
     "openimages_f16_8192": 'https://heibox.uni-heidelberg.de/d/2e5662443a6b4307b470/files/?p=%2Fckpts%2Flast.ckpt&dl=1',
     "coco": 'https://dl.nmkd.de/ai/clip/coco/coco.ckpt',
     "faceshq": 'https://app.koofr.net/content/links/a04deec9-0c59-4673-8b37-3d696fe63a5d/files/get/last.ckpt?path=%2F2020-11-13T21-41-45_faceshq_transformer%2Fcheckpoints%2Flast.ckpt',
-    "wikiart_1024": 'http://mirror.io.community/blob/vqgan/wikiart.ckpt',
-    "wikiart_16384": 'http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.ckpt',
-    "wikiart_16384m": 'http://mirror.io.community/blob/vqgan/wikiart_16384.ckpt',
+    "wikiart_1024": 'https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_1024.ckpt',
+    "wikiart_1024m": 'http://mirror.io.community/blob/vqgan/wikiart.ckpt',
+    "wikiart_16384": 'https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_16384.ckpt',
+    "wikiart_16384m": 'http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.ckpt',
+    "wikiart_16384m2": 'http://mirror.io.community/blob/vqgan/wikiart_16384.ckpt',
     "sflckr": 'https://heibox.uni-heidelberg.de/d/73487ab6e5314cb5adba/files/?p=%2Fcheckpoints%2Flast.ckpt&dl=1'
 }
-
-def wget_file(url, out):
-    try:
-        print(f"Downloading {out} from {url}, please wait")
-        output = subprocess.check_output(['wget', '-O', out, url])
-    except subprocess.CalledProcessError as cpe:
-        output = cpe.output
-        print("Ignoring non-zero exit: ", output)
 
 class ReplaceGrad(torch.autograd.Function):
     @staticmethod
