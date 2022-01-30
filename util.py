@@ -1,6 +1,7 @@
 import re
 import argparse
 import glob
+from pathlib import Path
 from braceexpand import braceexpand
 from codecs import encode
 from PIL import Image
@@ -25,6 +26,12 @@ def real_glob(rglob):
     for g in glob_list:
         files = files + glob.glob(g)
     return sorted(files)
+
+def get_file_path(directory, filename, suffix):
+    if filename is None or filename.strip() == '':
+        raise ValueError("Invalid filename specified.")
+
+    return str(Path(directory, filename).with_suffix(suffix))
 
 ####### argparse bools ##########
 def str2bool(v):

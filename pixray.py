@@ -1,9 +1,7 @@
 import argparse
-import pathvalidate
 import json
 import math
 import logging
-from utils.fileutils import *
 
 from urllib.request import urlopen
 import sys
@@ -1165,7 +1163,7 @@ def checkin(args, iter, losses):
     img = TF.to_pil_image(timg[0].cpu())
     # img = drawer.to_image()
     if cur_anim_index is None:
-        outfile = args.output
+        outfile = get_file_path(args.output_dir, args.output, '.png')
     else:
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
@@ -1611,8 +1609,7 @@ def do_video(args):
     fps = np.clip(total_frames/length,min_fps,max_fps)
 
     from subprocess import Popen, PIPE
-    import re
-    output_file = re.compile('\.png$').sub('.mp4', args.output)
+    output_file = get_file_path(args.output_dir, args.outfile, '.mp4')
     p = Popen(['ffmpeg',
                '-y',
                '-f', 'image2pipe',
@@ -1953,7 +1950,7 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     return arguments, unknown
 def initialize_logging(settings_core):
     if settings_core.debug:
-        logfile = get_output_file_name(settings_core.output, '.log')
+        logfile = get_file_path(args.output_dir, args.outfile, '.log')
         logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
 
 def apply_settings():
@@ -1966,8 +1963,8 @@ def apply_settings():
     vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
-    vq_parser.add_argument("-o",    "--output", type=validate_filename_arg, help="Output file name", default="output.png", dest='output')
-    vq_parser.add_argument("-od", "--output_dir", type=validate_filepath_arg, help="Output file directory", default="/output", dest='output_dir')
+    vq_parser.add_argument("-o",    "--output", type=str, help="Output filename", default="output.png", dest='output')
+    vq_parser.add_argument("-od", "--output_dir", type=str, help="Output file directory", default="/output", dest='output_dir')
     vq_parser.add_argument("--debug", type=str2bool, help="Output a debug file", default=False, dest='debug')
     
     settingsDict = SimpleNamespace(**global_pixray_settings)
