@@ -58,7 +58,7 @@ class VdiffDrawer(DrawingInterface):
     def add_settings(parser):
         parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1, cc12m_1_cfg]", default='yfcc_2', dest='vdiff_model')
         parser.add_argument("--vdiff_schedule", type=str, help="VDIFF schedule [default, log]", default="default", dest='vdiff_schedule')
-        parser.add_argument("--vdiff_skip", type=float, help="skip a percentage of the way into the decay schedule", default=0, dest='vdiff_skip')
+        parser.add_argument("--vdiff_skip", type=float, help="skip a percentage of the way into the decay schedule (0-100)", default=0, dest='vdiff_skip')
         return parser
 
     def __init__(self, settings):
