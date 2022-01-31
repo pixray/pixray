@@ -6,6 +6,7 @@ import sys
 import os
 import subprocess
 import json
+import yaml
 import glob
 from braceexpand import braceexpand
 from types import SimpleNamespace
@@ -106,6 +107,7 @@ from Losses.SymmetryLoss import SymmetryLoss
 from Losses.SmoothnessLoss import SmoothnessLoss
 from Losses.EdgeLoss import EdgeLoss
 from Losses.StyleLoss import StyleLoss
+from Losses.ResmemLoss import ResmemLoss
 
 loss_class_table = {
     "palette": PaletteLoss,
@@ -114,6 +116,7 @@ loss_class_table = {
     "smoothness": SmoothnessLoss,
     "edge": EdgeLoss,
     "style": StyleLoss,
+    "resmem": ResmemLoss,
 }
 
 
@@ -1086,7 +1089,7 @@ def checkdrop(args, iter, losses):
     return drop_loss_time
 
 # for a release just bake in the version to prevent git subprocess lookup
-git_official_release_version = "v1.7.1"
+git_official_release_version = None
 git_fallback_version = "v1.7.1+"
 
 # https://stackoverflow.com/a/40170206/1010653
@@ -1375,6 +1378,11 @@ def init_anim_z(args, init_rgba):
 
 # torch.autograd.set_detect_anomaly(True)
 
+def apply_overlay(args, cur_it):
+    return args.overlay_image is not None and \
+            (cur_it % args.overlay_every) == args.overlay_offset and \
+            ((args.overlay_until is None) or (cur_it < args.overlay_until))
+
 def train(args, cur_it):
     global drawer, opts
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
@@ -1396,10 +1404,7 @@ def train(args, cur_it):
                 num_anim_frames = len(init_image_rgba_list)
                 init_anim_z(args, init_image_rgba_list[cur_anim_index % num_anim_frames])
 
-        # if args.overlay_every and cur_it != 0 and \
-        #     (cur_it % (args.overlay_every + args.overlay_offset)) == 0:
-        if args.overlay_image is not None and \
-            (cur_it % args.overlay_every) == args.overlay_offset:
+        if apply_overlay(args, cur_it):
             if cur_anim_index is not None:
                 num_anim_frames = len(overlay_image_rgba_list)
                 overlay_image_rgba = overlay_image_rgba_list[cur_anim_index % num_anim_frames]
@@ -1650,6 +1655,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=10, dest='overlay_every')
     vq_parser.add_argument("-ovo",  "--overlay_offset", type=int, help="Overlay image iteration offset", default=0, dest='overlay_offset')
+    vq_parser.add_argument("-ovu",  "--overlay_until", type=int, help="Last iteration to continue applying overlay image", default=None, dest='overlay_until')
     vq_parser.add_argument("-ovi",  "--overlay_image", type=str, help="Overlay image (if not init)", default=None, dest='overlay_image')
     vq_parser.add_argument(         "--quality", type=str, help="draft, normal, better, best", default="normal", dest='quality')
     vq_parser.add_argument("-asp",  "--aspect", type=str, help="widescreen, square", default="widescreen", dest='aspect')
@@ -1920,6 +1926,29 @@ def get_settings():
     global global_pixray_settings
     return global_pixray_settings.copy()
 
+
+def parse_known_args_with_optional_yaml(parser, namespace=None):
+    parser.add_argument(
+        '--config_file',
+        dest='config_file',
+        type=argparse.FileType(mode='r'))
+    
+    arguments, unknown = parser.parse_known_args(namespace=namespace)
+    if arguments.config_file:
+        data = yaml.load(arguments.config_file, Loader=yaml.SafeLoader)
+        delattr(arguments, 'config_file')
+        arg_dict = arguments.__dict__
+        for key, value in data.items():
+            if isinstance(value, list):
+                if(key not in arg_dict or arg_dict[key] is None):
+                    arg_dict[key] = []
+                for v in value:
+                    arg_dict[key].append(v)
+            else:
+                arg_dict[key] = value
+    
+    return arguments, unknown
+
 def apply_settings():
     global global_pixray_settings
     settingsDict = None
@@ -1931,7 +1960,7 @@ def apply_settings():
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     settingsDict = SimpleNamespace(**global_pixray_settings)
-    settings_core, unknown = vq_parser.parse_known_args(namespace=settingsDict)
+    settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)

@@ -50,3 +50,6 @@ git+https://github.com/pixray/aphantasia@7e6b3bb
 
 # slip
 timm
+
+# resmem loss
+resmem
