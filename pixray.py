@@ -108,6 +108,7 @@ from Losses.SmoothnessLoss import SmoothnessLoss
 from Losses.EdgeLoss import EdgeLoss
 from Losses.StyleLoss import StyleLoss
 from Losses.ResmemLoss import ResmemLoss
+from Losses.AestheticLoss import AestheticLoss
 
 loss_class_table = {
     "palette": PaletteLoss,
@@ -117,6 +118,7 @@ loss_class_table = {
     "edge": EdgeLoss,
     "style": StyleLoss,
     "resmem": ResmemLoss,
+    "aesthetic": AestheticLoss,
 }
 
 
@@ -1330,7 +1332,8 @@ def ascend_txt(args):
     
     needed_globals = {
         # used to be for palette loss - now left as an example
-        'cur_iteration':cur_iteration,
+        "cur_iteration":cur_iteration,
+        "embeds": iii,
     }
 
     if args.transparency:
