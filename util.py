@@ -28,7 +28,7 @@ def real_glob(rglob):
     return sorted(files)
 
 def get_file_path(directory, filename, suffix):
-    if filename is None or filename.strip() == '':
+    if filename is None or re.search("\\\\|\/|^$", filename.strip()):
         raise ValueError("Invalid filename specified.")
 
     return str(Path(directory, filename).with_suffix(suffix))

@@ -8,6 +8,12 @@ class TestUtilMethods(unittest.TestCase):
     def test_get_file_path_with_backslash(self):
         self.assertEqual(get_file_path('/testpath/', 'testfile', '.png'), '/testpath/testfile.png')
 
+    def test_get_file_path_filename_contains_backslash(self):
+        self.assertRaises(ValueError, get_file_path, '/testpath/', '\\test\\filename.png', '.png')
+
+    def test_get_file_path_filename_contains_slash(self):
+        self.assertRaises(ValueError, get_file_path, '/testpath/', '/test/filename.png', '.png')
+
     def test_get_file_path_no_path(self):
         self.assertEqual(get_file_path('', 'testfile', '.png'), 'testfile.png')
 
