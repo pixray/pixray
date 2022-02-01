@@ -6,7 +6,7 @@ build:
   run:
     - "apt-get update && apt install -y libgl1-mesa-glx"
     # CMAKE_PREFIX_PATH fix is from https://github.com/readthedocs/readthedocs.org/issues/5867
-    - "git clone https://github.com/pixray/diffvg && cd diffvg && git submodule update --init --recursive && CMAKE_PREFIX_PATH=$(pyenv prefix) DIFFVG_CUDA=1 python setup.py install"
+    - "git clone https://github.com/pixray/diffvg && cd diffvg && git submodule update --init --recursive && CMAKE_PREFIX_PATH=$(pyenv prefix) DIFFVG_CUDA=1 python setup.py install && pip install basicsr"
 # predict: "cogrun.py:Text2Image"
 # predict: "cogrun.py:Text2Pixel"
 # predict: "cog_genesis.py:GenesisPredictor"
