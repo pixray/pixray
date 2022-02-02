@@ -697,13 +697,13 @@ def do_init(args):
             starting_image = init_image_rgba_list[0]
 
             save_image(init_image_tensor,"init_image_tensor.png")
-            drawer.init_from_tensor(init_image_tensor)
+            drawer.init_from_tensor(init_image_tensor * 2 - 1)
             z_orig = drawer.get_z_copy()
-
-        starting_image.save("starting_image.png")
-        starting_tensor = TF.to_tensor(starting_image)
-        init_tensor = starting_tensor.to(device).unsqueeze(0) * 2 - 1 # im not sure why?
-        drawer.init_from_tensor(init_tensor)
+        else:
+            starting_image.save("starting_image.png")
+            starting_tensor = TF.to_tensor(starting_image)
+            init_tensor = starting_tensor.to(device).unsqueeze(0)
+            drawer.init_from_tensor(init_tensor * 2 - 1)
 
     else:
         drawer.init_from_tensor(init_tensor=None)
