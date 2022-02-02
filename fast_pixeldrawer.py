@@ -1,25 +1,8 @@
-# Originally made by Katherine Crowson (https://github.com/crowsonkb, https://twitter.com/RiversHaveWings)
-# The original BigGAN+CLIP method was by https://twitter.com/advadnoun
-
-from mimetypes import init
-from DrawingInterface import DrawingInterface
-
-import sys
-import subprocess
-sys.path.append('taming-transformers')
-import os.path
 import torch
 from torch.nn import functional as F
 from torchvision.transforms import functional as TF
-from basicsr.archs.rrdbnet_arch import RRDBNet
 
-from real_esrganer import RealESRGANer
-
-from util import wget_file
-
-superresolution_checkpoint_table = {
-    "RealESRGAN_x4plus": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
-}
+from DrawingInterface import DrawingInterface
 
 
 class ClampWithGrad(torch.autograd.Function):
@@ -37,36 +20,20 @@ class ClampWithGrad(torch.autograd.Function):
 
 clamp_with_grad = ClampWithGrad.apply
 
-global_model_cache = {}
 
-class SuperResolutionDrawer(DrawingInterface):
+class FastPixelDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--super_resolution_model", type=str, help="Super resolution model", default="RealESRGAN_x4plus", dest="super_resolution_model")
+        parser.add_argument("--pixel_size", nargs=2, type=int, help="Pixel size (width height)", default=None, dest='pixel_size')
         return parser
 
     def __init__(self, settings):
         super(DrawingInterface, self).__init__()
-        self.super_resolution_model = settings.super_resolution_model
+        self.pixel_size = tuple(reversed(settings.pixel_size))
+        self.output_size = tuple(reversed(settings.size))
 
     def load_model(self, settings, device):
-        global global_model_cache
-
-        checkpoint_path = f'models/super_resolution_{self.super_resolution_model}.ckpt'
-        if not os.path.exists(checkpoint_path):
-            wget_file(superresolution_checkpoint_table[self.super_resolution_model], checkpoint_path)
-
-        self.model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
-
-        self.upsampler = RealESRGANer(
-            scale=4,
-            model_path=checkpoint_path,
-            model=self.model,
-            tile=0,
-            tile_pad=10,
-            pre_pad=0,
-            half=False,
-        )
+        pass
 
     def get_opts(self, decay_divisor):
         return None
@@ -81,13 +48,13 @@ class SuperResolutionDrawer(DrawingInterface):
             self.z.copy_(new_z)
 
     def get_z_from_tensor(self, ref_tensor):
-        return F.interpolate((ref_tensor + 1) / 2, size=(torch.tensor(ref_tensor.shape[-2:]) // 4).tolist(), mode="bilinear")
+        return F.interpolate((ref_tensor + 1) / 2, size=self.pixel_size, mode="bilinear", align_corners=False)
 
     def get_num_resolutions(self):
         return None
 
     def synth(self, cur_iteration):
-        output = self.upsampler.enhance(self.z, outscale=4)
+        output = F.interpolate(self.z, size=self.output_size, mode="nearest")
         return clamp_with_grad(output, 0, 1)
 
     @torch.no_grad()

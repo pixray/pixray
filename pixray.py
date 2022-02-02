@@ -71,11 +71,13 @@ from util import map_number, palette_from_string, real_glob
 from vqgan import VqganDrawer
 from vdiff import VdiffDrawer
 from super_resolution import SuperResolutionDrawer
+from fast_pixeldrawer import FastPixelDrawer
 
 class_table = {
     "vqgan": VqganDrawer,
     "vdiff": VdiffDrawer,
     "super_resolution": SuperResolutionDrawer,
+    "fast_pixel": FastPixelDrawer,
 }
 
 try:
