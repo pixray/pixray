@@ -46,7 +46,8 @@ class BasePixrayPredictor(cog.Predictor):
         run_complete = False
         while run_complete == False:
             run_complete = pixray.do_run(settings, return_display=True)
-            temp_copy = create_temporary_copy(settings.output)
+            output_file = os.path.join(settings.outdir, settings.output)
+            temp_copy = create_temporary_copy(output_file)
             yield pathlib.Path(os.path.realpath(temp_copy))
 
 class PixrayVqgan(BasePixrayPredictor):
