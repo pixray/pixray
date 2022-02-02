@@ -19,6 +19,10 @@ all_blip_models = {"BLIP_BASE": "model_base.pth",
                    "BLIP_BASE_14M": "model_base_14M.pth",
                    "BLIP_LARGE": "model_large.pth"}
 
+blip_vit_types  = {"BLIP_BASE": "base",
+                   "BLIP_BASE_14M": "base",
+                   "BLIP_LARGE": "large"}
+
 
 from util import wget_file
 
@@ -207,13 +211,13 @@ class BLIP_Base():
                 transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
             ])
 
-        model = blip_feature_extractor(pretrained=url, image_size=224, vit='base')
+        model = blip_feature_extractor(pretrained=url, image_size=224, vit=blip_vit_types[model_name])
         # model.eval()
         model = model.to(device)
 
         n_params = sum(p.numel() for p in model.parameters())
         print("Loaded perceptor %s: %.2fM params" %(model_name, (n_params/1000000)))
-        
+
         self.model = model
 
     def preprocess(self, imgs, input_range = None):
@@ -225,16 +229,21 @@ class BLIP_Base():
             imgs = self.preprocess(imgs, input_range = input_range)
 
         image_features = self.model(imgs, '', mode='image')
-        image_features = image_features[0][0].reshape(1, 768)
+        # print("IF", image_features.shape)
+        dim = image_features.shape[2]
+        image_features = image_features[0][0].reshape(1, dim)
         return image_features
 
     def encode_text(self, texts):
-        print(texts)
         text_features = self.model(self.fake_image, texts, mode='text')
-        text_features = text_features[0][0].reshape(1, 768)
+        # print("TF", text_features.shape)
+        dim = text_features.shape[2]
+        text_features = text_features[0][0].detach().clone().reshape(1, dim)
         return text_features
 
     def encode_texts(self, texts):
+        print("THIS IS NEVER CALLED?")
+        sys.exit(1)
         text_features = self.model(self.fake_image, texts, mode='text')
         text_features = text_features[0][0].reshape(1, 768)
         return text_features.unsqueeze(1)
