@@ -1948,6 +1948,7 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
                 arg_dict[key] = value
     
     return arguments, unknown
+
 def initialize_logging(settings_core):
     if settings_core.debug:
         logfile = get_file_path(settings_core.output_dir, settings_core.output, '.log')
