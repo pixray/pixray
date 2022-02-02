@@ -1167,7 +1167,7 @@ def checkin(args, iter, losses):
     img = TF.to_pil_image(timg[0].cpu())
     # img = drawer.to_image()
     if cur_anim_index is None:
-        outfile = get_file_path(args.output_dir, args.output, '.png')
+        outfile = get_file_path(args.outdir, args.output, '.png')
     else:
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
@@ -1614,7 +1614,7 @@ def do_video(args):
     fps = np.clip(total_frames/length,min_fps,max_fps)
 
     from subprocess import Popen, PIPE
-    output_file = get_file_path(args.output_dir, args.output, '.mp4')
+    output_file = get_file_path(args.outdir, args.output, '.mp4')
     p = Popen(['ffmpeg',
                '-y',
                '-f', 'image2pipe',
@@ -1955,8 +1955,8 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     return arguments, unknown
 
 def initialize_logging(settings_core):
-    if settings_core.output_dir is not None and settings_core.output_dir.strip() != '':
-        logfile = get_file_path(settings_core.output_dir, settings_core.output, '.log')
+    if settings_core.outdir is not None and settings_core.outdir.strip() != '':
+        logfile = get_file_path(settings_core.outdir, settings_core.output, '.log')
         logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
 
 def apply_settings():
@@ -1970,13 +1970,13 @@ def apply_settings():
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
-    vq_parser.add_argument("--output_dir", type=str, help="Output file directory", default="", dest='output_dir')
+    vq_parser.add_argument("--outdir", type=str, help="Output file directory", default="", dest='outdir')
     
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
-    if not os.path.exists(settings_core.output_dir):
-        os.makedirs(settings_core.output_dir)
+    if (settings_core.outdir != "") and (not os.path.exists(settings_core.outdir)):
+        os.makedirs(settings_core.outdir)
 
     initialize_logging(settings_core)
     vq_parser = setup_parser(vq_parser)
