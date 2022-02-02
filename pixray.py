@@ -50,9 +50,11 @@ from einops import rearrange
 
 from filters.colorlookup import ColorLookup
 from filters.wallpaper import WallpaperFilter
+from filters.tiler import TilerFilter
 
 filters_class_table = {
     "lookup": ColorLookup,
+    "tiler": TilerFilter,
     "wallpaper": WallpaperFilter,
 }
 
