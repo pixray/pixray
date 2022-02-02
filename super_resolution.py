@@ -99,7 +99,7 @@ class SuperResolutionDrawer(DrawingInterface):
             self.z.copy_(new_z)
 
     def get_z_from_tensor(self, ref_tensor):
-        return F.interpolate((ref_tensor + 1) / 2, size=(torch.tensor(ref_tensor.shape[-2:]) // 4).tolist(), mode="bilinear")
+        return F.interpolate((ref_tensor + 1) / 2, size=(torch.tensor(ref_tensor.shape[-2:]) // 4).tolist(), mode="bilinear", align_corners=False)
 
     def get_num_resolutions(self):
         return None

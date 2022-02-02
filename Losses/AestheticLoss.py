@@ -1,5 +1,6 @@
 import torch
 from torch import nn, optim
+from pathlib import Path
 from Losses.LossInterface import LossInterface
 from util import wget_file
 from torch.nn import functional as F
@@ -13,10 +14,12 @@ class AestheticLoss(LossInterface):
 
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        wget_file("https://dazhi.art/f/ava_vit_b_16_linear.pth", "models/ava_vit_b_16_linear.pth")
+        self.model_path = Path("models/ava_vit_b_16_linear.pth")
+        if not self.model_path.exists():
+            wget_file("https://dazhi.art/f/ava_vit_b_16_linear.pth", self.model_path)
     
     def parse_settings(self, args):
-        layer_weights = torch.load("models/ava_vit_b_16_linear.pth")
+        layer_weights = torch.load(self.model_path)
         self.ae_reg = nn.Linear(512, 1).to(self.device)
         self.ae_reg.bias.data = layer_weights["bias"].to(self.device)
         self.ae_reg.weight.data = layer_weights["weight"].to(self.device)
