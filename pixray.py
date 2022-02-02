@@ -1972,7 +1972,7 @@ def apply_settings():
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
-    vq_parser.add_argument("--outdir", type=str, help="Output file directory", default="", dest='outdir')
+    vq_parser.add_argument("--outdir", type=str, help="Output file directory", default="result", dest='outdir')
     
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
@@ -2029,6 +2029,14 @@ def command_line_override():
     vq_parser = setup_parser()
     settings = process_args(vq_parser)
     return settings
+
+# super-userful one stop shopping from notebooks or other python code
+def run(prompts=None, drawer="vqgan", **kwargs):
+    reset_settings()
+    add_settings(prompts=prompts, drawer=drawer, **kwargs)
+    settings = apply_settings()
+    do_init(settings)
+    do_run(settings)
 
 def main():
     settings = apply_settings()
