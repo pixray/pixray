@@ -1950,7 +1950,7 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     return arguments, unknown
 
 def initialize_logging(settings_core):
-    if settings_core.debug:
+    if settings_core.output_dir is not None and settings_core.output_dir.strip() != '':
         logfile = get_file_path(settings_core.output_dir, settings_core.output, '.log')
         logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
 
@@ -1965,8 +1965,7 @@ def apply_settings():
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
     vq_parser.add_argument("-o",    "--output", type=str, help="Output filename", default="output.png", dest='output')
-    vq_parser.add_argument("-od", "--output_dir", type=str, help="Output file directory", default="/output", dest='output_dir')
-    vq_parser.add_argument("--debug", type=str2bool, help="Output a debug file", default=False, dest='debug')
+    vq_parser.add_argument("-od", "--output_dir", type=str, help="Output file directory", default="", dest='output_dir')
     
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
