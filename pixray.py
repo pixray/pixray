@@ -1976,7 +1976,7 @@ def apply_settings():
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
     if not os.path.exists(settings_core.output_dir):
-        os.mkdir(settings_core.output_dir)
+        os.makedirs(settings_core.output_dir)
 
     initialize_logging(settings_core)
     vq_parser = setup_parser(vq_parser)
