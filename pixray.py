@@ -1,5 +1,7 @@
 import argparse
+import json
 import math
+import logging
 
 from urllib.request import urlopen
 import sys
@@ -28,7 +30,7 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 
 from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
-from util import str2bool
+from util import str2bool, get_file_path
 
 from slip import get_clip_perceptor
 
@@ -1161,7 +1163,7 @@ def checkin(args, iter, losses):
     img = TF.to_pil_image(timg[0].cpu())
     # img = drawer.to_image()
     if cur_anim_index is None:
-        outfile = args.output
+        outfile = get_file_path(args.output_dir, args.output, '.png')
     else:
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
@@ -1607,8 +1609,7 @@ def do_video(args):
     fps = np.clip(total_frames/length,min_fps,max_fps)
 
     from subprocess import Popen, PIPE
-    import re
-    output_file = re.compile('\.png$').sub('.mp4', args.output)
+    output_file = get_file_path(args.output_dir, args.output, '.mp4')
     p = Popen(['ffmpeg',
                '-y',
                '-f', 'image2pipe',
@@ -1685,7 +1686,6 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
     vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest='seed')
     vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
-    vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("--palette", type=str, help="target palette", default=None, dest='palette')
@@ -1949,6 +1949,11 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     
     return arguments, unknown
 
+def initialize_logging(settings_core):
+    if settings_core.output_dir is not None and settings_core.output_dir.strip() != '':
+        logfile = get_file_path(settings_core.output_dir, settings_core.output, '.log')
+        logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
+
 def apply_settings():
     global global_pixray_settings
     settingsDict = None
@@ -1959,9 +1964,13 @@ def apply_settings():
     vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
+    vq_parser.add_argument("-o",    "--output", type=str, help="Output filename", default="output.png", dest='output')
+    vq_parser.add_argument("-od", "--output_dir", type=str, help="Output file directory", default="", dest='output_dir')
+    
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
+    initialize_logging(settings_core)
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
 
@@ -1994,6 +2003,7 @@ def apply_settings():
         settingsDict = SimpleNamespace(**global_pixray_settings)
 
     settings = process_args(vq_parser, settingsDict)
+    logging.debug(json.dumps(settings, default=lambda o: o.__dict__, sort_keys=True, indent=4))
     return settings
 
 def add_custom_loss(name, customloss):
