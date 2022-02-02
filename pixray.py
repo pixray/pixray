@@ -1975,7 +1975,7 @@ def apply_settings():
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
-    if not os.path.exists(settings_core.output_dir):
+    if not os.path.exists(settings_core.output_dir) and settings_core.output_dir != "":
         os.makedirs(settings_core.output_dir)
 
     initialize_logging(settings_core)
