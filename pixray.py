@@ -1969,11 +1969,14 @@ def apply_settings():
     vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
-    vq_parser.add_argument("-o",    "--output", type=str, help="Output filename", default="output.png", dest='output')
-    vq_parser.add_argument("-od", "--output_dir", type=str, help="Output file directory", default="", dest='output_dir')
+    vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
+    vq_parser.add_argument("--output_dir", type=str, help="Output file directory", default="", dest='output_dir')
     
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
+
+    if not os.path.exists(settings_core.output_dir):
+        os.mkdir(settings_core.output_dir)
 
     initialize_logging(settings_core)
     vq_parser = setup_parser(vq_parser)
