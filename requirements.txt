@@ -55,4 +55,4 @@ timm
 resmem
 
 # super-resolution
-basicsr=1.3.4.9
+basicsr==1.3.4.9
