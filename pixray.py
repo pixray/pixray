@@ -65,12 +65,10 @@ from util import map_number, palette_from_string, real_glob
 
 from vqgan import VqganDrawer
 from vdiff import VdiffDrawer
-from ogvdiff import OGVdiffDrawer
 
 class_table = {
     "vqgan": VqganDrawer,
     "vdiff": VdiffDrawer,
-    "ogvdiff": OGVdiffDrawer,
 }
 
 try:
@@ -1433,7 +1431,7 @@ def train(args, cur_it):
 
         drawer.clip_z()
 
-    if args.drawer == "vdiff" or args.drawer == "ogvdiff" and cur_it>=1:
+    if args.drawer == "vdiff" and cur_it>=1:
         lr = drawer.sample_state[6][cur_it] / drawer.sample_state[5][cur_it]
         drawer.x = drawer.makenoise(cur_it)
         drawer.x.requires_grad_()
