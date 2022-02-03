@@ -1,5 +1,7 @@
 import argparse
+import json
 import math
+import logging
 
 from urllib.request import urlopen
 import sys
@@ -28,7 +30,7 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 
 from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
-from util import str2bool
+from util import str2bool, get_file_path, emit_filename
 
 from slip import get_clip_perceptor
 
@@ -48,9 +50,11 @@ from einops import rearrange
 
 from filters.colorlookup import ColorLookup
 from filters.wallpaper import WallpaperFilter
+from filters.tiler import TilerFilter
 
 filters_class_table = {
     "lookup": ColorLookup,
+    "tiler": TilerFilter,
     "wallpaper": WallpaperFilter,
 }
 
@@ -66,10 +70,12 @@ from util import map_number, palette_from_string, real_glob
 
 from vqgan import VqganDrawer
 from vdiff import VdiffDrawer
+from super_resolution import SuperResolutionDrawer
 
 class_table = {
     "vqgan": VqganDrawer,
-    "vdiff": VdiffDrawer
+    "vdiff": VdiffDrawer,
+    "super_resolution": SuperResolutionDrawer,
 }
 
 try:
@@ -108,6 +114,7 @@ from Losses.SmoothnessLoss import SmoothnessLoss
 from Losses.EdgeLoss import EdgeLoss
 from Losses.StyleLoss import StyleLoss
 from Losses.ResmemLoss import ResmemLoss
+from Losses.AestheticLoss import AestheticLoss
 
 loss_class_table = {
     "palette": PaletteLoss,
@@ -117,6 +124,7 @@ loss_class_table = {
     "edge": EdgeLoss,
     "style": StyleLoss,
     "resmem": ResmemLoss,
+    "aesthetic": AestheticLoss,
 }
 
 
@@ -695,13 +703,13 @@ def do_init(args):
             starting_image = init_image_rgba_list[0]
 
             save_image(init_image_tensor,"init_image_tensor.png")
-            drawer.init_from_tensor(init_image_tensor)
+            drawer.init_from_tensor(init_image_tensor * 2 - 1)
             z_orig = drawer.get_z_copy()
-
-        starting_image.save("starting_image.png")
-        starting_tensor = TF.to_tensor(starting_image)
-        init_tensor = starting_tensor.to(device).unsqueeze(0) * 2 - 1 # im not sure why?
-        drawer.init_from_tensor(init_tensor)
+        else:
+            starting_image.save("starting_image.png")
+            starting_tensor = TF.to_tensor(starting_image)
+            init_tensor = starting_tensor.to(device).unsqueeze(0)
+            drawer.init_from_tensor(init_tensor * 2 - 1)
 
     else:
         drawer.init_from_tensor(init_tensor=None)
@@ -1089,7 +1097,7 @@ def checkdrop(args, iter, losses):
     return drop_loss_time
 
 # for a release just bake in the version to prevent git subprocess lookup
-git_official_release_version = "v1.7.2"
+git_official_release_version = None
 git_fallback_version = "v1.7.2+"
 
 # https://stackoverflow.com/a/40170206/1010653
@@ -1161,7 +1169,7 @@ def checkin(args, iter, losses):
     img = TF.to_pil_image(timg[0].cpu())
     # img = drawer.to_image()
     if cur_anim_index is None:
-        outfile = args.output
+        outfile = get_file_path(args.outdir, args.output, '.png')
     else:
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
@@ -1330,7 +1338,8 @@ def ascend_txt(args):
     
     needed_globals = {
         # used to be for palette loss - now left as an example
-        'cur_iteration':cur_iteration,
+        "cur_iteration":cur_iteration,
+        "embeds": iii,
     }
 
     if args.transparency:
@@ -1607,8 +1616,7 @@ def do_video(args):
     fps = np.clip(total_frames/length,min_fps,max_fps)
 
     from subprocess import Popen, PIPE
-    import re
-    output_file = re.compile('\.png$').sub('.mp4', args.output)
+    output_file = get_file_path(args.outdir, args.output, '.mp4')
     p = Popen(['ffmpeg',
                '-y',
                '-f', 'image2pipe',
@@ -1685,7 +1693,6 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
     vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest='seed')
     vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
-    vq_parser.add_argument("-o",    "--output", type=str, help="Output file", default="output.png", dest='output')
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("--palette", type=str, help="target palette", default=None, dest='palette')
@@ -1693,6 +1700,8 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("--alpha_weight", type=float, help="strenght of alpha loss", default=1., dest='alpha_weight')
     vq_parser.add_argument("--alpha_use_g", type=str2bool, help="use gaussian mask weighting", default=False, dest='alpha_use_g')
     vq_parser.add_argument("--alpha_gamma", type=float, help="width-relative sigma for the alpha gaussian", default=4., dest='alpha_gamma')
+    vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
+    vq_parser.add_argument("--outdir", type=str, help="Output file directory", default='outputs/%DATE%_%SEQ%', dest='outdir')
 
     return vq_parser
 
@@ -1720,6 +1729,14 @@ def process_args(vq_parser, namespace=None):
     # print("NON DEFAULT ARGS ARE")
     # print(global_given_args)
     # sys.exit(0)
+
+    # resolve outdir from template if necessary
+    # TODO: should we delay template filling?
+    args.outdir = emit_filename(args.outdir);
+    if (args.outdir != "") and (not os.path.exists(args.outdir)):
+        os.makedirs(args.outdir)
+
+    initialize_logging(args, global_given_args)
 
     if args.cudnn_determinism:
         torch.backends.cudnn.deterministic = True
@@ -1949,6 +1966,15 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     
     return arguments, unknown
 
+def initialize_logging(settings_core, settings_dict):
+    if settings_core.outdir is not None and settings_core.outdir.strip() != '':
+        logfile = get_file_path(settings_core.outdir, settings_core.output, '.log')
+        logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
+
+        yaml_output = os.path.join(settings_core.outdir, "settings.yaml")
+        ff = open(yaml_output, 'w+')
+        yaml.dump(settings_dict, ff, allow_unicode=True, default_flow_style=False)
+
 def apply_settings():
     global global_pixray_settings
     settingsDict = None
@@ -1959,6 +1985,7 @@ def apply_settings():
     vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
+    
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
@@ -1994,6 +2021,7 @@ def apply_settings():
         settingsDict = SimpleNamespace(**global_pixray_settings)
 
     settings = process_args(vq_parser, settingsDict)
+    logging.debug(json.dumps(settings, default=lambda o: o.__dict__, sort_keys=True, indent=4))
     return settings
 
 def add_custom_loss(name, customloss):
@@ -2009,6 +2037,14 @@ def command_line_override():
     vq_parser = setup_parser()
     settings = process_args(vq_parser)
     return settings
+
+# super-userful one stop shopping from notebooks or other python code
+def run(prompts=None, drawer="vqgan", **kwargs):
+    reset_settings()
+    add_settings(prompts=prompts, drawer=drawer, **kwargs)
+    settings = apply_settings()
+    do_init(settings)
+    do_run(settings)
 
 def main():
     settings = apply_settings()
