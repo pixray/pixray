@@ -8,6 +8,8 @@ from PIL import Image
 import urllib.request
 from colorthief import ColorThief
 import subprocess
+import datetime
+import os
 
 try:
     import matplotlib.colors
@@ -242,3 +244,46 @@ def wget_file(url, out):
     except subprocess.CalledProcessError as cpe:
         output = cpe.output
         print("Ignoring non-zero exit: ", output)
+
+# filename templates - can fill in placeholders for %DATE%, %SIZE% and %SEQ%
+# TODO: load more of these settings into the template_dict
+def emit_filename(filename, template_dict={}, args=None):
+    datestr = datetime.datetime.now().strftime("%Y%m%d")
+    filename = filename.replace('%DATE%', datestr)
+
+    for key in template_dict:
+        pattern = "%{}%".format(key)
+        value = "{}".format(template_dict[key])
+        filename = filename.replace(pattern, value)
+
+    if args is not None:
+        # legacy version - needs updating!
+        if args.model:
+            model = args.model.replace(".", "_")
+        else:
+            model = "NoModel"
+        if args.seed:
+            seed = "{:d}".format(args.seed)
+        else:
+            seed = "NoSeed"
+        if '%MODEL%' in filename:
+            filename = filename.replace('%MODEL%', model)
+        if '%OFFSET%' in filename:
+            filename = filename.replace('%OFFSET%', "{:d}".format(args.offset))
+        if '%SEED%' in filename:
+            filename = filename.replace('%SEED%', seed)
+        if '%ROWS%' in filename:
+            filename = filename.replace('%ROWS%', "{:d}".format(args.rows))
+        if '%COLS%' in filename:
+            filename = filename.replace('%COLS%', "{:d}".format(args.cols))
+        if '%INDEX%' in filename:
+            filename = filename.replace('%INDEX%', "{}".format(args.anchor_offset_x))
+    if '%SEQ%' in filename:
+        # determine what the next available number is
+        cur_seq = 1
+        candidate = filename.replace('%SEQ%', "{:02d}".format(cur_seq))
+        while os.path.exists(candidate):
+            cur_seq = cur_seq + 1
+            candidate = filename.replace('%SEQ%', "{:02d}".format(cur_seq))
+        filename = candidate
+    return filename

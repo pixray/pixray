@@ -30,7 +30,7 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 
 from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
-from util import str2bool, get_file_path
+from util import str2bool, get_file_path, emit_filename
 
 from slip import get_clip_perceptor
 
@@ -1700,6 +1700,8 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("--alpha_weight", type=float, help="strenght of alpha loss", default=1., dest='alpha_weight')
     vq_parser.add_argument("--alpha_use_g", type=str2bool, help="use gaussian mask weighting", default=False, dest='alpha_use_g')
     vq_parser.add_argument("--alpha_gamma", type=float, help="width-relative sigma for the alpha gaussian", default=4., dest='alpha_gamma')
+    vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
+    vq_parser.add_argument("--outdir", type=str, help="Output file directory", default='outputs/%DATE%_%SEQ%', dest='outdir')
 
     return vq_parser
 
@@ -1727,6 +1729,14 @@ def process_args(vq_parser, namespace=None):
     # print("NON DEFAULT ARGS ARE")
     # print(global_given_args)
     # sys.exit(0)
+
+    # resolve outdir from template if necessary
+    # TODO: should we delay template filling?
+    args.outdir = emit_filename(args.outdir);
+    if (args.outdir != "") and (not os.path.exists(args.outdir)):
+        os.makedirs(args.outdir)
+
+    initialize_logging(args, global_given_args)
 
     if args.cudnn_determinism:
         torch.backends.cudnn.deterministic = True
@@ -1956,10 +1966,14 @@ def parse_known_args_with_optional_yaml(parser, namespace=None):
     
     return arguments, unknown
 
-def initialize_logging(settings_core):
+def initialize_logging(settings_core, settings_dict):
     if settings_core.outdir is not None and settings_core.outdir.strip() != '':
         logfile = get_file_path(settings_core.outdir, settings_core.output, '.log')
         logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
+
+        yaml_output = os.path.join(settings_core.outdir, "settings.yaml")
+        ff = open(yaml_output, 'w+')
+        yaml.dump(settings_dict, ff, allow_unicode=True, default_flow_style=False)
 
 def apply_settings():
     global global_pixray_settings
@@ -1971,16 +1985,10 @@ def apply_settings():
     vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
     vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
     vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
-    vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
-    vq_parser.add_argument("--outdir", type=str, help="Output file directory", default="result", dest='outdir')
     
     settingsDict = SimpleNamespace(**global_pixray_settings)
     settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
 
-    if (settings_core.outdir != "") and (not os.path.exists(settings_core.outdir)):
-        os.makedirs(settings_core.outdir)
-
-    initialize_logging(settings_core)
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
 
