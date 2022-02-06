@@ -15,8 +15,21 @@ There is currently [some documentation on options](https://dazhizhong.gitbook.io
 
 ## Usage
 
-Pixray can be run in Docker using [Cog](https://github.com/replicate/cog).
+Be sure to `git clone --recursive` to also get submodules.
 
-First, [install Docker and Cog](https://github.com/replicate/cog#install), then you can use `cog run` to run Pixray inside Docker. For example: 
+You can install `pip install -r requirements.txt` and then `pip install basicsr` manually in a fresh python 3.8 environment (eg: using conda). After that you can use the included `pixray.py` command line utility:
 
-    cog run python pixray.py --drawer=pixel --prompt=sunrise --output myfile.png
+    python pixray.py --drawer=pixel --prompt=sunrise --outdir sunrise01
+
+pixray can also be run from within your own python code, like this
+
+```python
+import pixray
+pixray.run("an extremely hairy panda bear", "vdiff", custom_loss="aesthetic", outdir="outputs/hairout")
+```
+
+Examples of pixray colab notebooks can be found [in this separate repo](https://github.com/pixray/pixray_notebooks).
+
+running in a Docker using [Cog](https://github.com/replicate/cog) is also possible. First, [install Docker and Cog](https://github.com/replicate/cog#install), then you can use `cog run` to run Pixray inside Docker. For example: 
+
+    cog run python pixray.py --drawer=pixel --prompt=sunrise --outdir sunrise01
