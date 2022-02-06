@@ -30,7 +30,7 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 
 from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
-from util import str2bool, get_file_path, emit_filename
+from util import str2bool, get_file_path, emit_filename, split_pipes
 
 from slip import get_clip_perceptor
 
@@ -1853,25 +1853,11 @@ def process_args(vq_parser, namespace=None):
     if args.init_noise.lower() == "none":
         args.init_noise = None
 
-    # Split text prompts using the pipe character
-    if args.prompts:
-        args.prompts = [phrase.strip() for phrase in args.prompts.split("|")]
-
-    # Split text prompts using the pipe character
-    if args.target_images:
-        args.target_images = [phrase.strip() for phrase in args.target_images.split("|")]
-
-    # Split text prompts using the pipe character
-    if args.spot_prompts:
-        args.spot_prompts = [phrase.strip() for phrase in args.spot_prompts.split("|")]
-
-    # Split text prompts using the pipe character
-    if args.spot_prompts_off:
-        args.spot_prompts_off = [phrase.strip() for phrase in args.spot_prompts_off.split("|")]
-
-    # Split text labels using the pipe character
-    if args.labels:
-        args.labels = [phrase.strip() for phrase in args.labels.split("|")]
+    args.prompts = split_pipes(args.prompts)
+    args.target_images = split_pipes(args.target_images)
+    args.spot_prompts = split_pipes(args.spot_prompts)
+    args.spot_prompts_off = split_pipes(args.spot_prompts_off)
+    args.labels = split_pipes(args.labels)
 
     # Split target images using the pipe character
     if args.image_prompts:

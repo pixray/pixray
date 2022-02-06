@@ -51,5 +51,19 @@ class TestUtilMethods(unittest.TestCase):
         self.assertEqual(parse_unit('200 iterATions    ', 500, 'overlay_until'), 200)
     #endregion parse_unit
 
+    #region split_pipes
+    def test_split_pipes_value_none(self):
+        self.assertEqual(split_pipes(None), None)
+
+    def test_split_pipes_with_pipe(self):
+        self.assertEqual(split_pipes('test|another'), ['test', 'another'])
+
+    def test_split_pipes_with_empty(self):
+        self.assertEqual(split_pipes(''), [''])
+
+    def test_split_pipes_with_one(self):
+        self.assertEqual(split_pipes('single'), ['single'])
+    #endregion split_pipes
+
 if __name__ == '__main__':
     unittest.main()

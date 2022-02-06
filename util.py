@@ -60,6 +60,12 @@ def parse_unit(value, total_iterations, argument_name):
 
     raise ValueError(f"Invalid value for {argument_name}, please use a digit-unit combination like '20 iterations' or '50%'.")
 
+def split_pipes(attribute):
+    if attribute is None:
+        return None
+
+    return [phrase.strip() for phrase in attribute.split("|")]
+
 ####### PALETTE SECTION ##########
 
 # canonical interpolation function, like https://p5js.org/reference/#/p5/map
