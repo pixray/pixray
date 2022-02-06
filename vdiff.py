@@ -58,7 +58,7 @@ class VdiffDrawer(DrawingInterface):
     def add_settings(parser):
         parser.add_argument("--vdiff_model", type=str, help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1, cc12m_1_cfg]", default='yfcc_2', dest='vdiff_model')
         parser.add_argument("--vdiff_schedule", type=str, help="VDIFF schedule [default, log]", default="default", dest='vdiff_schedule')
-        parser.add_argument("--vdiff_skip", type=float, help="skip a percentage of the way into the decay schedule", default=0, dest='vdiff_skip')
+        parser.add_argument("--vdiff_skip", type=float, help="skip a percentage of the way into the decay schedule (0-100)", default=0, dest='vdiff_skip')
         return parser
 
     def __init__(self, settings):
@@ -119,11 +119,14 @@ class VdiffDrawer(DrawingInterface):
             self.steps = utils.get_log_schedule(self.t)
         else:
             self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
-
+        
+        # [model, steps, eta, extra_args, ts, alphas, sigmas]
+        self.sample_state = sampling.sample_setup(self.model, self.x, self.steps, self.eta, {})
+        
         # todo: maybe scheduld should adjust better due to init_skip?
         if init_tensor is not None:
             # reverse-center crop
-            new_x = torch.randn([1, 3, self.gen_height, self.gen_width], device=self.device)
+            new_x = torch.zeros([1, 3, self.gen_height, self.gen_width], device=self.device)
             margin_x = int((self.gen_width - self.canvas_width)/2)
             margin_y = int((self.gen_height - self.canvas_height)/2)
             if (margin_x != 0 or margin_y != 0):
@@ -131,10 +134,8 @@ class VdiffDrawer(DrawingInterface):
             else:
                 new_x = init_tensor
             # by default the image is 99% based on init_tensor (for now)
-            self.x = new_x * 0.99 + self.x * 0.01
+            self.x = new_x * self.sample_state[5][0] + self.x * self.sample_state[6][0]
 
-        # [model, steps, eta, extra_args, ts, alphas, sigmas]
-        self.sample_state = sampling.sample_setup(self.model, self.x, self.steps, self.eta, {})
         self.x.requires_grad_(True)
         self.pred = None 
         self.v = None 

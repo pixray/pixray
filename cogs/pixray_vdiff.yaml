@@ -1,4 +1,4 @@
 drawer: vdiff
 quality: better
 display_every: 10
-output: outputs/vdiff.png
+outdir: outputs/vdiff
