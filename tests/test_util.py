@@ -59,7 +59,7 @@ class TestUtilMethods(unittest.TestCase):
         self.assertEqual(split_pipes('test|another'), ['test', 'another'])
 
     def test_split_pipes_with_empty(self):
-        self.assertEqual(split_pipes(''), [''])
+        self.assertEqual(split_pipes(''), '')
 
     def test_split_pipes_with_one(self):
         self.assertEqual(split_pipes('single'), ['single'])
