@@ -1,12 +1,4 @@
-# Originally made by Katherine Crowson (https://github.com/crowsonkb, https://twitter.com/RiversHaveWings)
-# The original BigGAN+CLIP method was by https://twitter.com/advadnoun
-
-from mimetypes import init
 from DrawingInterface import DrawingInterface
-
-import sys
-import subprocess
-sys.path.append('taming-transformers')
 import os.path
 import torch
 from torch.nn import functional as F
@@ -14,9 +6,8 @@ from torchvision.transforms import functional as TF
 from basicsr.archs.rrdbnet_arch import RRDBNet
 
 from real_esrganer import RealESRGANer
-
-
 from util import wget_file
+
 
 superresolution_checkpoint_table = {
     "RealESRGAN_x4plus": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
@@ -126,4 +117,3 @@ class SuperResolutionDrawer(DrawingInterface):
 
     def get_z_copy(self):
         return self.z.clone()
-        # return model, gumbel
