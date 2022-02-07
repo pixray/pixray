@@ -1902,8 +1902,11 @@ def process_args(vq_parser, namespace=None):
     if args.overlay_image is not None and args.overlay_every <= 0:
         args.overlay_image = None
 
-    clip_models = args.clip_models.split(",")
-    args.clip_models = [model.strip() for model in clip_models]
+    if args.clip_models and args.clip_models.lower() != "none":
+        clip_models = args.clip_models.split(",")
+        args.clip_models = [model.strip() for model in clip_models]
+    else:
+        args.clip_models = []
 
     # Make video steps directory
     if args.make_video:
