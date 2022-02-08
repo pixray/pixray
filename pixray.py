@@ -120,6 +120,8 @@ from Losses.EdgeLoss import EdgeLoss
 from Losses.StyleLoss import StyleLoss
 from Losses.ResmemLoss import ResmemLoss
 from Losses.AestheticLoss import AestheticLoss
+from Losses.BLIPLoss import BLIPLoss
+
 
 loss_class_table = {
     "palette": PaletteLoss,
@@ -130,6 +132,7 @@ loss_class_table = {
     "style": StyleLoss,
     "resmem": ResmemLoss,
     "aesthetic": AestheticLoss,
+    "blip": BLIPLoss,
 }
 
 
