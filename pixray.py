@@ -70,13 +70,18 @@ from util import map_number, palette_from_string, real_glob
 
 from vqgan import VqganDrawer
 from vdiff import VdiffDrawer
-from super_resolution import SuperResolutionDrawer
 
 class_table = {
     "vqgan": VqganDrawer,
     "vdiff": VdiffDrawer,
-    "super_resolution": SuperResolutionDrawer,
 }
+
+try:
+    from super_resolution import SuperResolutionDrawer
+    class_table.update({"super_resolution": SuperResolutionDrawer})
+except ImportError as e:
+    print("--> Super resolution drawer not supported", e)
+    pass
 
 try:
     from fftdrawer import FftDrawer
