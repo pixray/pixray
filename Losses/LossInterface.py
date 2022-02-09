@@ -2,7 +2,7 @@ import argparse
 
 
 class LossInterface():
-    def __init__(self, device=None):
+    def __init__(self, settings=None, device=None):
         self.device = device
 
     # a list of optional strings

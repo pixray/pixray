@@ -72,6 +72,10 @@ def blip_itm(pretrained='',**kwargs):
     model = BLIP_ITM(**kwargs)
     if pretrained:
         model,msg = load_checkpoint(model,pretrained)
-        assert(len(msg.missing_keys)==0)
+        if(len(msg.missing_keys)!=0):
+            print("Sorry, something dreadfully wrong happened...")
+            print(msg)
+            print("WARNING: WE ARE IGNORING A BIG BLIP ERROR!")
+            # assert(len(msg.missing_keys)==0)
     return model         
             

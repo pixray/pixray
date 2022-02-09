@@ -977,7 +977,7 @@ def do_init(args):
             lossClass = loss_class_table[loss_name]
             # do special initializations here
             try:
-                lossInstance = lossClass(device=device)
+                lossInstance = lossClass(settings=args, device=device)
                 lossInstance.instance_settings(instance_args)
                 lossClasses.append({"loss":lossInstance, "weight": weight})
             except TypeError as e:
