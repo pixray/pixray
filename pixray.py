@@ -635,6 +635,11 @@ def do_init(args):
             perceptor = get_clip_perceptor(clip_model, device)
             perceptors[clip_model] = perceptor
 
+    for cut_size in args.cut_sizes:
+        print(f"Explicitly adding a cut size of {cut_size}")
+        make_cutouts = MakeCutouts(cut_size, args.num_cuts, cut_pow=args.cut_pow)
+        cutoutsTable[cut_size] = make_cutouts
+
     # now separately setup cuts
     for clip_model in args.clip_models:
         perceptor = perceptors[clip_model]
@@ -1245,6 +1250,8 @@ def ascend_txt(args):
         for cutoutSize in cutoutsTable:
             cur_spot_off_cutouts[cutoutSize] = make_cutouts(out, spot=0)
 
+    # ViT_B_16_embeds == aesthetic loss hack
+    ViT_B_16_embeds = None
     for clip_model in args.clip_models:
         perceptor = perceptors[clip_model]
         cutoutSize = cutoutSizeTable[clip_model]
@@ -1263,6 +1270,8 @@ def ascend_txt(args):
                 result.append(prompt(iii_so))
 
         iii = perceptor.encode_image(cur_cutouts[cutoutSize]).float()
+        if clip_model == "ViT-B/16":
+            ViT_B_16_embeds = iii
 
         pMs = pmsTable[clip_model]
         for prompt in pMs:
@@ -1347,7 +1356,7 @@ def ascend_txt(args):
     needed_globals = {
         # used to be for palette loss - now left as an example
         "cur_iteration":cur_iteration,
-        "embeds": iii,
+        "embeds": ViT_B_16_embeds,
     }
 
     if args.transparency:
@@ -1691,6 +1700,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-iwp",  "--init_weight_pix", type=float, help="Initial weight pix loss", default=0., dest='init_weight_pix')
     vq_parser.add_argument(         "--perceptors", type=str, help="perceptors (clip/slip/mixed)", default="clip", dest='perceptors')
     vq_parser.add_argument(         "--clip_models", type=str, help="CLIP model", default=None, dest='clip_models')
+    vq_parser.add_argument(         "--cut_sizes", type=str, help="explicitly add cut sizes (for losses)", default=None, dest='cut_sizes')
     vq_parser.add_argument("-nps",  "--noise_prompt_seeds", nargs="*", type=int, help="Noise prompt seeds", default=[], dest='noise_prompt_seeds')
     vq_parser.add_argument("-npw",  "--noise_prompt_weights", nargs="*", type=float, help="Noise prompt weights", default=[], dest='noise_prompt_weights')
     vq_parser.add_argument("-lr",   "--learning_rate", type=float, help="Learning rate", default=0.2, dest='learning_rate')
@@ -1884,6 +1894,12 @@ def process_args(vq_parser, namespace=None):
     # Split target images using the pipe character
     if args.image_prompts:
         args.image_prompts = real_glob(args.image_prompts)
+
+    # cut sizes should be empty list or list of ints
+    if args.cut_sizes is None or args.cut_sizes.lower() == "none":
+        args.cut_sizes = []
+    else:
+        args.cut_sizes = [int(s) for s in args.cut_sizes.split(",")]
 
     # Split text prompts using the pipe character
     if args.vector_prompts:
