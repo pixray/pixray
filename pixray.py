@@ -1605,15 +1605,15 @@ def do_run(args, return_display=False):
 
 def step_to_video(step_folder):
     output_file = os.path.join(step_folder, "output.mp4")
-    frames_path = sorted(glob.glob(os.path.join(step_folder, "frame_*.png")))
+    les_frame_path = sorted(glob.glob(os.path.join(step_folder, "frame_*.png")))
 
-    frames = []
-    for frame_path in frames_path:
-        frames.append(Image.open(frame_path))
+    les_frame = []
+    for frame_path in les_frame_path:
+        les_frame.append(Image.open(frame_path))
     
     min_fps = 10
     max_fps = 60
-    total_frames = len(frame_path)
+    total_frames = len(les_frame)
     length = 15
     fps = np.clip(total_frames/length,min_fps,max_fps)
     from subprocess import Popen, PIPE
