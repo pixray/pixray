@@ -1600,6 +1600,38 @@ def do_run(args, return_display=False):
 
     return True
 
+def step_to_video(step_folder):
+    output_file = os.path.join(step_folder, "output.mp4")
+    frames_path = sorted(glob.glob(os.path.join(step_folder, "frame_*.png")))
+
+    frames = []
+    for frame_path in frames_path:
+        frames.append(Image.open(frame_path))
+    
+    min_fps = 10
+    max_fps = 60
+    total_frames = len(frame_path)
+    length = 15
+    fps = np.clip(total_frames/length,min_fps,max_fps)
+    from subprocess import Popen, PIPE
+    p = Popen(['ffmpeg',
+               '-y',
+               '-f', 'image2pipe',
+               '-vcodec', 'png',
+               '-r', str(fps),
+               '-i',
+               '-',
+               '-vcodec', 'libx264',
+               '-r', str(fps),
+               '-pix_fmt', 'yuv420p',
+               '-crf', '17',
+               '-preset', 'veryslow',
+               output_file], stdin=PIPE)
+    for im in tqdm(frames):
+        im.save(p.stdin, 'PNG')
+    p.stdin.close()
+    p.wait()
+
 def do_video(args):
     global cur_iteration
 
