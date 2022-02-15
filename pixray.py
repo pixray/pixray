@@ -1614,7 +1614,7 @@ def step_to_video(step_folder):
     min_fps = 10
     max_fps = 60
     total_frames = len(les_frame)
-    length = 15
+    length = 14
     fps = np.clip(total_frames/length,min_fps,max_fps)
     from subprocess import Popen, PIPE
     p = Popen(['ffmpeg',
@@ -1630,7 +1630,7 @@ def step_to_video(step_folder):
                '-crf', '17',
                '-preset', 'veryslow',
                output_file], stdin=PIPE)
-    for im in tqdm(frames):
+    for im in tqdm(les_frame + [les_frame[-1]]*fps):
         im.save(p.stdin, 'PNG')
     p.stdin.close()
     p.wait()
@@ -1647,7 +1647,7 @@ def do_video(args):
 
     total_frames = last_frame-init_frame
 
-    length = 15 # Desired time of the video in seconds
+    length = 14 # Desired time of the video in seconds
 
     frames = []
     tqdm.write('Generating video...')
@@ -1673,7 +1673,7 @@ def do_video(args):
                '-preset', 'veryslow',
                '-metadata', f'comment={args.prompts}',
                output_file], stdin=PIPE)
-    for im in tqdm(frames):
+    for im in tqdm(frames + [frames[-1]] * fps):
         im.save(p.stdin, 'PNG')
     p.stdin.close()
     p.wait()
