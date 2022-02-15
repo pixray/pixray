@@ -1178,6 +1178,8 @@ def checkin(args, iter, losses):
     else:
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
+    if args.save_intermediates:
+        imageio.imwrite(get_file_path(args.outdir, f'frame_{cur_iteration:04d}', '.png'), np.array(img))
     if cur_anim_index == len(anim_output_files) - 1:
         # save gif
         gif_output = make_gif(args, iter)
@@ -1664,6 +1666,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-ilw",  "--image_label_weight", type=float, help="Weight for image prompt", default=1.0, dest='image_label_weight')
     vq_parser.add_argument("-i",    "--iterations", type=int, help="Number of iterations", default=None, dest='iterations')
     vq_parser.add_argument("-se",   "--save_every", type=int, help="Save image iterations", default=10, dest='save_every')
+    vq_parser.add_argument("-si",   "--save_intermediates", action="store_true", help="Save image iterations as intermediate files", dest='save_intermediates')
     vq_parser.add_argument("-de",   "--display_every", type=int, help="Display image iterations", default=20, dest='display_every')
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=10, dest='overlay_every')
