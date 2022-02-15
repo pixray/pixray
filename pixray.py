@@ -1179,7 +1179,10 @@ def checkin(args, iter, losses):
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
     if args.save_intermediates:
-        imageio.imwrite(get_file_path(args.outdir, f'frame_{cur_iteration:04d}', '.png'), np.array(img))
+        step_path = os.path.join(args.outdir, "steps")
+        if not os.path.isdir(step_path):
+            os.makedirs(step_path)
+        imageio.imwrite(get_file_path(step_path, f'frame_{cur_iteration:04d}', '.png'), np.array(img))
     if cur_anim_index == len(anim_output_files) - 1:
         # save gif
         gif_output = make_gif(args, iter)
