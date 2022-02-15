@@ -17,7 +17,7 @@ imageio==2.9.0
 ipython==7.28.0
 kornia==0.6.2
 omegaconf==2.1.1
-Pillow==8.3.2
+Pillow==9.0.1
 PyYAML==5.4.1
 scikit_learn==1.0
 scikit-image==0.18.3
