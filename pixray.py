@@ -600,7 +600,8 @@ def do_init(args):
 
     # set device only once
     if device is None:
-        device = torch.device('cuda:0' if torch.cuda.is_available() and not args.cpu else 'cpu')
+        # device = torch.device('cuda:0' if torch.cuda.is_available() and not args.cpu else 'cpu')
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     drawer = class_table[args.drawer](args)
     drawer.load_model(args, device)
@@ -1745,7 +1746,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("--alpha_gamma", type=float, help="width-relative sigma for the alpha gaussian", default=4., dest='alpha_gamma')
     vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
     vq_parser.add_argument("--outdir", type=str, help="Output file directory", default='outputs/%DATE%_%SEQ%', dest='outdir')
-    vq_parser.add_argument("--cpu", action="store_true", help="Force cpu", dest='cpu')
+    # vq_parser.add_argument("--cpu", action="store_true", help="Force cpu", dest='cpu', default=False)
 
     return vq_parser
 
