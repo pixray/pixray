@@ -2,5 +2,5 @@
 	path = v-diffusion-pytorch
 	url = https://github.com/paulasquin/v-diffusion-pytorch
 [submodule "SLIP"]
-	path = SLIP
+	path = slip
 	url = https://github.com/paulasquin/slip
