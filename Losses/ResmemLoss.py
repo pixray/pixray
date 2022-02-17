@@ -13,7 +13,7 @@ recenter = transforms.Compose((
     )
 )
 
-from util import wget_file, map_number
+from pixray.util import wget_file, map_number
 resmem_url = 'https://github.com/pixray/resmem/releases/download/1.1.3_model/model.pt'
 
 class ResmemLoss(LossInterface):

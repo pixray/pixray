@@ -16,7 +16,7 @@ import PIL
 from PIL import Image
 from time import time
 from argparse import ArgumentParser
-from util import real_glob
+from pixray.util import real_glob
 from urllib.request import urlopen
 
 

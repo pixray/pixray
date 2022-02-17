@@ -1,6 +1,6 @@
 [submodule "v-diffusion-pytorch"]
 	path = v-diffusion-pytorch
-	url = https://github.com/pixray/v-diffusion-pytorch
-[submodule "SLIP"]
-	path = SLIP
-	url = https://github.com/facebookresearch/SLIP
+	url = https://github.com/paulasquin/v-diffusion-pytorch
+[submodule "slip"]
+	path = slip
+	url = https://github.com/paulasquin/slip

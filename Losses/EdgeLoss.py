@@ -1,9 +1,9 @@
 import torch
 from torch import nn, optim
 
-from util import get_single_rgb
+from pixray.util import get_single_rgb
 from PIL import Image
-from util import *
+from pixray.util import *
 from urllib.request import urlopen
 import torchvision.transforms.functional as TF
 
