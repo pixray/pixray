@@ -5,7 +5,7 @@
 -f https://download.pytorch.org/whl/torch_stable.html
 torch==1.9.0+cu102
 torchvision==0.10.0+cu102
-torchtext==1.9.0
+torchtext
 
 numpy==1.19.4
 tqdm==4.49.0
