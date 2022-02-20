@@ -46,13 +46,17 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-def parse_unit(value, total_iterations, argument_name):
+def parse_unit(value, total_iterations, argument_name, default_unit="%"):
     if value is None:
         return None
 
-    value = value.lower().strip()
+    value = str(value).lower().strip()
 
     digits = re.search("^\d+", value)
+    
+    if re.match("^\d+$", value):
+        value += default_unit
+    
     if re.match("^\d+[\s]*(i|iter|iterations)$", value):
         return int(digits.group(0))
     elif re.match("^\d+[\s]*(p|%|percent)$", value):

@@ -49,6 +49,15 @@ class TestUtilMethods(unittest.TestCase):
 
     def test_parse_unit_robust_format(self):
         self.assertEqual(parse_unit('200 iterATions    ', 500, 'overlay_until'), 200)
+        
+    def test_parse_unit_default_percent(self):
+        self.assertEqual(parse_unit('50', 500, 'overlay_until'), 250)
+
+    def test_parse_unit_default_unit_arg(self):
+        self.assertEqual(parse_unit('50', 500, 'overlay_until', 'i'), 50)
+        
+    def test_parse_unit_plain_integer(self):
+        self.assertEqual(parse_unit(50, 500, 'overlay_until', 'i'), 50)
     #endregion parse_unit
 
     #region split_pipes
