@@ -1859,9 +1859,9 @@ def process_args(vq_parser, namespace=None):
     args.spot_prompts_off = split_pipes(args.spot_prompts_off)
     args.labels = split_pipes(args.labels)
 
-    args.overlay_offset = parse_unit(args.overlay_offset, args.iterations, "overlay_offset")
-    args.overlay_until = parse_unit(args.overlay_until, args.iterations, "overlay_until")
-    args.overlay_every = parse_unit(args.overlay_every, args.iterations, "overlay_every")
+    args.overlay_offset = parse_unit(args.overlay_offset, args.iterations, "overlay_offset", "i")
+    args.overlay_until = parse_unit(args.overlay_until, args.iterations, "overlay_until", "i")
+    args.overlay_every = parse_unit(args.overlay_every, args.iterations, "overlay_every", "i")
 
     # Split target images using the pipe character
     if args.image_prompts:
