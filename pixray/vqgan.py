@@ -1,7 +1,7 @@
 # Originally made by Katherine Crowson (https://github.com/crowsonkb, https://twitter.com/RiversHaveWings)
 # The original BigGAN+CLIP method was by https://twitter.com/advadnoun
 
-from DrawingInterface import DrawingInterface
+from pixray.DrawingInterface import DrawingInterface
 
 import sys
 import subprocess
@@ -14,7 +14,7 @@ from torchvision.transforms import functional as TF
 from omegaconf import OmegaConf
 from taming.models import cond_transformer, vqgan
 
-from util import wget_file
+from pixray.util import wget_file
 
 vqgan_config_table = {
     "imagenet_f16_1024": 'http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_1024.yaml',

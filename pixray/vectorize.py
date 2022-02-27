@@ -13,7 +13,7 @@ from clip import clip
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from PIL import Image
 
-from slip import get_clip_perceptor, all_slip_models
+from pixray.slip import get_clip_perceptor, all_slip_models
 
 perceptors = {}
 

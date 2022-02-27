@@ -6,7 +6,7 @@ from torchvision.transforms import functional as TF
 from basicsr.archs.rrdbnet_arch import RRDBNet
 
 from real_esrganer import RealESRGANer
-from util import wget_file
+from pixray.util import wget_file
 
 
 superresolution_checkpoint_table = {

@@ -18,7 +18,7 @@ import torchvision.transforms as transforms
 import numpy as np
 import PIL.Image
 
-from util import str2bool
+from pixray.util import str2bool
 
 def bound(value, low, high):
     return max(low, min(high, value))

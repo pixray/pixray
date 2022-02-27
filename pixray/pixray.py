@@ -30,9 +30,9 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 
 from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
-from util import str2bool, get_file_path, emit_filename
+from pixray.util import str2bool, get_file_path, emit_filename
 
-from slip import get_clip_perceptor
+from pixray.slip import get_clip_perceptor
 
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
@@ -66,10 +66,10 @@ global_padding_mode = 'reflection'
 global_aspect_width = 1
 global_spot_file = None
 
-from util import map_number, palette_from_string, real_glob
+from pixray.util import map_number, palette_from_string, real_glob
 
-from vqgan import VqganDrawer
-from vdiff import VdiffDrawer
+from pixray.vqgan import VqganDrawer
+from pixray.vdiff import VdiffDrawer
 
 class_table = {
     "vqgan": VqganDrawer,
@@ -600,6 +600,7 @@ def do_init(args):
 
     # set device only once
     if device is None:
+        # device = torch.device('cuda:0' if torch.cuda.is_available() and not args.cpu else 'cpu')
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     drawer = class_table[args.drawer](args)
@@ -1178,6 +1179,11 @@ def checkin(args, iter, losses):
     else:
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
+    if args.save_intermediates:
+        step_path = os.path.join(args.outdir, "steps")
+        if not os.path.isdir(step_path):
+            os.makedirs(step_path)
+        imageio.imwrite(get_file_path(step_path, f'frame_{cur_iteration:04d}', '.png'), np.array(img))
     if cur_anim_index == len(anim_output_files) - 1:
         # save gif
         gif_output = make_gif(args, iter)
@@ -1598,6 +1604,38 @@ def do_run(args, return_display=False):
 
     return True
 
+def step_to_video(step_folder):
+    output_file = os.path.join(step_folder, "output.mp4")
+    les_frame_path = sorted(glob.glob(os.path.join(step_folder, "frame_*.png")))
+    print(f"Creating video based on {len(les_frame_path)} frames")
+    les_frame = []
+    for frame_path in les_frame_path:
+        les_frame.append(Image.open(frame_path))
+    
+    min_fps = 10
+    max_fps = 60
+    total_frames = len(les_frame)
+    length = 14
+    fps = np.clip(total_frames/length,min_fps,max_fps)
+    from subprocess import Popen, PIPE
+    p = Popen(['ffmpeg',
+               '-y',
+               '-f', 'image2pipe',
+               '-vcodec', 'png',
+               '-r', str(fps),
+               '-i',
+               '-',
+               '-vcodec', 'libx264',
+               '-r', str(fps),
+               '-pix_fmt', 'yuv420p',
+               '-crf', '17',
+               '-preset', 'veryslow',
+               output_file], stdin=PIPE)
+    for im in tqdm(les_frame + [les_frame[-1]]*int(fps)):
+        im.save(p.stdin, 'PNG')
+    p.stdin.close()
+    p.wait()
+
 def do_video(args):
     global cur_iteration
 
@@ -1610,7 +1648,7 @@ def do_video(args):
 
     total_frames = last_frame-init_frame
 
-    length = 15 # Desired time of the video in seconds
+    length = 14 # Desired time of the video in seconds
 
     frames = []
     tqdm.write('Generating video...')
@@ -1636,7 +1674,7 @@ def do_video(args):
                '-preset', 'veryslow',
                '-metadata', f'comment={args.prompts}',
                output_file], stdin=PIPE)
-    for im in tqdm(frames):
+    for im in tqdm(frames + [frames[-1]] * int(fps)):
         im.save(p.stdin, 'PNG')
     p.stdin.close()
     p.wait()
@@ -1664,6 +1702,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-ilw",  "--image_label_weight", type=float, help="Weight for image prompt", default=1.0, dest='image_label_weight')
     vq_parser.add_argument("-i",    "--iterations", type=int, help="Number of iterations", default=None, dest='iterations')
     vq_parser.add_argument("-se",   "--save_every", type=int, help="Save image iterations", default=10, dest='save_every')
+    vq_parser.add_argument("-si",   "--save_intermediates", action="store_true", help="Save image iterations as intermediate files", dest='save_intermediates')
     vq_parser.add_argument("-de",   "--display_every", type=int, help="Display image iterations", default=20, dest='display_every')
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=10, dest='overlay_every')
@@ -1707,6 +1746,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("--alpha_gamma", type=float, help="width-relative sigma for the alpha gaussian", default=4., dest='alpha_gamma')
     vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
     vq_parser.add_argument("--outdir", type=str, help="Output file directory", default='outputs/%DATE%_%SEQ%', dest='outdir')
+    # vq_parser.add_argument("--cpu", action="store_true", help="Force cpu", dest='cpu', default=False)
 
     return vq_parser
 

@@ -14,7 +14,7 @@ import torchvision.transforms as transforms
 import numpy as np
 import PIL.Image
 
-from util import str2bool
+from pixray.util import str2bool
 
 from perlin_numpy import generate_fractal_noise_3d
 

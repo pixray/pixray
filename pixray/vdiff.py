@@ -1,15 +1,15 @@
 # Originally made by Katherine Crowson (https://github.com/crowsonkb, https://twitter.com/RiversHaveWings)
 # The original BigGAN+CLIP method was by https://twitter.com/advadnoun
 
-from DrawingInterface import DrawingInterface
+from pixray.DrawingInterface import DrawingInterface
 
 import sys
 import os
 import subprocess
 
 # TODO: this is very hacky, must fix this later (submodule dependency)
-VDIFF_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'v-diffusion-pytorch')
-sys.path.append(VDIFF_PATH)
+# VDIFF_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'v-diffusion-pytorch')
+# sys.path.append(VDIFF_PATH)
 
 import torch
 from torch.nn import functional as F
@@ -18,7 +18,7 @@ import math
 
 from omegaconf import OmegaConf
 from taming.models import cond_transformer, vqgan
-from util import wget_file, map_number
+from pixray.util import wget_file, map_number
 
 
 model_urls = {

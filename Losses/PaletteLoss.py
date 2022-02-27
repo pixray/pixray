@@ -2,7 +2,7 @@
 import torch
 from torch import nn, optim
 
-from util import  palette_from_string
+from pixray.util import palette_from_string
 
 
 

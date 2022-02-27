@@ -2,7 +2,7 @@ import torch
 from torch import nn, optim
 from pathlib import Path
 from Losses.LossInterface import LossInterface
-from util import wget_file
+from pixray.util import wget_file
 from torch.nn import functional as F
 
 

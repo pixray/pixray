@@ -16,7 +16,7 @@ all_slip_models =  ["SLIP_VITS16", "SLIP_VITB16", "SLIP_VITL16",
                     "CLIP_VITS16", "CLIP_VITB16", "CLIP_VITL16"]
 
 
-from util import wget_file
+from pixray.util import wget_file
 
 def normalize(img, input_range = None):
     if input_range is None:
@@ -74,12 +74,12 @@ class CLIP_Base():
         return text_embeddings / text_embeddings.norm(dim=-1, keepdim=True)
 
 # TODO: this is very hacky, must fix this later (submodule dependency)
-SLIP_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'SLIP')
+# SLIP_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'SLIP')
 # print("APPENDING PATH ", SLIP_PATH)
-sys.path.append(SLIP_PATH)
-import models
-from tokenizer import SimpleTokenizer
-import utils
+# sys.path.append(SLIP_PATH)
+import slip.models as models
+from slip.tokenizer import SimpleTokenizer
+import slip.utils
 
 class SLIP_Base():
     def __init__(self, model_name, device):
