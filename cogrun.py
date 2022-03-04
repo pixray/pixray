@@ -48,7 +48,7 @@ class BasePixrayPredictor(BasePredictor):
             run_complete = pixray.do_run(settings, return_display=True)
             output_file = os.path.join(settings.outdir, settings.output)
             temp_copy = create_temporary_copy(output_file)
-            yield pathlib.Path(os.path.realpath(temp_copy))
+            yield Path(os.path.realpath(temp_copy))
 
 class PixrayVqgan(BasePixrayPredictor):
     def predict(self, 
