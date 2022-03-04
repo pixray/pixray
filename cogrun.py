@@ -1,5 +1,4 @@
-from cog import BasePredictor, Input
-from pathlib import Path
+from cog import BasePredictor, Input, Path
 from typing import Iterator
 import torch
 import yaml
@@ -24,7 +23,7 @@ class BasePixrayPredictor(BasePredictor):
     def predict(self, 
         settings: str = Input(description="Default settings to use"),
         prompts: str = Input(description="Text prompts", default=None),
-    **kwargs) -> Iterator[str]:
+    **kwargs) -> Iterator[Path]:
         # workaround for import issue when deploying
         import pixray
         """Run a single prediction on the model"""
@@ -59,7 +58,7 @@ class PixrayVqgan(BasePixrayPredictor):
         # num_cuts: int = Input(description="number of cuts", default=24, ge:4, le:96),
         # batches: int = Input(description="number of batches", default=1, ge:1, le:32),
         **kwargs
-    ) -> Iterator[str]:
+    ) -> Iterator[Path]:
         yield from super().predict(settings="pixray_vqgan", **kwargs)
 
 class PixrayPixel(BasePixrayPredictor):
@@ -68,7 +67,7 @@ class PixrayPixel(BasePixrayPredictor):
         aspect: str = Input(description="wide vs square", default="widescreen", choices=["widescreen", "square"]),
         drawer: str = Input(description="render enging", default="pixel", choices=["pixel", "vqgan", "line_sketch", "clipdraw"]),
         **kwargs
-    ) -> Iterator[str]:
+    ) -> Iterator[Path]:
         yield from super().predict(settings="pixray_pixel", **kwargs)
 
 class Text2Image(BasePixrayPredictor):
@@ -77,7 +76,7 @@ class Text2Image(BasePixrayPredictor):
         quality: str = Input(description="speed vs quality", default="normal", choices=["draft", "normal", "better", "best"]),
         aspect: str = Input(description="wide or narrow", default="widescreen", choices=["widescreen", "square", "portrait"]),
         **kwargs
-    ) -> Iterator[str]:
+    ) -> Iterator[Path]:
         yield from super().predict(settings="text2image", **kwargs)
 
 class Text2Pixel(BasePixrayPredictor):
@@ -86,14 +85,14 @@ class Text2Pixel(BasePixrayPredictor):
         aspect: str = Input(description="wide or narrow", default="widescreen", choices=["widescreen", "square", "portrait"]),
         pixel_scale: float = Input(description="bigger pixels", default=1.0, ge=0.5, le=2.0),
         **kwargs
-    ) -> Iterator[str]:
+    ) -> Iterator[Path]:
         yield from super().predict(settings="text2pixel", **kwargs)
 
 class PixrayRaw(BasePixrayPredictor):
     def predict(self, 
         prompts: str = Input(description="text prompt", default="Manhattan skyline at sunset. #pixelart"),
         settings: str = Input(description="yaml settings", default="\n")
-    ) -> Iterator[str]:
+    ) -> Iterator[Path]:
         ydict = yaml.safe_load(settings)
         if ydict == None:
             # no settings
@@ -103,7 +102,7 @@ class PixrayRaw(BasePixrayPredictor):
 class PixrayApi(BasePixrayPredictor):
     def predict(self, 
         settings: str = Input(description="yaml settings", default="\n")
-    ) -> Iterator[str]:
+    ) -> Iterator[Path]:
         ydict = yaml.safe_load(settings)
         if ydict == None:
             # no settings
@@ -116,7 +115,7 @@ class Tiler(BasePixrayPredictor):
         pixelart: bool = Input(description="pixelart style?", default=False),
         mirror: bool = Input(description="shifted pattern?", default=False),
         settings: str = Input(description="yaml settings", default="\n")
-    ) -> Iterator[str]:
+    ) -> Iterator[Path]:
         ydict = yaml.safe_load(settings)
         if ydict == None:
             # no settings
@@ -138,7 +137,7 @@ class PixrayVdiff(BasePixrayPredictor):
     def predict(self, 
         prompts: str = Input(description="text prompt", default="Manhattan skyline at sunset. #artstation 🌇"),
         settings: str = Input(description="extra settings in `name: value` format. reference: https://dazhizhong.gitbook.io/pixray-docs/docs/primary-settings", default='\n')
-    ) -> Iterator[str]:
+    ) -> Iterator[Path]:
         ydict = yaml.safe_load(settings)
         if ydict == None:
             # no settings
