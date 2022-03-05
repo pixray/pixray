@@ -1165,13 +1165,10 @@ def checkin(args, iter, losses):
         writestr = f'anim: {cur_anim_index}/{len(anim_output_files)} {writestr}'
     else:
         writestr = f'{writestr} (-{num_cycles_not_best}=>{best_loss:2.4g})'
-    timg = drawer.synth(cur_iteration)
-    if filters is not None and len(filters)>0:
-        for f in filters:
-            filtclass = f["filter"]
-            timg, closs = filtclass(timg);
 
+    timg, img_alpha = do_synth_and_filter(args, cur_iteration, [], to_file=True)
     img = TF.to_pil_image(timg[0].cpu())
+    # print(f"Gonna save {timg.shape} and {img}")
     # img = drawer.to_image()
     if cur_anim_index is None:
         outfile = get_file_path(args.outdir, args.output, '.png')
@@ -1191,19 +1188,14 @@ def checkin(args, iter, losses):
             display.display(display.Image(outfile))
     tqdm.write(writestr)
 
-def ascend_txt(args):
-    global cur_iteration, cur_anim_index, perceptors, cutoutsTable, cutoutSizeTable # normalize, 
-    global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
-    global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode, global_fill_color
-    global pmsTargetTable
-    global lossGlobals
+def do_synth_and_filter(args, cur_iteration, loss_list, to_file=False):
+    global device, global_fill_color
 
-    if args.transparency:
-        out, alpha = drawer.synth(cur_iteration, return_transparency=True)
-    else:
-        out = drawer.synth(cur_iteration)
-
-    result = []
+    out = drawer.synth(cur_iteration)
+    # if args.transparency:
+    #     out, alpha = drawer.synth(cur_iteration, return_transparency=True)
+    # else:
+    #     out = drawer.synth(cur_iteration)
 
     if filters is not None and len(filters)>0:
         for f in filters:
@@ -1217,6 +1209,32 @@ def ascend_txt(args):
                 weighted_losses = [(filtweight * l) for l in new_losses]
                 result += weighted_losses
 
+
+    alpha = None
+    # flatten to 3 channel
+    _B,C,_H,_W = out.shape
+    if C == 4:
+        colors = out[:,0:3,:,:]
+        if args.transparent:
+            if not to_file:
+                # random squash
+                # print(f"Flattening {out.shape} on {global_fill_color[0]}")
+                alpha = out[:,3,:,:]
+                bg_shade = global_fill_color[0] * torch.ones(size=(_B,3,_H,_W), device=device, dtype=torch.float)
+                out = alpha * colors + (1 - alpha) * bg_shade
+                TF.to_pil_image(out[0].cpu()).save("flat.png")
+        else:
+            out = colors
+
+    return out, alpha
+
+def ascend_txt(args):
+    global cur_iteration, cur_anim_index, perceptors, cutoutsTable, cutoutSizeTable # normalize, 
+    global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
+    global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode, global_fill_color
+    global pmsTargetTable
+    global lossGlobals
+
     if (cur_iteration%2 == 0):
         global_padding_mode = 'reflection'
     else:
@@ -1226,6 +1244,9 @@ def ascend_txt(args):
     # print("Color fill is ", color_fill)
     # color_fill = 1.0
     global_fill_color =torch.tensor([color_fill,color_fill,color_fill], device=device, dtype=torch.float)
+
+    result = []
+    out, img_alpha = do_synth_and_filter(args, cur_iteration, result)
 
     cur_cutouts = {}
     cur_spot_cutouts = {}
@@ -1347,8 +1368,10 @@ def ascend_txt(args):
         "embeds": iii,
     }
 
-    if args.transparency:
-        result.append(args.alpha_weight*torch.mean(alpha))
+    if img_alpha is not None and args.transparent_weight != 0:
+        t_loss = args.transparent_weight*torch.mean(img_alpha)
+        # print(f"with weight {args.transparent_weight} the loss is {t_loss}")
+        result.append(t_loss)
     
     if args.custom_loss is not None and len(args.custom_loss)>0:
         for t in args.custom_loss:
@@ -1701,8 +1724,8 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
     vq_parser.add_argument("--palette", type=str, help="target palette", default=None, dest='palette')
-    vq_parser.add_argument("--transparent", type=str2bool, help="enable transparency", default=False, dest='transparency')
-    vq_parser.add_argument("--alpha_weight", type=float, help="strenght of alpha loss", default=1., dest='alpha_weight')
+    vq_parser.add_argument("--transparent", type=str2bool, help="enable transparent outputs", default=False, dest='transparent')
+    vq_parser.add_argument("--transparent_weight", type=float, help="strenght of transparent loss", default=0., dest='transparent_weight')
     vq_parser.add_argument("--alpha_use_g", type=str2bool, help="use gaussian mask weighting", default=False, dest='alpha_use_g')
     vq_parser.add_argument("--alpha_gamma", type=float, help="width-relative sigma for the alpha gaussian", default=4., dest='alpha_gamma')
     vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')

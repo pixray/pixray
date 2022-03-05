@@ -176,12 +176,12 @@ class PixelDrawer(DrawingInterface):
                 if self.num_rows % 2 == 1:
                     self.num_rows = self.num_rows + 1
 
-        self.transparency = settings.transparency
-        if self.transparency:
-            if settings.alpha_use_g:
-                self.gkern = torch.tensor(gkern(self.canvas_width, settings.alpha_gamma))
-            else:
-                self.gkern = None
+        self.transparent = settings.transparent
+        # if self.transparent:
+        #     if settings.alpha_use_g:
+        #         self.gkern = torch.tensor(gkern(self.canvas_width, settings.alpha_gamma))
+        #     else:
+        self.gkern = None
 
     def load_model(self, settings, device):
         # gamma = 1.0
@@ -347,10 +347,10 @@ class PixelDrawer(DrawingInterface):
             res = [1,2,4,8,16][random.randint(0,4)] # resolution of the perlin noise
             noise = generate_fractal_noise_3d((img_h, img_w, 3), (res, res, 1))
             img = alpha * img[:, :, :3] + (1 - alpha) * torch.tensor(noise, dtype=torch.float32, device=self.device)
-        else:
-            img = alpha * img[:, :, :3]
+        # else:
+        #     img = alpha * img[:, :, :3]
         
-        img = img[:, :, :3]
+        # img = img[:, :, :3]
         img = img.unsqueeze(0)
         img = img.permute(0, 3, 1, 2) # NHWC -> NCHW
         # if cur_iteration == 0:
@@ -379,7 +379,7 @@ class PixelDrawer(DrawingInterface):
         with torch.no_grad():
             for group in self.shape_groups:
                 group.fill_color.data[:3].clamp_(0.0, 1.0)
-                group.fill_color.data[3].clamp_(0.0 if self.transparency else 1.0, 1.0)
+                group.fill_color.data[3].clamp_(0.0 if self.transparent else 1.0, 1.0)
 
     def get_z(self):
         groups = []
