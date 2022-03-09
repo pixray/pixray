@@ -1,5 +1,5 @@
-import cog
-from pathlib import Path
+from cog import BasePredictor, Input, Path
+from typing import Iterator
 import torch
 import yaml
 import pathlib
@@ -15,15 +15,15 @@ def create_temporary_copy(src_path):
     shutil.copy2(src_path, temp_path)
     return temp_path
 
-class BasePixrayPredictor(cog.Predictor):
+class BasePixrayPredictor(BasePredictor):
     def setup(self):
         print("---> BasePixrayPredictor Setup")
         os.environ['TORCH_HOME'] = 'models/'
 
-    # Define the input types for a prediction
-    @cog.input("settings", type=str, help="Default settings to use")
-    @cog.input("prompts", type=str, help="Text Prompts")
-    def predict(self, settings, **kwargs):
+    def predict(self, 
+        settings: str = Input(description="Default settings to use"),
+        prompts: str = Input(description="Text prompts", default=None),
+    **kwargs) -> Iterator[Path]:
         # workaround for import issue when deploying
         import pixray
         """Run a single prediction on the model"""
@@ -48,42 +48,51 @@ class BasePixrayPredictor(cog.Predictor):
             run_complete = pixray.do_run(settings, return_display=True)
             output_file = os.path.join(settings.outdir, settings.output)
             temp_copy = create_temporary_copy(output_file)
-            yield pathlib.Path(os.path.realpath(temp_copy))
+            yield Path(os.path.realpath(temp_copy))
 
 class PixrayVqgan(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="text prompt", default="rainbow mountain")
-    @cog.input("quality", type=str, help="better is slower", default="normal", options=["draft", "normal", "better", "best"])
-    @cog.input("aspect", type=str, help="wide vs square", default="widescreen", options=["widescreen", "square"])
-    # @cog.input("num_cuts", type=int, default="24", min=4, max=96)
-    # @cog.input("batches", type=int, default="1", min=1, max=32)
-    def predict(self, **kwargs):
+    def predict(self, 
+        prompts: str = Input(description="text prompt", default="rainbow mountain"),
+        quality: str = Input(description="better is slower", default="normal", choices=["draft", "normal", "better", "best"]),
+        aspect: str = Input(description="wide vs square", default="widescreen", choices=["widescreen", "square"]),
+        # num_cuts: int = Input(description="number of cuts", default=24, ge:4, le:96),
+        # batches: int = Input(description="number of batches", default=1, ge:1, le:32),
+        **kwargs
+    ) -> Iterator[Path]:
         yield from super().predict(settings="pixray_vqgan", **kwargs)
 
 class PixrayPixel(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="text prompt", default="Beirut Skyline. #pixelart")
-    @cog.input("aspect", type=str, help="wide vs square", default="widescreen", options=["widescreen", "square"])
-    @cog.input("drawer", type=str, help="render engine", default="pixel", options=["pixel", "vqgan", "line_sketch", "clipdraw"])
-    def predict(self, **kwargs):
+    def predict(self, 
+        prompts: str = Input(description="text promps", default="Beirut Skyline. #pixelart"),
+        aspect: str = Input(description="wide vs square", default="widescreen", choices=["widescreen", "square"]),
+        drawer: str = Input(description="render enging", default="pixel", choices=["pixel", "vqgan", "line_sketch", "clipdraw"]),
+        **kwargs
+    ) -> Iterator[Path]:
         yield from super().predict(settings="pixray_pixel", **kwargs)
 
 class Text2Image(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="description of what to draw", default="Robots skydiving high above the city")
-    @cog.input("quality", type=str, help="speed vs quality", default="normal", options=["draft", "normal", "better", "best"])
-    @cog.input("aspect", type=str, help="wide or narrow", default="widescreen", options=["widescreen", "square", "portrait"])
-    def predict(self, **kwargs):
+    def predict(self, 
+        prompts: str = Input(description="description of what to draw", default="Robots skydiving high above the city"),
+        quality: str = Input(description="speed vs quality", default="normal", choices=["draft", "normal", "better", "best"]),
+        aspect: str = Input(description="wide or narrow", default="widescreen", choices=["widescreen", "square", "portrait"]),
+        **kwargs
+    ) -> Iterator[Path]:
         yield from super().predict(settings="text2image", **kwargs)
 
 class Text2Pixel(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #pixelart")
-    @cog.input("aspect", type=str, help="wide or narrow", default="widescreen", options=["widescreen", "square", "portrait"])
-    @cog.input("pixel_scale", type=float, help="bigger pixels", default=1.0, min=0.5, max=2.0)
-    def predict(self, **kwargs):
+    def predict(self, 
+        prompts: str = Input(description="text prompt", default="Manhattan skyline at sunset. #pixelart"),
+        aspect: str = Input(description="wide or narrow", default="widescreen", choices=["widescreen", "square", "portrait"]),
+        pixel_scale: float = Input(description="bigger pixels", default=1.0, ge=0.5, le=2.0),
+        **kwargs
+    ) -> Iterator[Path]:
         yield from super().predict(settings="text2pixel", **kwargs)
 
 class PixrayRaw(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #pixelart")
-    @cog.input("settings", type=str, help="yaml settings", default='\n')
-    def predict(self, prompts, settings):
+    def predict(self, 
+        prompts: str = Input(description="text prompt", default="Manhattan skyline at sunset. #pixelart"),
+        settings: str = Input(description="yaml settings", default="\n")
+    ) -> Iterator[Path]:
         ydict = yaml.safe_load(settings)
         if ydict == None:
             # no settings
@@ -91,8 +100,9 @@ class PixrayRaw(BasePixrayPredictor):
         yield from super().predict(settings="pixrayraw", prompts=prompts, **ydict)
 
 class PixrayApi(BasePixrayPredictor):
-    @cog.input("settings", type=str, help="yaml settings", default='\n')
-    def predict(self, settings):
+    def predict(self, 
+        settings: str = Input(description="yaml settings", default="\n")
+    ) -> Iterator[Path]:
         ydict = yaml.safe_load(settings)
         if ydict == None:
             # no settings
@@ -100,11 +110,12 @@ class PixrayApi(BasePixrayPredictor):
         yield from super().predict(settings="pixrayapi", **ydict)
 
 class Tiler(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="text prompt", default="Beautiful marble texture")
-    @cog.input("pixelart", type=bool, help="pixelart style?", default=False)
-    @cog.input("mirror", type=bool, help="shifted pattern?", default=False)
-    @cog.input("settings", type=str, help="yaml settings", default='\n')
-    def predict(self, prompts, pixelart, mirror, settings):
+    def predict(self, 
+        prompts: str = Input(description="text prompt", default=""),
+        pixelart: bool = Input(description="pixelart style?", default=False),
+        mirror: bool = Input(description="shifted pattern?", default=False),
+        settings: str = Input(description="yaml settings", default="\n")
+    ) -> Iterator[Path]:
         ydict = yaml.safe_load(settings)
         if ydict == None:
             # no settings
@@ -123,12 +134,12 @@ class Tiler(BasePixrayPredictor):
             yield from super().predict(prompts=prompts, settings=settings, **ydict)    
 
 class PixrayVdiff(BasePixrayPredictor):
-    @cog.input("prompts", type=str, help="text prompt", default="Manhattan skyline at sunset. #artstation 🌇")
-    @cog.input("settings", type=str, help="extra settings in `name: value` format. reference: https://dazhizhong.gitbook.io/pixray-docs/docs/primary-settings", default='\n')
-    def predict(self, prompts, settings):
+    def predict(self, 
+        prompts: str = Input(description="text prompt", default="Manhattan skyline at sunset. #artstation 🌇"),
+        settings: str = Input(description="extra settings in `name: value` format. reference: https://dazhizhong.gitbook.io/pixray-docs/docs/primary-settings", default='\n')
+    ) -> Iterator[Path]:
         ydict = yaml.safe_load(settings)
         if ydict == None:
             # no settings
             ydict = {}
         yield from super().predict(settings="pixray_vdiff", prompts=prompts, **ydict)
-
