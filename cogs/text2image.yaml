@@ -1,2 +1,2 @@
 display_every: 10
-output: outputs/text2image.png
+outdir: outputs/text2image
