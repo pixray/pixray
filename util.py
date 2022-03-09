@@ -46,6 +46,29 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+def parse_unit(value, total_iterations, argument_name, default_unit="%"):
+    if value is None:
+        return None
+
+    value = str(value).lower().strip()
+
+    digits = re.search("^\d+", value)
+    
+    if re.match("^\d+$", value):
+        value += default_unit
+    
+    if re.match("^\d+[\s]*(i|iter|iterations)$", value):
+        return int(digits.group(0))
+    elif re.match("^\d+[\s]*(p|%|percent)$", value):
+        return int(digits.group(0)) * 0.01 * total_iterations
+
+    raise ValueError(f"Invalid value for {argument_name}, please use a digit-unit combination like '20 iterations' or '50%'.")
+
+def split_pipes(attribute):
+    if not attribute:
+        return attribute
+
+    return [phrase.strip() for phrase in attribute.split("|")]
 
 ####### PALETTE SECTION ##########
 

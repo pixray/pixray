@@ -30,7 +30,7 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 
 from torch_optimizer import DiffGrad, AdamP
 from perlin_numpy import generate_fractal_noise_2d
-from util import str2bool, get_file_path, emit_filename
+from util import str2bool, get_file_path, emit_filename, split_pipes, parse_unit
 
 from slip import get_clip_perceptor
 
@@ -1696,9 +1696,9 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-se",   "--save_every", type=int, help="Save image iterations", default=10, dest='save_every')
     vq_parser.add_argument("-de",   "--display_every", type=int, help="Display image iterations", default=20, dest='display_every')
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
-    vq_parser.add_argument("-ove",  "--overlay_every", type=int, help="Overlay image iterations", default=10, dest='overlay_every')
-    vq_parser.add_argument("-ovo",  "--overlay_offset", type=int, help="Overlay image iteration offset", default=0, dest='overlay_offset')
-    vq_parser.add_argument("-ovu",  "--overlay_until", type=int, help="Last iteration to continue applying overlay image", default=None, dest='overlay_until')
+    vq_parser.add_argument("-ove",  "--overlay_every", type=str, help="Overlay image iterations", default="10 iterations", dest='overlay_every')
+    vq_parser.add_argument("-ovo",  "--overlay_offset", type=str, help="Overlay image iteration offset", default="0 iterations", dest='overlay_offset')
+    vq_parser.add_argument("-ovu",  "--overlay_until", type=str, help="Last iteration to continue applying overlay image", default=None, dest='overlay_until')
     vq_parser.add_argument("-ovi",  "--overlay_image", type=str, help="Overlay image (if not init)", default=None, dest='overlay_image')
     vq_parser.add_argument(         "--quality", type=str, help="draft, normal, better, best", default="normal", dest='quality')
     vq_parser.add_argument("-asp",  "--aspect", type=str, help="widescreen, square", default="widescreen", dest='aspect')
@@ -1888,25 +1888,15 @@ def process_args(vq_parser, namespace=None):
     if args.init_noise.lower() == "none":
         args.init_noise = None
 
-    # Split text prompts using the pipe character
-    if args.prompts:
-        args.prompts = [phrase.strip() for phrase in args.prompts.split("|")]
+    args.prompts = split_pipes(args.prompts)
+    args.target_images = split_pipes(args.target_images)
+    args.spot_prompts = split_pipes(args.spot_prompts)
+    args.spot_prompts_off = split_pipes(args.spot_prompts_off)
+    args.labels = split_pipes(args.labels)
 
-    # Split text prompts using the pipe character
-    if args.target_images:
-        args.target_images = [phrase.strip() for phrase in args.target_images.split("|")]
-
-    # Split text prompts using the pipe character
-    if args.spot_prompts:
-        args.spot_prompts = [phrase.strip() for phrase in args.spot_prompts.split("|")]
-
-    # Split text prompts using the pipe character
-    if args.spot_prompts_off:
-        args.spot_prompts_off = [phrase.strip() for phrase in args.spot_prompts_off.split("|")]
-
-    # Split text labels using the pipe character
-    if args.labels:
-        args.labels = [phrase.strip() for phrase in args.labels.split("|")]
+    args.overlay_offset = parse_unit(args.overlay_offset, args.iterations, "overlay_offset", "i")
+    args.overlay_until = parse_unit(args.overlay_until, args.iterations, "overlay_until", "i")
+    args.overlay_every = parse_unit(args.overlay_every, args.iterations, "overlay_every", "i")
 
     # Split target images using the pipe character
     if args.image_prompts:
