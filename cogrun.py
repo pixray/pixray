@@ -65,19 +65,22 @@ class PixrayPixel(BasePixrayPredictor):
     def predict(self, 
         prompts: str = Input(description="text promps", default="Beirut Skyline. #pixelart"),
         aspect: str = Input(description="wide vs square", default="widescreen", choices=["widescreen", "square"]),
-        drawer: str = Input(description="render enging", default="pixel", choices=["pixel", "vqgan", "line_sketch", "clipdraw"]),
+        drawer: str = Input(description="render engine", default="pixel", choices=["pixel", "vqgan", "line_sketch", "clipdraw"]),
         **kwargs
     ) -> Iterator[Path]:
         yield from super().predict(settings="pixray_pixel", **kwargs)
 
 class Text2Image(BasePixrayPredictor):
     def predict(self, 
-        prompts: str = Input(description="description of what to draw", default="Robots skydiving high above the city"),
-        quality: str = Input(description="speed vs quality", default="normal", choices=["draft", "normal", "better", "best"]),
-        aspect: str = Input(description="wide or narrow", default="widescreen", choices=["widescreen", "square", "portrait"]),
-        **kwargs
+        prompts: str = Input(description="text prompt", default="Cairo skyline at sunset."),
+        drawer: str = Input(description="render engine", default="vqgan", choices=["pixel", "vqgan", "vdiff", "fft", "fast_pixel", "line_sketch", "clipdraw"]),
+        settings: str = Input(description="extra settings in `name: value` format. reference: https://dazhizhong.gitbook.io/pixray-docs/docs/primary-settings", default='\n')
     ) -> Iterator[Path]:
-        yield from super().predict(settings="text2image", **kwargs)
+        ydict = yaml.safe_load(settings)
+        if ydict == None:
+            # no settings
+            ydict = {}
+        yield from super().predict(settings="text2image", prompts=prompts, drawer=drawer, **ydict)
 
 class Text2Pixel(BasePixrayPredictor):
     def predict(self, 
