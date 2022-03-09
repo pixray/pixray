@@ -77,6 +77,13 @@ class_table = {
 }
 
 try:
+    from fast_pixeldrawer import FastPixelDrawer
+    class_table.update({"fast_pixel": FastPixelDrawer})
+except ImportError as e:
+    print("--> FastPixelDrawer not supported", e)
+    pass
+
+try:
     from super_resolution import SuperResolutionDrawer
     class_table.update({"super_resolution": SuperResolutionDrawer})
 except ImportError as e:
