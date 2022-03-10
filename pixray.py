@@ -1397,10 +1397,11 @@ def ascend_txt(args):
                 weighted_losses = [(lossweight * l) for l in new_losses]
                 result += weighted_losses
 
-    if args.make_video:    
+    if args.make_video:
+        video_folder = os.path.join(args.outdir, "video")
         img = np.array(out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8))[:,:,:]
         img = np.transpose(img, (1, 2, 0))
-        imageio.imwrite(f'./steps/frame_{cur_iteration:04d}.png', np.array(img))
+        imageio.imwrite(f'{video_folder}/frame_{cur_iteration:04d}.png', np.array(img))
 
     return result
 
@@ -1631,9 +1632,13 @@ def do_run(args, return_display=False):
     if args.make_video:
         do_video(args)
 
+    if args.save_intermediates:
+        step_to_video(args)
+
     return True
 
-def step_to_video(step_folder):
+def step_to_video(args):
+    step_folder = os.path.join(args.outdir, "steps")
     output_file = os.path.join(step_folder, "output.mp4")
     les_frame_path = sorted(glob.glob(os.path.join(step_folder, "frame_*.png")))
 
@@ -1645,7 +1650,7 @@ def step_to_video(step_folder):
     max_fps = 60
     total_frames = len(les_frame)
     length = 14
-    fps = np.clip(total_frames/length,min_fps,max_fps)
+    fps = int(np.clip(total_frames/length,min_fps,max_fps))
     from subprocess import Popen, PIPE
     p = Popen(['ffmpeg',
                '-y',
@@ -1667,6 +1672,7 @@ def step_to_video(step_folder):
 
 def do_video(args):
     global cur_iteration
+    video_folder = os.path.join(args.outdir, "video")
 
     # Video generation
     init_frame = 1 # This is the frame where the video will start
@@ -1682,10 +1688,10 @@ def do_video(args):
     frames = []
     tqdm.write('Generating video...')
     for i in range(init_frame,last_frame): #
-        frames.append(Image.open(f'./steps/frame_{i:04d}.png'))
+        frames.append(Image.open(f'{video_folder}/frame_{i:04d}.png'))
 
     #fps = last_frame/10
-    fps = np.clip(total_frames/length,min_fps,max_fps)
+    fps = int(np.clip(total_frames/length,min_fps,max_fps))
 
     from subprocess import Popen, PIPE
     output_file = get_file_path(args.outdir, args.output, '.mp4')
@@ -1731,7 +1737,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-ilw",  "--image_label_weight", type=float, help="Weight for image prompt", default=1.0, dest='image_label_weight')
     vq_parser.add_argument("-i",    "--iterations", type=int, help="Number of iterations", default=None, dest='iterations')
     vq_parser.add_argument("-se",   "--save_every", type=int, help="Save image iterations", default=10, dest='save_every')
-    vq_parser.add_argument("-si",   "--save_intermediates", action="store_true", help="Save image iterations as intermediate files", dest='save_intermediates')
+    vq_parser.add_argument("-si",   "--save_intermediates", type=str2bool, help="Save image iterations as intermediate files", default=True, dest='save_intermediates')
     vq_parser.add_argument("-de",   "--display_every", type=int, help="Display image iterations", default=20, dest='display_every')
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=str, help="Overlay image iterations", default="10 iterations", dest='overlay_every')
@@ -1963,8 +1969,9 @@ def process_args(vq_parser, namespace=None):
 
     # Make video steps directory
     if args.make_video:
-        if not os.path.exists('steps'):
-            os.mkdir('steps')
+        video_folder = os.path.join(args.outdir, "video")
+        if not os.path.exists(video_folder):
+            os.mkdir(video_folder)
 
     if args.learning_rate_drops is None:
         args.learning_rate_drops = []
