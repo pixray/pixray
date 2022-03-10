@@ -1210,11 +1210,11 @@ def do_synth_and_filter(args, cur_iteration, loss_list, to_file=False):
             filtweight = f["weight"]
             out, new_losses = filtclass(out);
             if type(new_losses) is not list and type(new_losses) is not tuple:
-                result.append(filtweight * new_losses)
+                loss_list.append(filtweight * new_losses)
             else:
                 # warning: this path might be untested by current losses?
                 weighted_losses = [(filtweight * l) for l in new_losses]
-                result += weighted_losses
+                loss_list += weighted_losses
 
 
     alpha = None
