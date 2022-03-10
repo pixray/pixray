@@ -22,7 +22,6 @@ class BasePixrayPredictor(BasePredictor):
 
     def predict(self, 
         settings: str = Input(description="Default settings to use"),
-        prompts: str = Input(description="Text prompts", default=None),
     **kwargs) -> Iterator[Path]:
         # workaround for import issue when deploying
         import pixray

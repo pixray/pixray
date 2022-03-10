@@ -876,7 +876,7 @@ def do_init(args):
                 allweights.append(weight)
             pMs.append(Prompt(embed, weight, stop).to(device))
 
-    if drawer_clip_target is not None:
+    if drawer_clip_target is not None and len(allpromptembeds) > 0:
         if args.drawer=="vdiff" and args.vdiff_model[:7] == "cc12m_1":
             target_embeds = torch.cat(allpromptembeds)
             allweights = torch.tensor(allweights, dtype=torch.float, device=device)
