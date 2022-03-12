@@ -600,7 +600,7 @@ def do_init(args):
 
     # set device only once
     if device is None:
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        device = torch.device(args.cuda_device if torch.cuda.is_available() else 'cpu')
 
     drawer = class_table[args.drawer](args)
     drawer.load_model(args, device)
@@ -1700,6 +1700,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
     vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
     vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
+    vq_parser.add_argument("-cud",  "--cuda_device", type=str, help="The Cuda device you want to use. (Typically 'cuda:0','cuda:1','cuda:2', etc...)", default='cuda:0', dest='cuda_device')
     vq_parser.add_argument("--palette", type=str, help="target palette", default=None, dest='palette')
     vq_parser.add_argument("--transparent", type=str2bool, help="enable transparency", default=False, dest='transparency')
     vq_parser.add_argument("--alpha_weight", type=float, help="strenght of alpha loss", default=1., dest='alpha_weight')
