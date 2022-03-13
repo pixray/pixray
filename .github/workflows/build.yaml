@@ -7,15 +7,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out Pixray code
-      - uses: actions/checkout@v3
-      - with:
+        uses: actions/checkout@v3
+        with:
           submodules: 'recursive'
 
       - name: Set up Python
-      - uses: actions/setup-python@v2
-      - with:
+        uses: actions/setup-python@v2
+        with:
           python-version: '3.10'
           cache: 'pip'
 
       - name: Install dependencies
-      - run: pip install -r requirements.txt
+        run: pip install -r requirements.txt
