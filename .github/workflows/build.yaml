@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out Pixray code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           submodules: 'recursive'
 
