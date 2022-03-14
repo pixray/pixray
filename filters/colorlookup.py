@@ -50,21 +50,37 @@ class ColorLookup(FilterInterface):
     # https://discuss.pytorch.org/t/how-to-find-k-nearest-neighbor-of-a-tensor/51593
     def forward(self, z):
         B, C, H, W = z.size()
+        # print("z coming in is ", z.size())
+
+        do_alpha = False
+        if C == 4:
+            alpha = z[:,3,:,:]
+            z3 = z[:,0:3,:,:]
+            do_alpha = True
+        else:
+            z3 = z
 
         # project and flatten out space, so (B, C, H, W) -> (B*H*W, C)
         # reshape z -> (batch, height, width, channel) and flatten
-        z = rearrange(z, 'b c h w -> b h w c').contiguous()
+        z3 = rearrange(z3, 'b c h w -> b h w c').contiguous()
 
-        ind = torch.cdist(z, self.color_table).argmin(axis=-1)
-        z_q = torch.index_select(self.color_table, 0, ind.flatten()).view(z.shape)
+        ind = torch.cdist(z3, self.color_table).argmin(axis=-1)
+        z_q = torch.index_select(self.color_table, 0, ind.flatten()).view(z3.shape)
 
-        loss = self.beta * torch.mean((z_q.detach()-z)**2) + \
-               torch.mean((z_q - z.detach()) ** 2)
+        loss = self.beta * torch.mean((z_q.detach()-z3)**2) + \
+               torch.mean((z_q - z3.detach()) ** 2)
 
         # preserve gradients
-        z_q = z + (z_q - z).detach()
+        z_q = z3 + (z_q - z3).detach()
 
         # reshape back to match original input shape
         z_q = rearrange(z_q, 'b h w c -> b c h w').contiguous()
-        return z_q, loss
+        if do_alpha:
+            # z_q = torch.stack([z_q, alpha], dim=1)
+            z[:,0:3,:,:] = z_q
+            z[:,3,:,:] = alpha
+            # print("z_q with alpha is now ", z_q.shape)
+        else:
+            z = z_q
+        return z, loss
 
