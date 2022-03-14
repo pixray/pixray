@@ -1182,6 +1182,11 @@ def checkin(args, iter, losses):
     else:
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
+    if args.save_intermediates:
+        step_path = os.path.join(args.outdir, "steps")
+        if not os.path.isdir(step_path):
+            os.makedirs(step_path)
+        imageio.imwrite(get_file_path(step_path, f'frame_{cur_iteration:04d}', '.png'), np.array(img))
     if cur_anim_index == len(anim_output_files) - 1:
         # save gif
         gif_output = make_gif(args, iter)
@@ -1628,6 +1633,38 @@ def do_run(args, return_display=False):
 
     return True
 
+def step_to_video(step_folder):
+    output_file = os.path.join(step_folder, "output.mp4")
+    frames_path = sorted(glob.glob(os.path.join(step_folder, "frame_*.png")))
+
+    frames = []
+    for frame_path in frames_path:
+        frames.append(Image.open(frame_path))
+    
+    min_fps = 10
+    max_fps = 60
+    total_frames = len(frame_path)
+    length = 15
+    fps = np.clip(total_frames/length,min_fps,max_fps)
+    from subprocess import Popen, PIPE
+    p = Popen(['ffmpeg',
+               '-y',
+               '-f', 'image2pipe',
+               '-vcodec', 'png',
+               '-r', str(fps),
+               '-i',
+               '-',
+               '-vcodec', 'libx264',
+               '-r', str(fps),
+               '-pix_fmt', 'yuv420p',
+               '-crf', '17',
+               '-preset', 'veryslow',
+               output_file], stdin=PIPE)
+    for im in tqdm(frames):
+        im.save(p.stdin, 'PNG')
+    p.stdin.close()
+    p.wait()
+
 def do_video(args):
     global cur_iteration
 
@@ -1694,6 +1731,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-ilw",  "--image_label_weight", type=float, help="Weight for image prompt", default=1.0, dest='image_label_weight')
     vq_parser.add_argument("-i",    "--iterations", type=int, help="Number of iterations", default=None, dest='iterations')
     vq_parser.add_argument("-se",   "--save_every", type=int, help="Save image iterations", default=10, dest='save_every')
+    vq_parser.add_argument("-si",   "--save_intermediates", action="store_true", help="Save image iterations as intermediate files", dest='save_intermediates')
     vq_parser.add_argument("-de",   "--display_every", type=int, help="Display image iterations", default=20, dest='display_every')
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=str, help="Overlay image iterations", default="10 iterations", dest='overlay_every')
