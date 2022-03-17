@@ -1,2 +1,3 @@
 display_every: 10
 outdir: outputs/text2image
+save_intermediates: False
