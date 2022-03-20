@@ -1765,7 +1765,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-nps",  "--noise_prompt_seeds", nargs="*", type=int, help="Noise prompt seeds", default=[], dest='noise_prompt_seeds')
     vq_parser.add_argument("-npw",  "--noise_prompt_weights", nargs="*", type=float, help="Noise prompt weights", default=[], dest='noise_prompt_weights')
     vq_parser.add_argument("-lr",   "--learning_rate", type=float, help="Learning rate", default=0.2, dest='learning_rate')
-    vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=float, help="When to drop learning rate (relative to iterations)", default=[75], dest='learning_rate_drops')
+    vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=str, help="When to drop learning rate (relative to iterations)", default=[75], dest='learning_rate_drops')
     vq_parser.add_argument("-as",   "--auto_stop", type=str2bool, help="Auto stopping", default=False, dest='auto_stop')
     vq_parser.add_argument("-cuts", "--num_cuts", type=int, help="Number of cuts", default=None, dest='num_cuts')
     vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=None, dest='batches')
@@ -1976,10 +1976,7 @@ def process_args(vq_parser, namespace=None):
         if not os.path.exists(video_folder):
             os.mkdir(video_folder)
 
-    if args.learning_rate_drops is None:
-        args.learning_rate_drops = []
-    else:
-        args.learning_rate_drops = [int(map_number(n, 0, 100, 0, args.iterations-1)) for n in args.learning_rate_drops]
+    args.learning_rate_drops = get_learning_rate_drops(args.learning_rate_drops, args.iterations);
 
     # reset global animation variables
     cur_iteration=0
@@ -1998,6 +1995,12 @@ def process_args(vq_parser, namespace=None):
     global_spot_file = args.spot_file
 
     return args
+
+def get_learning_rate_drops(learning_rate_drops, iterations):
+    if learning_rate_drops is None:
+        return []
+    
+    return [parse_unit(n, iterations-1, "learning_rate_drops") for n in learning_rate_drops]
 
 def reset_settings():
     global global_pixray_settings

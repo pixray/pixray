@@ -58,6 +58,15 @@ class TestUtilMethods(unittest.TestCase):
         
     def test_parse_unit_plain_integer(self):
         self.assertEqual(parse_unit(50, 500, 'overlay_until', 'i'), 50)
+    
+    def test_parse_unit_leading_decimal_iterations(self):
+        self.assertEqual(parse_unit(.6, 500, 'overlay_until', 'i'), 0)
+    
+    def test_parse_unit_leading_decimal_percent(self):
+        self.assertEqual(parse_unit(.5, 500, 'overlay_until', 'p'), 2)
+
+    def test_parse_unit_trailing_decimal_invalid(self):
+        self.assertRaises(ValueError, parse_unit, '67.i', 500, 'overlay_until')
     #endregion parse_unit
 
     #region split_pipes
