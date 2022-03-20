@@ -66,7 +66,7 @@ global_padding_mode = 'reflection'
 global_aspect_width = 1
 global_spot_file = None
 
-from util import map_number, palette_from_string, real_glob
+from util import palette_from_string, real_glob
 
 from vqgan import VqganDrawer
 from vdiff import VdiffDrawer
