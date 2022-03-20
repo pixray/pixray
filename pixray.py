@@ -1943,6 +1943,9 @@ def process_args(vq_parser, namespace=None):
     args.overlay_until = parse_unit(args.overlay_until, args.iterations, "overlay_until", "i")
     args.overlay_every = parse_unit(args.overlay_every, args.iterations, "overlay_every", "i")
 
+    args.display_every = parse_unit(args.display_every, args.iterations, "display_every", "i")
+    args.save_every = parse_unit(args.save_every, args.iterations, "save_every", "i")
+
     # Split target images using the pipe character
     if args.image_prompts:
         args.image_prompts = real_glob(args.image_prompts)
