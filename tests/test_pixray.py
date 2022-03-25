@@ -30,6 +30,7 @@ class TestPixrayMethods(unittest.TestCase):
         args.overlay_every = parse_unit(args.overlay_every, args.iterations, "overlay_every")
         return args
 
+    #region apply_overlay
     def test_apply_overlay_all_true(self):
         args = self.get_args_for_apply_overlay_test('image.png', '1i', '0i', '100i')
         self.assertEqual(apply_overlay(args, 10), True)
@@ -49,6 +50,19 @@ class TestPixrayMethods(unittest.TestCase):
     def test_apply_overlay_less_than_overlay_until(self):
         args = self.get_args_for_apply_overlay_test('image.png', '1i', '0i', '5i')
         self.assertEqual(apply_overlay(args, 10), False)
+    #endregion apply_overlay
+
+    #region get_learning_rate_drops
+    def test_get_learning_rate_drops_empty(self):
+        self.assertEqual(get_learning_rate_drops(None, 300), [])
+
+    def test_get_learning_rate_drops_single(self):
+        self.assertEqual(get_learning_rate_drops([75], 300), [224])
+
+    def test_get_learning_rate_drops_multi(self):
+        self.assertEqual(get_learning_rate_drops([50, 22.5], 300), [149, 67])
+    #endregion get_learning_rate_drops
+
 
 if __name__ == '__main__':
     unittest.main()

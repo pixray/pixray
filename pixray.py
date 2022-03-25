@@ -66,7 +66,7 @@ global_padding_mode = 'reflection'
 global_aspect_width = 1
 global_spot_file = None
 
-from util import map_number, palette_from_string, real_glob
+from util import palette_from_string, real_glob
 
 from vqgan import VqganDrawer
 from vdiff import VdiffDrawer
@@ -1736,9 +1736,9 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-il",   "--image_labels", type=str, help="Image prompts", default=None, dest='image_labels')
     vq_parser.add_argument("-ilw",  "--image_label_weight", type=float, help="Weight for image prompt", default=1.0, dest='image_label_weight')
     vq_parser.add_argument("-i",    "--iterations", type=int, help="Number of iterations", default=None, dest='iterations')
-    vq_parser.add_argument("-se",   "--save_every", type=int, help="Save image iterations", default=10, dest='save_every')
+    vq_parser.add_argument("-se",   "--save_every", type=str, help="Save image iterations", default=10, dest='save_every')
     vq_parser.add_argument("-si",   "--save_intermediates", type=str2bool, help="Save image iterations as intermediate files", default=True, dest='save_intermediates')
-    vq_parser.add_argument("-de",   "--display_every", type=int, help="Display image iterations", default=20, dest='display_every')
+    vq_parser.add_argument("-de",   "--display_every", type=str, help="Display image iterations", default=20, dest='display_every')
     vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
     vq_parser.add_argument("-ove",  "--overlay_every", type=str, help="Overlay image iterations", default="10 iterations", dest='overlay_every')
     vq_parser.add_argument("-ovo",  "--overlay_offset", type=str, help="Overlay image iteration offset", default="0 iterations", dest='overlay_offset')
@@ -1765,7 +1765,7 @@ def setup_parser(vq_parser):
     vq_parser.add_argument("-nps",  "--noise_prompt_seeds", nargs="*", type=int, help="Noise prompt seeds", default=[], dest='noise_prompt_seeds')
     vq_parser.add_argument("-npw",  "--noise_prompt_weights", nargs="*", type=float, help="Noise prompt weights", default=[], dest='noise_prompt_weights')
     vq_parser.add_argument("-lr",   "--learning_rate", type=float, help="Learning rate", default=0.2, dest='learning_rate')
-    vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=float, help="When to drop learning rate (relative to iterations)", default=[75], dest='learning_rate_drops')
+    vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=str, help="When to drop learning rate (relative to iterations)", default=[75], dest='learning_rate_drops')
     vq_parser.add_argument("-as",   "--auto_stop", type=str2bool, help="Auto stopping", default=False, dest='auto_stop')
     vq_parser.add_argument("-cuts", "--num_cuts", type=int, help="Number of cuts", default=None, dest='num_cuts')
     vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=None, dest='batches')
@@ -1943,6 +1943,9 @@ def process_args(vq_parser, namespace=None):
     args.overlay_until = parse_unit(args.overlay_until, args.iterations, "overlay_until", "i")
     args.overlay_every = parse_unit(args.overlay_every, args.iterations, "overlay_every", "i")
 
+    args.display_every = parse_unit(args.display_every, args.iterations, "display_every", "i")
+    args.save_every = parse_unit(args.save_every, args.iterations, "save_every", "i")
+
     # Split target images using the pipe character
     if args.image_prompts:
         args.image_prompts = real_glob(args.image_prompts)
@@ -1973,10 +1976,7 @@ def process_args(vq_parser, namespace=None):
         if not os.path.exists(video_folder):
             os.mkdir(video_folder)
 
-    if args.learning_rate_drops is None:
-        args.learning_rate_drops = []
-    else:
-        args.learning_rate_drops = [int(map_number(n, 0, 100, 0, args.iterations-1)) for n in args.learning_rate_drops]
+    args.learning_rate_drops = get_learning_rate_drops(args.learning_rate_drops, args.iterations);
 
     # reset global animation variables
     cur_iteration=0
@@ -1995,6 +1995,12 @@ def process_args(vq_parser, namespace=None):
     global_spot_file = args.spot_file
 
     return args
+
+def get_learning_rate_drops(learning_rate_drops, iterations):
+    if learning_rate_drops is None:
+        return []
+    
+    return [parse_unit(n, iterations-1, "learning_rate_drops") for n in learning_rate_drops]
 
 def reset_settings():
     global global_pixray_settings
