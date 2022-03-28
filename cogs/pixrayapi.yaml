@@ -1,1 +1,2 @@
 outdir: outputs/api
+save_intermediates: False
