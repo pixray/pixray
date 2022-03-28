@@ -6,6 +6,8 @@ import pathlib
 import os
 import yaml
 
+from util import get_single_rgb
+
 # https://stackoverflow.com/a/6587648/1010653
 import tempfile, shutil
 def create_temporary_copy(src_path):
@@ -145,3 +147,13 @@ class PixrayVdiff(BasePixrayPredictor):
             # no settings
             ydict = {}
         yield from super().predict(settings="pixray_vdiff", prompts=prompts, **ydict)
+
+class EightBidG(BasePixrayPredictor):
+    def predict(self, 
+        prompts: str = Input(description="text prompt", default=""),
+        border: str = Input(description="border color", default="white", choices=["white", "black", "grey", "none"]),
+    ) -> Iterator[Path]:
+        if border == "none":
+            yield from super().predict(prompts=prompts, settings="8bidg", custom_loss="smoothness:0.25")
+        else:
+            yield from super().predict(prompts=prompts, settings="8bidg", custom_loss="edge,smoothness:0.25", edge_thickness=2, edge_color=get_single_rgb(border))
