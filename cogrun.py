@@ -151,9 +151,16 @@ class PixrayVdiff(BasePixrayPredictor):
 class EightBidG(BasePixrayPredictor):
     def predict(self, 
         prompts: str = Input(description="text prompt", default=""),
-        border: str = Input(description="border color", default="white", choices=["white", "black", "grey", "none"]),
+        palette: str = Input(description="colors to use", default="full color", choices=["full color", "web safe", "grayscale"]),
+        border: str = Input(description="border color", default="none", choices=["white", "black", "grey", "none"]),
     ) -> Iterator[Path]:
+        ydict = {}
         if border == "none":
-            yield from super().predict(prompts=prompts, settings="8bidg", custom_loss="smoothness:0.25")
+            ydict.update({"custom_loss":"smoothness:0.25"})
         else:
-            yield from super().predict(prompts=prompts, settings="8bidg", custom_loss="edge,smoothness:0.25", edge_thickness=2, edge_color=get_single_rgb(border))
+            ydict.update({"custom_loss":"edge,smoothness:0.25", "edge_thickness":2, "edge_color":get_single_rgb(border)})
+        if palette == "grayscale":
+            ydict.update({"filters":"lookup", "palette":'black->white\\256'})
+        elif palette == "web safe":
+            ydict.update({"filters":"lookup", "palette":'https://www.pagetutor.com/common/net216pics/net216.gif'})
+        yield from super().predict(prompts=prompts, settings="8bidg", **ydict)

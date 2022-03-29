@@ -192,7 +192,7 @@ def palette_from_section(s):
             num_steps = None
 
         # pull from a file or URL
-        if s.endswith(".png") or s.endswith(".jpg"):
+        if s.endswith(".png") or s.endswith(".jpg") or s.endswith(".gif"):
             if 'http' in s:
                 opener = AppURLopener()
                 obj = opener.open(s)
