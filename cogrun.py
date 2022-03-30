@@ -160,7 +160,7 @@ class EightBidG(BasePixrayPredictor):
         else:
             ydict.update({"custom_loss":"edge,smoothness:0.25", "edge_thickness":2, "edge_color":get_single_rgb(border)})
         if palette == "grayscale":
-            ydict.update({"filters":"lookup", "palette":'black->white\\256'})
+            ydict.update({"filters":"lookup", "palette":'black->white\256'})
         elif palette == "web safe":
             ydict.update({"filters":"lookup", "palette":'https://www.pagetutor.com/common/net216pics/net216.gif'})
         yield from super().predict(prompts=prompts, settings="8bidg", **ydict)
