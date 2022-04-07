@@ -34,7 +34,7 @@ from util import str2bool, get_file_path, emit_filename, split_pipes, parse_unit
 
 from slip import get_clip_perceptor
 
-from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
+from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize, InterpolationMode
 
 # installed by doing `pip install git+https://github.com/openai/CLIP`
 from clip import clip
@@ -777,7 +777,7 @@ def do_init(args):
                 input_resolution = perceptor.input_resolution
                 # print(f"Running {clip_model} at {input_resolution}")
                 preprocess = Compose([
-                    Resize(input_resolution, interpolation=Image.BICUBIC),
+                    Resize(input_resolution, interpolation=InterpolationMode.BICUBIC),
                     CenterCrop(input_resolution),
                     ToTensor()
                 ])
@@ -802,7 +802,7 @@ def do_init(args):
                 input_resolution = perceptor.input_resolution
                 # print(f"Running {clip_model} at {input_resolution}")
                 preprocess = Compose([
-                    Resize(input_resolution, interpolation=Image.BICUBIC),
+                    Resize(input_resolution, interpolation=InterpolationMode.BICUBIC),
                     CenterCrop(input_resolution),
                     ToTensor()
                 ])
