@@ -171,7 +171,7 @@ class SLIP_Base():
         
 
 def get_clip_perceptor(clip_model_name, device):
-    if clip_model_name in ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']:
+    if clip_model_name in clip.available_models():
         perceptor, preprocess = clip.load(clip_model_name, download_root="models")
         perceptor = perceptor.requires_grad_(False).eval().to(device)
 
