@@ -11,12 +11,12 @@ build:
 # image: "r8.im/pixray/api"
 # predict: "cogrun.py:PixrayApi"
 
-# image: "r8.im/pixray/text2image"
+image: "r8.im/pixray/text2image"
 # image: "r8.im/pixray/text2image-future"
-# predict: "cogrun.py:Text2Image"
+predict: "cogrun.py:Text2Image"
 
-image: "r8.im/dribnet/8bidoug"
-predict: "cogrun.py:EightBidG"
+# image: "r8.im/dribnet/8bidoug"
+# predict: "cogrun.py:EightBidG"
 
 # image: "r8.im/dribnet/pixray-text2pixel"
 # predict: "cogrun.py:Text2Pixel"
