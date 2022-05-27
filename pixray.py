@@ -4,25 +4,20 @@ import math
 import logging
 
 from urllib.request import urlopen
-import sys
 import os
 import subprocess
 import json
 import yaml
 import glob
-from braceexpand import braceexpand
 from types import SimpleNamespace
 
 import os.path
 
-from omegaconf import OmegaConf
 import hashlib
 
-import time
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
-from torchvision import transforms
 from torchvision.transforms import functional as TF
 from torchvision.utils import save_image
 torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead to OOM. False is more deterministic.
@@ -34,7 +29,7 @@ from util import str2bool, get_file_path, emit_filename, split_pipes, parse_unit
 
 from slip import get_clip_perceptor
 
-from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize, InterpolationMode
+from torchvision.transforms import CenterCrop, Compose, InterpolationMode, Resize, ToTensor
 
 # installed by doing `pip install git+https://github.com/openai/CLIP`
 from clip import clip
@@ -43,10 +38,8 @@ import kornia
 import kornia.augmentation as K
 import numpy as np
 import imageio
-import re
 import random
 
-from einops import rearrange
 
 from filters.colorlookup import ColorLookup
 from filters.wallpaper import WallpaperFilter
@@ -81,14 +74,12 @@ try:
     class_table.update({"fast_pixel": FastPixelDrawer})
 except ImportError as e:
     print("--> FastPixelDrawer not supported", e)
-    pass
 
 try:
     from super_resolution import SuperResolutionDrawer
     class_table.update({"super_resolution": SuperResolutionDrawer})
 except ImportError as e:
     print("--> Super resolution drawer not supported", e)
-    pass
 
 try:
     from fftdrawer import FftDrawer
@@ -96,7 +87,6 @@ try:
     class_table.update({"fft": FftDrawer})
 except ImportError as e:
     print("--> Not running with fft support", e)
-    pass
 
 try:
     from clipdrawer import ClipDrawer
@@ -110,10 +100,9 @@ try:
     })
 except ImportError as e:
     print("--> Not running with pydiffvg drawer support ", e)
-    pass
 
 try:
-    import matplotlib.colors
+    pass
 except ImportError:
     # only needed for palette stuff
     pass
@@ -320,7 +309,7 @@ def parse_prompt(prompt):
     # print(f"parsed vals is {textPrompt}, {weight}, {stop}")
     return textPrompt, weight, stop
 
-from typing import cast, Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, cast
 
 # override class to get padding_mode
 class MyRandomPerspective(K.RandomPerspective):

@@ -1,16 +1,14 @@
 import torch
-from torch import nn, optim
+from torch import nn
 from Losses.LossInterface import LossInterface
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 import torchvision.models as models
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as TF
 import numpy as np
-import os
 import math
 import PIL
 from PIL import Image

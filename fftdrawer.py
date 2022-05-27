@@ -4,7 +4,6 @@ from torchvision.utils import save_image
 
 from aphantasia.image import to_valid_rgb, fft_image, dwt_image, pixel_image
 import torch
-from util import str2bool
 
 # canonical interpolation function, like https://p5js.org/reference/#/p5/map
 def map_number(n, start1, stop1, start2, stop2):

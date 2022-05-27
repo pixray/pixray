@@ -2,15 +2,12 @@ import argparse
 import sys
 import json
 import numpy as np
-from sklearn import metrics
 from sklearn import svm
-import os
-from tqdm import tqdm
 from util import real_glob
 
 import torch
 from clip import clip
-from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
+from torchvision.transforms import CenterCrop, Compose, Resize, ToTensor
 from PIL import Image
 
 from slip import get_clip_perceptor, all_slip_models

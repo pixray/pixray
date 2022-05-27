@@ -7,14 +7,7 @@ from DrawingInterface import DrawingInterface
 
 import pydiffvg
 import torch
-import skimage
-import skimage.io
 import random
-import ttools.modules
-import argparse
-import math
-import torchvision
-import torchvision.transforms as transforms
 import numpy as np
 import PIL.Image
 

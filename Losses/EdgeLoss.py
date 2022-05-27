@@ -1,5 +1,5 @@
 import torch
-from torch import nn, optim
+from torch import nn
 
 from util import get_single_rgb
 from PIL import Image

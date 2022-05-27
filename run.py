@@ -1,5 +1,4 @@
 import sys
-import os
 import pixray
 import yaml
 

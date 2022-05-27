@@ -5,19 +5,15 @@ from DrawingInterface import DrawingInterface
 
 import sys
 import os
-import subprocess
 
 # TODO: this is very hacky, must fix this later (submodule dependency)
 VDIFF_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'v-diffusion-pytorch')
 sys.path.append(VDIFF_PATH)
 
 import torch
-from torch.nn import functional as F
 from torchvision.transforms import functional as TF
 import math
 
-from omegaconf import OmegaConf
-from taming.models import cond_transformer, vqgan
 from util import wget_file, map_number
 
 
@@ -33,9 +29,8 @@ model_urls = {
 }
 
 
-from pathlib import Path
 
-from diffusion import get_model, get_models, sampling, utils
+from diffusion import get_model, sampling, utils
 
 class ClampWithGrad(torch.autograd.Function):
     @staticmethod

@@ -4,7 +4,6 @@
 from DrawingInterface import DrawingInterface
 
 import sys
-import subprocess
 sys.path.append('taming-transformers')
 import os.path
 import torch

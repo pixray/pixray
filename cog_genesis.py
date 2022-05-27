@@ -1,6 +1,4 @@
 import cog
-from pathlib import Path
-import torch
 import pixray
 import yaml
 import pathlib

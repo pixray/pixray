@@ -1,8 +1,6 @@
 from cog import BasePredictor, Input, Path
 from typing import Iterator
-import torch
 import yaml
-import pathlib
 import os
 import yaml
 

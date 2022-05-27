@@ -1,10 +1,8 @@
 import torch
-import sys
 import os
-from torch import nn, optim
 from Losses.LossInterface import LossInterface
 import resmem
-from resmem import ResMem, transformer
+from resmem import ResMem
 from torchvision import transforms
 
 recenter = transforms.Compose((

@@ -1,5 +1,5 @@
 import torch
-from torch import nn, optim
+from torch import nn
 from Losses.LossInterface import LossInterface
 
 class SymmetryLoss(LossInterface):

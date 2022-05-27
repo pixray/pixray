@@ -1,5 +1,5 @@
 import torch
-from torch import nn, optim
+from torch import nn
 from pathlib import Path
 from Losses.LossInterface import LossInterface
 from util import wget_file

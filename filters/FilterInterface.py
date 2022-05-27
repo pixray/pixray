@@ -1,4 +1,3 @@
-import argparse
 from torch import nn
 
 class FilterInterface(nn.Module):
