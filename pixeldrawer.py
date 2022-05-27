@@ -10,6 +10,7 @@ from util import str2bool
 
 from perlin_numpy import generate_fractal_noise_3d
 
+
 def rect_from_corners(p0, p1):
     x1, y1 = p0
     x2, y2 = p1
@@ -17,37 +18,42 @@ def rect_from_corners(p0, p1):
     return pts
 
 # canonical interpolation function, like https://p5js.org/reference/#/p5/map
+
+
 def map_number(n, start1, stop1, start2, stop2):
-  return ((n-start1)/(stop1-start1))*(stop2-start2)+start2;
+    return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2
+
 
 def diamond_from_corners(p0, p1):
     x1, y1 = p0
     x2, y2 = p1
     n = 1
     hyA = map_number(-2, -n, n, y1, y2)
-    hyB = map_number( 2, -n, n, y1, y2)
-    hyH = map_number(     0, -n, n, y1, y2)
-    hxH = map_number(     0, -n, n, x1, x2)
+    hyB = map_number(2, -n, n, y1, y2)
+    hyH = map_number(0, -n, n, y1, y2)
+    hxH = map_number(0, -n, n, x1, x2)
     pts = [[hxH, hyA], [x1, hyH], [hxH, hyB], [x2, hyH]]
     return pts
+
 
 def tri_from_corners(p0, p1, is_up):
     x1, y1 = p0
     x2, y2 = p1
     n = 1
-    hxA = map_number( 2, -n, n, x1, x2)
+    hxA = map_number(2, -n, n, x1, x2)
     hxB = map_number(-2, -n, n, x1, x2)
-    hxH = map_number(     0, -n, n, x1, x2)
+    hxH = map_number(0, -n, n, x1, x2)
     if is_up:
         pts = [[hxH, y1], [hxB, y2], [hxA, y2]]
     else:
         pts = [[hxH, y2], [hxA, y1], [hxB, y1]]
     return pts
 
+
 def hex_from_corners(p0, p1):
     x1, y1 = p0
     x2, y2 = p1
-    n  = 3
+    n = 3
     hyA = map_number(4, -n, n, y1, y2)
     hyB = map_number(2, -n, n, y1, y2)
     hyC = map_number(-2, -n, n, y1, y2)
@@ -55,6 +61,7 @@ def hex_from_corners(p0, p1):
     hxH = map_number(0, -n, n, x1, x2)
     pts = [[hxH, hyA], [x1, hyB], [x1, hyC], [hxH, hyD], [x2, hyC], [x2, hyB]]
     return pts
+
 
 def knit_from_corners(p0, p1):
     x1, y1 = p0
@@ -85,28 +92,58 @@ def knit_from_corners(p0, p1):
     pts.extend([[x1, y_up2], [x1, y_up1]])
     return pts
 
+
 shift_pixel_types = ["hex", "rectshift", "diamond"]
-   
+
+
 def gkern(size, gamma):
     """
     creates gaussian kernel with side length `l` and a sigma of `sig`
     https://stackoverflow.com/a/43346070/6028830
     """
-    sig = size/gamma
+    sig = size / gamma
     ax = np.linspace(-(size - 1) / 2., (size - 1) / 2., size)
     gauss = np.exp(-0.5 * np.square(ax) / np.square(sig))
     kernel = -np.outer(gauss, gauss)
-    kernel = (kernel-kernel.min()) / (kernel.max()-kernel.min())
-    return kernel * (size**2) / np.sum(kernel) # normalize such that the sum of pixel was the same as the original
+    kernel = (kernel - kernel.min()) / (kernel.max() - kernel.min())
+    # normalize such that the sum of pixel was the same as the original
+    return kernel * (size**2) / np.sum(kernel)
+
 
 class PixelDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--pixel_size", nargs=2, type=int, help="Pixel size (width height)", default=None, dest='pixel_size')
-        parser.add_argument("--pixel_scale", type=float, help="Pixel scale", default=None, dest='pixel_scale')
-        parser.add_argument("--pixel_type", type=str, help="rect, rectshift, hex, tri, diamond, knit", default="rect", dest='pixel_type')
-        parser.add_argument("--pixel_edge_check", type=str2bool, help="ensure grid is symmetric", default=True, dest='pixel_edge_check')
-        parser.add_argument("--pixel_iso_check", type=str2bool, help="ensure tri and hex shapes are w/h scaled", default=True, dest='pixel_iso_check')
+        parser.add_argument(
+            "--pixel_size",
+            nargs=2,
+            type=int,
+            help="Pixel size (width height)",
+            default=None,
+            dest='pixel_size')
+        parser.add_argument(
+            "--pixel_scale",
+            type=float,
+            help="Pixel scale",
+            default=None,
+            dest='pixel_scale')
+        parser.add_argument(
+            "--pixel_type",
+            type=str,
+            help="rect, rectshift, hex, tri, diamond, knit",
+            default="rect",
+            dest='pixel_type')
+        parser.add_argument(
+            "--pixel_edge_check",
+            type=str2bool,
+            help="ensure grid is symmetric",
+            default=True,
+            dest='pixel_edge_check')
+        parser.add_argument(
+            "--pixel_iso_check",
+            type=str2bool,
+            help="ensure tri and hex shapes are w/h scaled",
+            default=True,
+            dest='pixel_iso_check')
         return parser
 
     def __init__(self, settings):
@@ -137,22 +174,23 @@ class PixelDrawer(DrawingInterface):
                 self.num_rows = int(1.414 * self.num_rows)
             elif self.pixel_type == "diamond":
                 self.num_rows = int(2 * self.num_rows)
- 
-        # we can also "scale" pixels -- scaling "up" meaning fewer rows/cols, etc.
+
+        # we can also "scale" pixels -- scaling "up" meaning fewer rows/cols,
+        # etc.
         if settings.pixel_scale is not None and settings.pixel_scale > 0:
             self.num_cols = int(self.num_cols / settings.pixel_scale)
             self.num_rows = int(self.num_rows / settings.pixel_scale)
 
-
         shrink = False
-        if self.num_cols>self.canvas_width:
+        if self.num_cols > self.canvas_width:
             shrink = True
             self.num_cols = self.canvas_width
-        if self.num_rows>self.canvas_height:
+        if self.num_rows > self.canvas_height:
             shrink = True
             self.num_rows = self.canvas_height
         if shrink:
-            print('pixel grid size should not be larger than output pixel size: reducing pixel grid')
+            print(
+                'pixel grid size should not be larger than output pixel size: reducing pixel grid')
 
         print(f"Running pixeldrawer with {self.num_cols}x{self.num_rows} grid")
 
@@ -206,15 +244,21 @@ class PixelDrawer(DrawingInterface):
             tensor_cell_width = tensor_shape[3] / num_cols
             tensor_cell_height = tensor_shape[2] / num_rows
             if int(tensor_cell_width) < max_tensor_num_subsamples:
-                tensor_subsamples_x = [i for i in range(int(tensor_cell_width))]
+                tensor_subsamples_x = [
+                    i for i in range(
+                        int(tensor_cell_width))]
             else:
                 step_size_x = tensor_cell_width / max_tensor_num_subsamples
-                tensor_subsamples_x = [int(i*step_size_x) for i in range(max_tensor_num_subsamples)]
+                tensor_subsamples_x = [int(i * step_size_x)
+                                       for i in range(max_tensor_num_subsamples)]
             if int(tensor_cell_height) < max_tensor_num_subsamples:
-                tensor_subsamples_y = [i for i in range(int(tensor_cell_height))]
+                tensor_subsamples_y = [
+                    i for i in range(
+                        int(tensor_cell_height))]
             else:
                 step_size_y = tensor_cell_height / max_tensor_num_subsamples
-                tensor_subsamples_y = [int(i*step_size_y) for i in range(max_tensor_num_subsamples)]
+                tensor_subsamples_y = [int(i * step_size_y)
+                                       for i in range(max_tensor_num_subsamples)]
 
             # print(tensor_shape, tensor_cell_width, tensor_cell_height,tensor_subsamples_x,tensor_subsamples_y)
 
@@ -232,10 +276,11 @@ class PixelDrawer(DrawingInterface):
                 num_cols_this_row = num_cols - 1
                 col_offset = 0.5
             for c in range(num_cols_this_row):
-                tensor_cur_x =  (col_offset + c) * tensor_cell_width
+                tensor_cur_x = (col_offset + c) * tensor_cell_width
                 cur_x = (col_offset + c) * cell_width
                 if init_tensor is None:
-                    cell_color = torch.tensor([random.random(), random.random(), random.random(), 1.0])
+                    cell_color = torch.tensor(
+                        [random.random(), random.random(), random.random(), 1.0])
                 else:
                     try:
                         rgb_sum = [0, 0, 0]
@@ -246,23 +291,30 @@ class PixelDrawer(DrawingInterface):
                                 cur_subsample_y = tensor_cur_y + t_y
                                 if(cur_subsample_x < tensor_shape[3] and cur_subsample_y < tensor_shape[2]):
                                     rgb_count += 1
-                                    rgb_sum[0] += scaled_init_tensor[0][int(cur_subsample_y)][int(cur_subsample_x)]
-                                    rgb_sum[1] += scaled_init_tensor[1][int(cur_subsample_y)][int(cur_subsample_x)]
-                                    rgb_sum[2] += scaled_init_tensor[2][int(cur_subsample_y)][int(cur_subsample_x)]
+                                    rgb_sum[0] += scaled_init_tensor[0][int(
+                                        cur_subsample_y)][int(cur_subsample_x)]
+                                    rgb_sum[1] += scaled_init_tensor[1][int(
+                                        cur_subsample_y)][int(cur_subsample_x)]
+                                    rgb_sum[2] += scaled_init_tensor[2][int(
+                                        cur_subsample_y)][int(cur_subsample_x)]
                                 else:
-                                    print(f"Ignoring out of bounds entry: {cur_subsample_x},{cur_subsample_y}")
+                                    print(
+                                        f"Ignoring out of bounds entry: {cur_subsample_x},{cur_subsample_y}")
                         if rgb_count == 0:
-                            print("init cell count is 0, this shouldn't happen. but it did?")
+                            print(
+                                "init cell count is 0, this shouldn't happen. but it did?")
                             rgb_count = 1
-                        cell_color = torch.tensor([rgb_sum[0]/rgb_count, rgb_sum[1]/rgb_count, rgb_sum[2]/rgb_count, 1.0])
+                        cell_color = torch.tensor(
+                            [rgb_sum[0] / rgb_count, rgb_sum[1] / rgb_count, rgb_sum[2] / rgb_count, 1.0])
                     except BaseException as error:
                         print("WTF", error)
                         mono_color = random.random()
-                        cell_color = torch.tensor([mono_color, mono_color, mono_color, 1.0])
+                        cell_color = torch.tensor(
+                            [mono_color, mono_color, mono_color, 1.0])
                         raise error
                 colors.append(cell_color)
                 p0 = [cur_x, cur_y]
-                p1 = [cur_x+cell_width, cur_y+cell_height]
+                p1 = [cur_x + cell_width, cur_y + cell_height]
 
                 if self.pixel_type == "hex":
                     pts = hex_from_corners(p0, p1)
@@ -279,11 +331,12 @@ class PixelDrawer(DrawingInterface):
 
                 # path = pydiffvg.Rect(p_min=torch.tensor(p0), p_max=torch.tensor(p1))
                 shapes.append(path)
-                path_group = pydiffvg.ShapeGroup(shape_ids = torch.tensor([len(shapes) - 1]), stroke_color = None, fill_color = cell_color)
+                path_group = pydiffvg.ShapeGroup(shape_ids=torch.tensor(
+                    [len(shapes) - 1]), stroke_color=None, fill_color=cell_color)
                 shape_groups.append(path_group)
 
         # Just some diffvg setup
-        scene_args = pydiffvg.RenderFunction.serialize_scene(\
+        scene_args = pydiffvg.RenderFunction.serialize_scene(
             canvas_width, canvas_height, shapes, shape_groups)
         render = pydiffvg.RenderFunction.apply
         img = render(canvas_width, canvas_height, 2, 2, 0, None, *scene_args)
@@ -304,7 +357,8 @@ class PixelDrawer(DrawingInterface):
         # Optimizers
         # points_optim = torch.optim.Adam(points_vars, lr=1.0)
         # width_optim = torch.optim.Adam(stroke_width_vars, lr=0.1)
-        color_optim = torch.optim.Adam(self.color_vars, lr=0.03/decay_divisor)
+        color_optim = torch.optim.Adam(
+            self.color_vars, lr=0.03 / decay_divisor)
         self.opts = [color_optim]
         return self.opts
 
@@ -319,7 +373,7 @@ class PixelDrawer(DrawingInterface):
     def get_num_resolutions(self):
         return None
 
-    def synth(self, cur_iteration: int, return_transparency: bool=False):
+    def synth(self, cur_iteration: int, return_transparency: bool = False):
         """Uses pydiffvg to render the image.
 
         Returns synthesized RGB image when return_transparency is False.
@@ -329,22 +383,34 @@ class PixelDrawer(DrawingInterface):
             return self.img
 
         render = pydiffvg.RenderFunction.apply
-        scene_args = pydiffvg.RenderFunction.serialize_scene(\
+        scene_args = pydiffvg.RenderFunction.serialize_scene(
             self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)
-        img = render(self.canvas_width, self.canvas_height, 2, 2, cur_iteration, None, *scene_args)
+        img = render(
+            self.canvas_width,
+            self.canvas_height,
+            2,
+            2,
+            cur_iteration,
+            None,
+            *scene_args)
         img_h, img_w = img.shape[0], img.shape[1]
         alpha = img[:, :, 3:4]
 
         if return_transparency:
-            res = [1,2,4,8,16][random.randint(0,4)] # resolution of the perlin noise
+            # resolution of the perlin noise
+            res = [1, 2, 4, 8, 16][random.randint(0, 4)]
             noise = generate_fractal_noise_3d((img_h, img_w, 3), (res, res, 1))
-            img = alpha * img[:, :, :3] + (1 - alpha) * torch.tensor(noise, dtype=torch.float32, device=self.device)
+            img = alpha * img[:,
+                              :,
+                              :3] + (1 - alpha) * torch.tensor(noise,
+                                                               dtype=torch.float32,
+                                                               device=self.device)
         # else:
         #     img = alpha * img[:, :, :3]
-        
+
         # img = img[:, :, :3]
         img = img.unsqueeze(0)
-        img = img.permute(0, 3, 1, 2) # NHWC -> NCHW
+        img = img.permute(0, 3, 1, 2)  # NHWC -> NCHW
         # if cur_iteration == 0:
         #     print("SHAPE", img.shape)
 
@@ -352,7 +418,8 @@ class PixelDrawer(DrawingInterface):
 
         if return_transparency:
             if self.gkern is not None:
-                return img, alpha*self.gkern.to(self.device) # weight by the gaussian mask
+                # weight by the gaussian mask
+                return img, alpha * self.gkern.to(self.device)
             else:
                 return img, alpha
         else:
@@ -371,13 +438,14 @@ class PixelDrawer(DrawingInterface):
         with torch.no_grad():
             for group in self.shape_groups:
                 group.fill_color.data[:3].clamp_(0.0, 1.0)
-                group.fill_color.data[3].clamp_(0.0 if self.transparent else 1.0, 1.0)
+                group.fill_color.data[3].clamp_(
+                    0.0 if self.transparent else 1.0, 1.0)
 
     def get_z(self):
         groups = []
         for g in self.shape_groups:
             groups.append(g.fill_color.data)
-        groups =  torch.stack(groups)
+        groups = torch.stack(groups)
         groups.requires_grad_()
         return groups
 
@@ -399,4 +467,9 @@ class PixelDrawer(DrawingInterface):
 
     @torch.no_grad()
     def to_svg(self):
-        pydiffvg.save_svg("./pixels.svg", self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)
+        pydiffvg.save_svg(
+            "./pixels.svg",
+            self.canvas_width,
+            self.canvas_height,
+            self.shapes,
+            self.shape_groups)

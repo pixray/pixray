@@ -14,6 +14,7 @@ from slip import get_clip_perceptor, all_slip_models
 
 perceptors = {}
 
+
 def init(args):
     global perceptors, resolutions
 
@@ -25,12 +26,13 @@ def init(args):
         args.models = [model.strip() for model in models]
     else:
         args.models = clip.available_models()
-        args.models =  args.models + all_slip_models
+        args.models = args.models + all_slip_models
         # print("using models ", args.models)
 
     for p_model in args.models:
         perceptor = get_clip_perceptor(p_model, device)
         perceptors[p_model] = perceptor
+
 
 def fetch_images(preprocess, image_files):
     images = []
@@ -41,6 +43,7 @@ def fetch_images(preprocess, image_files):
 
     return images
 
+
 def do_image_features(model, images):
     image_input = torch.tensor(np.stack(images)).cuda()
 
@@ -48,6 +51,7 @@ def do_image_features(model, images):
         image_features = model.encode_image(image_input).float()
 
     return image_features
+
 
 def spew_vectors(args, inputs, outfile):
     global perceptors, resolutions
@@ -63,7 +67,7 @@ def spew_vectors(args, inputs, outfile):
             CenterCrop(input_resolution),
             ToTensor()
         ])
-        images = fetch_images(preprocess, input_files);
+        images = fetch_images(preprocess, input_files)
 
         features = do_image_features(perceptor, images)
         print(f"saving {features.shape} to {clip_model}")
@@ -71,6 +75,7 @@ def spew_vectors(args, inputs, outfile):
 
     with open(outfile, 'w') as fp:
         json.dump(save_table, fp)
+
 
 def run_avg_diff(args):
     f1, f2 = args.avg_diff.split(",")
@@ -82,17 +87,21 @@ def run_avg_diff(args):
     for k in table1:
         encoded1 = np.array(table1[k])
         encoded2 = np.array(table2[k])
-        print("Taking the difference between {} and {} vectors".format(encoded1.shape, encoded2.shape))
-        m1 = np.mean(encoded1,axis=0)
-        m2 = np.mean(encoded2,axis=0)
+        print(
+            "Taking the difference between {} and {} vectors".format(
+                encoded1.shape,
+                encoded2.shape))
+        m1 = np.mean(encoded1, axis=0)
+        m2 = np.mean(encoded2, axis=0)
         atvec = m2 - m1
         z_dim, = atvec.shape
-        atvecs = atvec.reshape(1,z_dim)
+        atvecs = atvec.reshape(1, z_dim)
         print("Computed diff shape: {}".format(atvecs.shape))
         save_table[k] = atvecs.tolist()
 
     with open(args.outfile, 'w') as fp:
         json.dump(save_table, fp)
+
 
 def run_svm_diff(args):
     f1, f2 = args.svm_diff.split(",")
@@ -104,7 +113,10 @@ def run_svm_diff(args):
     for k in table1:
         encoded1 = np.array(table1[k])
         encoded2 = np.array(table2[k])
-        print("Taking the svm difference between {} and {} vectors".format(encoded1.shape, encoded2.shape))
+        print(
+            "Taking the svm difference between {} and {} vectors".format(
+                encoded1.shape,
+                encoded2.shape))
         h = .02  # step size in the mesh
         C = 1.0  # SVM regularization parameter
         X_arr = []
@@ -118,30 +130,41 @@ def run_svm_diff(args):
         X = np.array(X_arr)
         y = np.array(y_arr)
         # svc = svm.LinearSVC(C=C, class_weight="balanced").fit(X, y)
-        svc = svm.LinearSVC(C=C,max_iter=20000).fit(X, y)
+        svc = svm.LinearSVC(C=C, max_iter=20000).fit(X, y)
         # get the separating hyperplane
         w = svc.coef_[0]
 
-        #FIXME: this is a scaling hack.
-        m1 = np.mean(encoded1,axis=0)
-        m2 = np.mean(encoded2,axis=0)
+        # FIXME: this is a scaling hack.
+        m1 = np.mean(encoded1, axis=0)
+        m2 = np.mean(encoded2, axis=0)
         mean_vector = m1 - m2
         mean_length = np.linalg.norm(mean_vector)
         svn_length = np.linalg.norm(w)
 
-        atvec = (mean_length / svn_length)  * w
+        atvec = (mean_length / svn_length) * w
         z_dim, = atvec.shape
-        atvecs = atvec.reshape(1,z_dim)
+        atvecs = atvec.reshape(1, z_dim)
         print("Computed svm diff shape: {}".format(atvecs.shape))
         save_table[k] = atvecs.tolist()
 
     with open(args.outfile, 'w') as fp:
         json.dump(save_table, fp)
 
+
 def main():
     parser = argparse.ArgumentParser(description="Do vectory things")
-    parser.add_argument("--models", type=str, help="CLIP model", default=None, dest='models')
-    parser.add_argument("--inputs", type=str, help="Images to process", default=None, dest='inputs')
+    parser.add_argument(
+        "--models",
+        type=str,
+        help="CLIP model",
+        default=None,
+        dest='models')
+    parser.add_argument(
+        "--inputs",
+        type=str,
+        help="Images to process",
+        default=None,
+        dest='inputs')
     parser.add_argument("--avg-diff", dest='avg_diff', type=str, default=None,
                         help="Two vector files to average and then diff")
     parser.add_argument("--svm-diff", dest='svm_diff', type=str, default=None,
@@ -154,20 +177,38 @@ def main():
                         help="Comma separated list of json arrays (true)")
     parser.add_argument("--encoded-false", type=str, default=None,
                         help="Comma separated list of json arrays (false)")
-    parser.add_argument('--thresh', dest='thresh', default=False, action='store_true',
-                        help="Compute thresholds for attribute vectors classifiers")
-    parser.add_argument('--svm', dest='svm', default=False, action='store_true',
-                        help="Use SVM for computing attribute vectors")
+    parser.add_argument(
+        '--thresh',
+        dest='thresh',
+        default=False,
+        action='store_true',
+        help="Compute thresholds for attribute vectors classifiers")
+    parser.add_argument(
+        '--svm',
+        dest='svm',
+        default=False,
+        action='store_true',
+        help="Use SVM for computing attribute vectors")
     parser.add_argument("--limit", dest='limit', type=int, default=None,
                         help="Limit number of inputs when computing atvecs")
-    parser.add_argument("--attribute-vectors", dest='attribute_vectors', default=None,
-                        help="use json file as source of attribute vectors")
-    parser.add_argument("--attribute-thresholds", dest='attribute_thresholds', default=None,
-                        help="use these non-zero values for binary classifier thresholds")
+    parser.add_argument(
+        "--attribute-vectors",
+        dest='attribute_vectors',
+        default=None,
+        help="use json file as source of attribute vectors")
+    parser.add_argument(
+        "--attribute-thresholds",
+        dest='attribute_thresholds',
+        default=None,
+        help="use these non-zero values for binary classifier thresholds")
     parser.add_argument("--attribute-set", dest='attribute_set', default="all",
                         help="score ROC/accuracy against true/false/all")
-    parser.add_argument('--attribute-indices', dest='attribute_indices', default=None, type=str,
-                        help="indices to select specific attribute vectors")
+    parser.add_argument(
+        '--attribute-indices',
+        dest='attribute_indices',
+        default=None,
+        type=str,
+        help="indices to select specific attribute vectors")
     parser.add_argument('--outfile', dest='outfile', default=None,
                         help="Output json file for vectors.")
     args = parser.parse_args()
@@ -182,6 +223,7 @@ def main():
 
     init(args)
     spew_vectors(args, args.inputs, args.outfile)
+
 
 if __name__ == '__main__':
     main()

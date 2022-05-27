@@ -10,8 +10,18 @@ class WallpaperFilter(FilterInterface):
     """
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--wallpaper_type", type=str, help="none, shift, horizontal", default=None, dest='wallpaper_type')
-        parser.add_argument("--wallpaper_edge_match", type=int, help="force repeating match in pixels", default=0, dest='wallpaper_edge_match')
+        parser.add_argument(
+            "--wallpaper_type",
+            type=str,
+            help="none, shift, horizontal",
+            default=None,
+            dest='wallpaper_type')
+        parser.add_argument(
+            "--wallpaper_edge_match",
+            type=int,
+            help="force repeating match in pixels",
+            default=0,
+            dest='wallpaper_edge_match')
         return parser
 
     def __init__(self, settings, device):
@@ -28,8 +38,8 @@ class WallpaperFilter(FilterInterface):
             # rand_w = int(W/2)
             # rand_h = int(H/2)
             half_W = int(W / 2)
-            row1 = imgs.tile((1,1,1,1))
-            row2 = imgs.tile((1,1,1,1))
+            row1 = imgs.tile((1, 1, 1, 1))
+            row2 = imgs.tile((1, 1, 1, 1))
             row2 = torch.roll(row2, shifts=(half_W,), dims=(3,))
             two_rows = torch.cat([row1, row2], dim=2)
             # print(f"Went from {imgs.shape} to {two_rows.shape}")
@@ -42,11 +52,11 @@ class WallpaperFilter(FilterInterface):
                 em2 = int(em / 2)
                 mseloss = nn.MSELoss()
                 # first trim edge and compute loss
-                col1 = imgs[:,:,:,:em]
-                col2 = imgs[:,:,:, -em:]
+                col1 = imgs[:, :, :, :em]
+                col2 = imgs[:, :, :, -em:]
                 loss = mseloss(col1, col2) / em
                 new_imgs = torch.clone(imgs)
-                new_imgs = new_imgs[:,:,:,em2:-em2]
+                new_imgs = new_imgs[:, :, :, em2:-em2]
                 imgs = new_imgs
 
             imgs = torch.roll(imgs, shifts=(rand_w,), dims=(3,))
@@ -55,12 +65,12 @@ class WallpaperFilter(FilterInterface):
                 em = self.edge_match
                 em2 = int(em / 2)
                 # first trim edge and compute loss
-                col1 = imgs[:,:,:em,:]
-                col2 = imgs[:,:,-em:,:]
+                col1 = imgs[:, :, :em, :]
+                col2 = imgs[:, :, -em:, :]
                 mseloss = nn.MSELoss()
                 loss = mseloss(col1, col2) / em
                 # print(col1.shape, col2.shape, imgs.shape, em, em2)
-                imgs = imgs[:,:,em2:-em2,:]
+                imgs = imgs[:, :, em2:-em2, :]
                 # print(col1.shape, col2.shape, imgs.shape, em, em2)
             imgs = torch.roll(imgs, shifts=(rand_h,), dims=(2,))
         else:
@@ -70,23 +80,22 @@ class WallpaperFilter(FilterInterface):
                 mseloss = nn.MSELoss()
 
                 # first trim edge and compute loss HORIZ
-                col1 = imgs[:,:,:,:em]
-                col2 = imgs[:,:,:, -em:]
+                col1 = imgs[:, :, :, :em]
+                col2 = imgs[:, :, :, -em:]
                 loss1 = mseloss(col1, col2) / em
                 new_imgs = torch.clone(imgs)
-                new_imgs = new_imgs[:,:,:,em2:-em2]
+                new_imgs = new_imgs[:, :, :, em2:-em2]
                 imgs = new_imgs
 
                 # first trim edge and compute loss VERT
-                col1 = imgs[:,:,:em,:]
-                col2 = imgs[:,:,-em:,:]
+                col1 = imgs[:, :, :em, :]
+                col2 = imgs[:, :, -em:, :]
                 mseloss = nn.MSELoss()
                 loss2 = mseloss(col1, col2) / em
                 new_imgs2 = torch.clone(imgs)
-                new_imgs2 = new_imgs2[:,:,em2:-em2,:]
+                new_imgs2 = new_imgs2[:, :, em2:-em2, :]
                 imgs = new_imgs2
 
                 loss = loss1 + loss2
             imgs = torch.roll(imgs, shifts=(rand_h, rand_w), dims=(2, 3))
         return imgs, loss
-

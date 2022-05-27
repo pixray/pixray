@@ -7,13 +7,15 @@ import yaml
 
 from cogrun import create_temporary_copy
 
+
 class GenesisPredictor(cog.Predictor):
     def setup(self):
         print("---> GenesisPredictor Setup")
 
     # Define the input types for a prediction
     @cog.input("title", type=str, default="")
-    @cog.input("quality", type=str, options=["draft", "mintable"], default="draft")
+    @cog.input("quality", type=str,
+               options=["draft", "mintable"], default="draft")
     @cog.input("optional_settings", type=str, default="\n")
     def predict(self, title, quality, optional_settings):
         """Run a single prediction on the model"""
@@ -21,10 +23,18 @@ class GenesisPredictor(cog.Predictor):
 
         pixray.reset_settings()
 
-        if(quality=="draft"):
-            pixray.add_settings(output="outputs/genesis_draft.png", quality="draft", scale=2.5, iterations=100)
+        if(quality == "draft"):
+            pixray.add_settings(
+                output="outputs/genesis_draft.png",
+                quality="draft",
+                scale=2.5,
+                iterations=100)
         else:
-            pixray.add_settings(output="outputs/genesis.png", quality="best", scale=4, iterations=350)
+            pixray.add_settings(
+                output="outputs/genesis.png",
+                quality="best",
+                scale=4,
+                iterations=350)
 
         # apply settings in order
         title = title.strip()

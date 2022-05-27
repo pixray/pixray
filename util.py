@@ -18,10 +18,14 @@ except ImportError:
     pass
 
 # https://stackoverflow.com/a/31758803/1010653
+
+
 class AppURLopener(urllib.request.FancyURLopener):
     version = "Mozilla/5.0"
 
 # file helpers
+
+
 def real_glob(rglob):
     glob_list = braceexpand(rglob)
     files = []
@@ -29,13 +33,16 @@ def real_glob(rglob):
         files = files + glob.glob(g)
     return sorted(files)
 
+
 def get_file_path(directory, filename, suffix):
-    if filename is None or re.search("\\\\|\/|^$", filename.strip()):
+    if filename is None or re.search("\\\\|\\/|^$", filename.strip()):
         raise ValueError("Invalid filename specified.")
 
     return str(Path(directory, filename).with_suffix(suffix))
 
 ####### argparse bools ##########
+
+
 def str2bool(v):
     if isinstance(v, bool):
         return v
@@ -46,23 +53,26 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+
 def parse_unit(value, total_iterations, argument_name, default_unit="%"):
     if value is None:
         return None
 
     value = str(value).lower().strip()
 
-    digits = re.search("^\d*[.]?\d+", value)
-    
-    if re.match("^\d*[.]?\d+$", value):
+    digits = re.search("^\\d*[.]?\\d+", value)
+
+    if re.match("^\\d*[.]?\\d+$", value):
         value += default_unit
-    
-    if re.match("^\d*[.]?\d+[\s]*(i|iter|iterations)$", value):
+
+    if re.match("^\\d*[.]?\\d+[\\s]*(i|iter|iterations)$", value):
         return int(float(digits.group(0)))
-    elif re.match("^\d*[.]?\d+[\s]*(p|%|percent)$", value):
+    elif re.match("^\\d*[.]?\\d+[\\s]*(p|%|percent)$", value):
         return int(float(digits.group(0)) * 0.01 * total_iterations)
 
-    raise ValueError(f"Invalid value for {argument_name}, please use a digit-unit combination like '20 iterations' or '50%'.")
+    raise ValueError(
+        f"Invalid value for {argument_name}, please use a digit-unit combination like '20 iterations' or '50%'.")
+
 
 def split_pipes(attribute):
     if not attribute:
@@ -73,10 +83,14 @@ def split_pipes(attribute):
 ####### PALETTE SECTION ##########
 
 # canonical interpolation function, like https://p5js.org/reference/#/p5/map
+
+
 def map_number(n, start1, stop1, start2, stop2):
-  return ((n-start1)/(stop1-start1))*(stop2-start2)+start2;
+    return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2
 
 # parses either (255,255,0) or [1,1,0] as yellow, etc
+
+
 def parse_triple_to_rgb(s):
     s2 = re.sub(r'[(\[\])]', '', s)
     t = s2.split("+")
@@ -100,15 +114,17 @@ def parse_triple_to_rgb(s):
 # red->yellow;[black]     (16 colors from ramp and also black)
 #
 # TODO: maybe foo.jpg, foo.json, foo.png, foo.asc
+
+
 def get_single_rgb(s):
     palette_lookups = {
-        "pixel_green":     [0.44, 1.00, 0.53],
-        "pixel_orange":    [1.00, 0.80, 0.20],
-        "pixel_blue":      [0.44, 0.53, 1.00],
-        "pixel_red":       [1.00, 0.53, 0.44],
+        "pixel_green": [0.44, 1.00, 0.53],
+        "pixel_orange": [1.00, 0.80, 0.20],
+        "pixel_blue": [0.44, 0.53, 1.00],
+        "pixel_red": [1.00, 0.53, 0.44],
         "pixel_grayscale": [1.00, 1.00, 1.00],
     }
-    if s[0] == "("  or s[0] == "[":
+    if s[0] == "(" or s[0] == "[":
         rgb = parse_triple_to_rgb(s)
     elif s in palette_lookups:
         rgb = palette_lookups[s]
@@ -120,26 +136,29 @@ def get_single_rgb(s):
         rgb = matplotlib.colors.to_rgb(s)
     return rgb
 
+
 def expand_colors(colors, num_steps):
-    index_episilon = 1e-6;
+    index_episilon = 1e-6
     pal = []
     num_colors = len(colors)
     for n in range(num_steps):
-        cur_float_index = map_number(n, 0, num_steps-1, 0, num_colors-1)
+        cur_float_index = map_number(n, 0, num_steps - 1, 0, num_colors - 1)
         cur_int_index = int(cur_float_index)
         cur_float_offset = cur_float_index - cur_int_index
-        if(cur_float_offset < index_episilon or (1.0-cur_float_offset) < index_episilon):
+        if(cur_float_offset < index_episilon or (1.0 - cur_float_offset) < index_episilon):
             # debug print(n, "->", cur_int_index)
             pal.append(colors[cur_int_index])
         else:
-            # debug print(n, num_steps, num_colors, cur_float_index, cur_int_index, cur_float_offset)
+            # debug print(n, num_steps, num_colors, cur_float_index,
+            # cur_int_index, cur_float_offset)
             rgb1 = colors[cur_int_index]
-            rgb2 = colors[cur_int_index+1]
+            rgb2 = colors[cur_int_index + 1]
             r = map_number(cur_float_offset, 0, 1, rgb1[0], rgb2[0])
             g = map_number(cur_float_offset, 0, 1, rgb1[1], rgb2[1])
             b = map_number(cur_float_offset, 0, 1, rgb1[2], rgb2[2])
             pal.append([r, g, b])
     return pal
+
 
 def get_rgb_range(s):
     # get the list that defines the range
@@ -157,10 +176,11 @@ def get_rgb_range(s):
         num_steps = 16
 
     colors = [get_single_rgb(s) for s in parts]
-    #debug print("We have colors: ", colors)
+    # debug print("We have colors: ", colors)
 
     pal = expand_colors(colors, num_steps)
     return pal
+
 
 def palette_from_section(s):
     s = s.strip()
@@ -206,22 +226,26 @@ def palette_from_section(s):
             # try to get all the colors
             img = Image.open(obj)
             img = img.convert('RGB')
-            color_pairs = img.getcolors(img.size[0]*img.size[1])
+            color_pairs = img.getcolors(img.size[0] * img.size[1])
             print(f"Found {len(color_pairs)} colors in {s}")
             if len(color_pairs) <= num_steps:
                 # not too many
                 colors = [c[1] for c in color_pairs]
-                colors = [[c[0]/255.0, c[1]/255.0, c[2]/255.0] for c in colors]
+                colors = [[c[0] / 255.0, c[1] / 255.0, c[2] / 255.0]
+                          for c in colors]
                 return colors
 
-            # dumb: but colortheif can't deal with an Image, so reopen the url if need be
+            # dumb: but colortheif can't deal with an Image, so reopen the url
+            # if need be
             if 'http' in s:
                 opener = AppURLopener()
                 obj = opener.open(s)
             ct = ColorThief(obj)
             colors = ct.get_palette(color_count=num_steps, quality=2)
-            colors = [[c[0]/255.0, c[1]/255.0, c[2]/255.0] for c in colors]
-            print(f"Distilled {len(colors)} (reqeusted {num_steps}) colors from {s}")
+            colors = [[c[0] / 255.0, c[1] / 255.0, c[2] / 255.0]
+                      for c in colors]
+            print(
+                f"Distilled {len(colors)} (reqeusted {num_steps}) colors from {s}")
             return list(colors)
 
         elif s.endswith(".act"):
@@ -233,23 +257,31 @@ def palette_from_section(s):
                 opener = AppURLopener()
                 obj = opener.open(s)
                 raw_data = obj.read()
-            hex_data = encode(raw_data, 'hex')                  # Convert it to hexadecimal values
-            total_colors_count = (int(hex_data[-7:-4], 16))     # Get last 3 digits to get number of colors total
-            misterious_count = (int(hex_data[-4:-3], 16))       # I have no idea what does it do
-            colors_count = (int(hex_data[-3:], 16))             # Get last 3 digits to get number of nontransparent colors
+            # Convert it to hexadecimal values
+            hex_data = encode(raw_data, 'hex')
+            # Get last 3 digits to get number of colors total
+            total_colors_count = (int(hex_data[-7:-4], 16))
+            # I have no idea what does it do
+            misterious_count = (int(hex_data[-4:-3], 16))
+            # Get last 3 digits to get number of nontransparent colors
+            colors_count = (int(hex_data[-3:], 16))
 
-            # Decode colors from hex to string and split it by 6 (because colors are #1c1c1c)
-            colors = [hex_data[i:i+6].decode() for i in range(0, total_colors_count*6, 6)]
+            # Decode colors from hex to string and split it by 6 (because
+            # colors are #1c1c1c)
+            colors = [hex_data[i:i + 6].decode()
+                      for i in range(0, total_colors_count * 6, 6)]
 
-            # Add # to each item and filter empty items if there is a corrupted total_colors_count bit
-            colors = ['#'+i for i in colors if len(i)]
+            # Add # to each item and filter empty items if there is a corrupted
+            # total_colors_count bit
+            colors = ['#' + i for i in colors if len(i)]
             colors = [get_single_rgb(s) for s in colors]
             return colors
         else:
             raise ValueError(f'Unknown file type: {s}')
     else:
         return get_rgb_range(s)
- 
+
+
 def palette_from_string(s):
     s = s.strip()
     pal = []
@@ -270,6 +302,8 @@ def wget_file(url, out):
 
 # filename templates - can fill in placeholders for %DATE%, %SIZE% and %SEQ%
 # TODO: load more of these settings into the template_dict
+
+
 def emit_filename(filename, template_dict={}, args=None):
     datestr = datetime.datetime.now().strftime("%Y%m%d")
     filename = filename.replace('%DATE%', datestr)
@@ -300,7 +334,9 @@ def emit_filename(filename, template_dict={}, args=None):
         if '%COLS%' in filename:
             filename = filename.replace('%COLS%', "{:d}".format(args.cols))
         if '%INDEX%' in filename:
-            filename = filename.replace('%INDEX%', "{}".format(args.anchor_offset_x))
+            filename = filename.replace(
+                '%INDEX%', "{}".format(
+                    args.anchor_offset_x))
     if '%SEQ%' in filename:
         # determine what the next available number is
         cur_seq = 1

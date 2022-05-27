@@ -6,18 +6,47 @@ from aphantasia.image import to_valid_rgb, fft_image, dwt_image, pixel_image
 import torch
 
 # canonical interpolation function, like https://p5js.org/reference/#/p5/map
+
+
 def map_number(n, start1, stop1, start2, stop2):
-  return ((n-start1)/(stop1-start1))*(stop2-start2)+start2;
+    return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2
+
 
 class FftDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--fft_use",     type=str, help="use fft or dwt or pixel", default="fft", dest='fft_use')
-        parser.add_argument('--fft_decay',   default=1.5, type=float, dest='fft_decay')
-        parser.add_argument('--fft_wave',    default='coif2', help='wavelets: db[1..], coif[1..], haar, dmey', dest='fft_wave')
-        parser.add_argument('--fft_sharp',   default=0.3, type=float, dest='fft_sharp')
-        parser.add_argument('--fft_colors',  default=1.5, type=float, dest='fft_colors')
-        parser.add_argument('--fft_lrate',   default=0.3, type=float, help='Learning rate', dest='fft_lrate')
+        parser.add_argument(
+            "--fft_use",
+            type=str,
+            help="use fft or dwt or pixel",
+            default="fft",
+            dest='fft_use')
+        parser.add_argument(
+            '--fft_decay',
+            default=1.5,
+            type=float,
+            dest='fft_decay')
+        parser.add_argument(
+            '--fft_wave',
+            default='coif2',
+            help='wavelets: db[1..], coif[1..], haar, dmey',
+            dest='fft_wave')
+        parser.add_argument(
+            '--fft_sharp',
+            default=0.3,
+            type=float,
+            dest='fft_sharp')
+        parser.add_argument(
+            '--fft_colors',
+            default=1.5,
+            type=float,
+            dest='fft_colors')
+        parser.add_argument(
+            '--fft_lrate',
+            default=0.3,
+            type=float,
+            help='Learning rate',
+            dest='fft_lrate')
         return parser
 
     def __init__(self, settings):
@@ -49,13 +78,16 @@ class FftDrawer(DrawingInterface):
             resume = "res_init.png"
         if self.fft_use == "dwt":
             print("Using DWT instead of FFT")
-            params, image_f, sz = dwt_image(shape, self.wave, self.sharp, self.colors, resume=resume)
+            params, image_f, sz = dwt_image(
+                shape, self.wave, self.sharp, self.colors, resume=resume)
         elif self.fft_use == "pixel":
             params, image_f, sz = pixel_image(shape, sd=1, resume=resume)
         elif self.fft_use == "fft":
-            params, image_f, sz = fft_image(shape, sd=0.01, decay_power=self.decay, resume=resume)            
+            params, image_f, sz = fft_image(
+                shape, sd=0.01, decay_power=self.decay, resume=resume)
         else:
-            raise ValueError(f"fft drawer does not know how to apply fft_use={self.fft_use}")
+            raise ValueError(
+                f"fft drawer does not know how to apply fft_use={self.fft_use}")
         self.params = params
         self.image_f = to_valid_rgb(image_f, colors=1.5)
 

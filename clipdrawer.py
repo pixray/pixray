@@ -11,12 +11,28 @@ import random
 import numpy as np
 import PIL.Image
 
+
 class ClipDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--strokes", type=int, help="number strokes", default=1024, dest='strokes')
-        parser.add_argument("--min_stroke_width", type=float, help="min width (percent of height)", default=1, dest='min_stroke_width')
-        parser.add_argument("--max_stroke_width", type=float, help="max width (percent of height)", default=5, dest='max_stroke_width')
+        parser.add_argument(
+            "--strokes",
+            type=int,
+            help="number strokes",
+            default=1024,
+            dest='strokes')
+        parser.add_argument(
+            "--min_stroke_width",
+            type=float,
+            help="min width (percent of height)",
+            default=1,
+            dest='min_stroke_width')
+        parser.add_argument(
+            "--max_stroke_width",
+            type=float,
+            help="max width (percent of height)",
+            default=5,
+            dest='max_stroke_width')
         return parser
 
     def __init__(self, settings):
@@ -42,15 +58,19 @@ class ClipDrawer(DrawingInterface):
         shape_groups = []
         for i in range(num_paths):
             num_segments = random.randint(1, 3)
-            num_control_points = torch.zeros(num_segments, dtype = torch.int32) + 2
+            num_control_points = torch.zeros(
+                num_segments, dtype=torch.int32) + 2
             points = []
             p0 = (random.random(), random.random())
             points.append(p0)
             for j in range(num_segments):
                 radius = 0.1
-                p1 = (p0[0] + radius * (random.random() - 0.5), p0[1] + radius * (random.random() - 0.5))
-                p2 = (p1[0] + radius * (random.random() - 0.5), p1[1] + radius * (random.random() - 0.5))
-                p3 = (p2[0] + radius * (random.random() - 0.5), p2[1] + radius * (random.random() - 0.5))
+                p1 = (p0[0] + radius * (random.random() - 0.5),
+                      p0[1] + radius * (random.random() - 0.5))
+                p2 = (p1[0] + radius * (random.random() - 0.5),
+                      p1[1] + radius * (random.random() - 0.5))
+                p3 = (p2[0] + radius * (random.random() - 0.5),
+                      p2[1] + radius * (random.random() - 0.5))
                 points.append(p1)
                 points.append(p2)
                 points.append(p3)
@@ -58,13 +78,28 @@ class ClipDrawer(DrawingInterface):
             points = torch.tensor(points)
             points[:, 0] *= canvas_width
             points[:, 1] *= canvas_height
-            path = pydiffvg.Path(num_control_points = num_control_points, points = points, stroke_width = torch.tensor((min_width + max_width)/4), is_closed = False)
+            path = pydiffvg.Path(
+                num_control_points=num_control_points,
+                points=points,
+                stroke_width=torch.tensor(
+                    (min_width + max_width) / 4),
+                is_closed=False)
             shapes.append(path)
-            path_group = pydiffvg.ShapeGroup(shape_ids = torch.tensor([len(shapes) - 1]), fill_color = None, stroke_color = torch.tensor([random.random(), random.random(), random.random(), random.random()]))
+            path_group = pydiffvg.ShapeGroup(
+                shape_ids=torch.tensor(
+                    [
+                        len(shapes) - 1]),
+                fill_color=None,
+                stroke_color=torch.tensor(
+                    [
+                        random.random(),
+                        random.random(),
+                        random.random(),
+                        random.random()]))
             shape_groups.append(path_group)
 
         # Just some diffvg setup
-        scene_args = pydiffvg.RenderFunction.serialize_scene(\
+        scene_args = pydiffvg.RenderFunction.serialize_scene(
             canvas_width, canvas_height, shapes, shape_groups)
         render = pydiffvg.RenderFunction.apply
         img = render(canvas_width, canvas_height, 2, 2, 0, None, *scene_args)
@@ -85,8 +120,8 @@ class ClipDrawer(DrawingInterface):
         self.stroke_width_vars = stroke_width_vars
         self.color_vars = color_vars
         self.img = img
-        self.shapes = shapes 
-        self.shape_groups  = shape_groups
+        self.shapes = shapes
+        self.shape_groups = shape_groups
         self.max_width = max_width
         self.min_width = min_width
         self.canvas_width = canvas_width
@@ -94,9 +129,13 @@ class ClipDrawer(DrawingInterface):
 
     def get_opts(self, decay_divisor):
         # Optimizers
-        points_optim = torch.optim.Adam(self.points_vars, lr=1.0/decay_divisor)
-        width_optim = torch.optim.Adam(self.stroke_width_vars, lr=0.1/decay_divisor)
-        color_optim = torch.optim.Adam(self.color_vars, lr=0.01/decay_divisor)
+        points_optim = torch.optim.Adam(
+            self.points_vars, lr=1.0 / decay_divisor)
+        width_optim = torch.optim.Adam(
+            self.stroke_width_vars,
+            lr=0.1 / decay_divisor)
+        color_optim = torch.optim.Adam(
+            self.color_vars, lr=0.01 / decay_divisor)
         opts = [points_optim, width_optim, color_optim]
         return opts
 
@@ -120,13 +159,29 @@ class ClipDrawer(DrawingInterface):
 
     def synth(self, cur_iteration):
         render = pydiffvg.RenderFunction.apply
-        scene_args = pydiffvg.RenderFunction.serialize_scene(\
+        scene_args = pydiffvg.RenderFunction.serialize_scene(
             self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)
-        img = render(self.canvas_width, self.canvas_height, 2, 2, cur_iteration, None, *scene_args)
-        img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(img.shape[0], img.shape[1], 3, device = pydiffvg.get_device()) * (1 - img[:, :, 3:4])
+        img = render(
+            self.canvas_width,
+            self.canvas_height,
+            2,
+            2,
+            cur_iteration,
+            None,
+            *scene_args)
+        img = img[:,
+                  :,
+                  3:4] * img[:,
+                             :,
+                             :3] + torch.ones(img.shape[0],
+                                              img.shape[1],
+                                              3,
+                                              device=pydiffvg.get_device()) * (1 - img[:,
+                                                                                       :,
+                                                                                       3:4])
         img = img[:, :, :3]
         img = img.unsqueeze(0)
-        img = img.permute(0, 3, 1, 2) # NHWC -> NCHW
+        img = img.permute(0, 3, 1, 2)  # NHWC -> NCHW
         self.img = img
         return img
 
@@ -157,8 +212,9 @@ class ClipDrawer(DrawingInterface):
     def set_z(self, new_z):
         return None
 
-### EXTERNAL INTERFACE
-### load_vqgan_model
+# EXTERNAL INTERFACE
+# load_vqgan_model
+
 
 if __name__ == '__main__':
     main()

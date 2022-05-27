@@ -24,7 +24,15 @@ class RealESRGANer():
         half (float): Whether to use half precision during inference. Default: False.
     """
 
-    def __init__(self, scale, model_path, model=None, tile=0, tile_pad=10, pre_pad=10, half=False):
+    def __init__(
+            self,
+            scale,
+            model_path,
+            model=None,
+            tile=0,
+            tile_pad=10,
+            pre_pad=10,
+            half=False):
         self.scale = scale
         self.tile_size = tile
         self.tile_pad = tile_pad
@@ -33,11 +41,18 @@ class RealESRGANer():
         self.half = half
 
         # initialize model
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # if the model_path starts with https, it will first download models to the folder: realesrgan/weights
+        self.device = torch.device(
+            'cuda' if torch.cuda.is_available() else 'cpu')
+        # if the model_path starts with https, it will first download models to
+        # the folder: realesrgan/weights
         if model_path.startswith('https://'):
             model_path = load_file_from_url(
-                url=model_path, model_dir=os.path.join(ROOT_DIR, 'realesrgan/weights'), progress=True, file_name=None)
+                url=model_path,
+                model_dir=os.path.join(
+                    ROOT_DIR,
+                    'realesrgan/weights'),
+                progress=True,
+                file_name=None)
         loadnet = torch.load(model_path, map_location=torch.device('cpu'))
         # prefer to use params_ema
         if 'params_ema' in loadnet:
@@ -60,7 +75,8 @@ class RealESRGANer():
 
         # pre_pad
         if self.pre_pad != 0:
-            self.img = F.pad(self.img, (0, self.pre_pad, 0, self.pre_pad), 'reflect')
+            self.img = F.pad(
+                self.img, (0, self.pre_pad, 0, self.pre_pad), 'reflect')
         # mod pad for divisible borders
         if self.scale == 2:
             self.mod_scale = 2
@@ -73,7 +89,8 @@ class RealESRGANer():
                 self.mod_pad_h = (self.mod_scale - h % self.mod_scale)
             if (w % self.mod_scale != 0):
                 self.mod_pad_w = (self.mod_scale - w % self.mod_scale)
-            self.img = F.pad(self.img, (0, self.mod_pad_w, 0, self.mod_pad_h), 'reflect')
+            self.img = F.pad(
+                self.img, (0, self.mod_pad_w, 0, self.mod_pad_h), 'reflect')
 
     def process(self):
         # model inference
@@ -116,7 +133,10 @@ class RealESRGANer():
                 input_tile_width = input_end_x - input_start_x
                 input_tile_height = input_end_y - input_start_y
                 tile_idx = y * tiles_x + x + 1
-                input_tile = self.img[:, :, input_start_y_pad:input_end_y_pad, input_start_x_pad:input_end_x_pad]
+                input_tile = self.img[:,
+                                      :,
+                                      input_start_y_pad:input_end_y_pad,
+                                      input_start_x_pad:input_end_x_pad]
 
                 # upscale tile
                 try:
@@ -133,25 +153,39 @@ class RealESRGANer():
                 output_end_y = input_end_y * self.scale
 
                 # output tile area without padding
-                output_start_x_tile = (input_start_x - input_start_x_pad) * self.scale
+                output_start_x_tile = (
+                    input_start_x - input_start_x_pad) * self.scale
                 output_end_x_tile = output_start_x_tile + input_tile_width * self.scale
-                output_start_y_tile = (input_start_y - input_start_y_pad) * self.scale
+                output_start_y_tile = (
+                    input_start_y - input_start_y_pad) * self.scale
                 output_end_y_tile = output_start_y_tile + input_tile_height * self.scale
 
                 # put tile into output image
-                self.output[:, :, output_start_y:output_end_y,
-                            output_start_x:output_end_x] = output_tile[:, :, output_start_y_tile:output_end_y_tile,
+                self.output[:,
+                            :,
+                            output_start_y:output_end_y,
+                            output_start_x:output_end_x] = output_tile[:,
+                                                                       :,
+                                                                       output_start_y_tile:output_end_y_tile,
                                                                        output_start_x_tile:output_end_x_tile]
 
     def post_process(self):
         # remove extra pad
         if self.mod_scale is not None:
             _, _, h, w = self.output.size()
-            self.output = self.output[:, :, 0:h - self.mod_pad_h * self.scale, 0:w - self.mod_pad_w * self.scale]
+            self.output = self.output[:, :, 0:h -
+                                      self.mod_pad_h *
+                                      self.scale, 0:w -
+                                      self.mod_pad_w *
+                                      self.scale]
         # remove prepad
         if self.pre_pad != 0:
             _, _, h, w = self.output.size()
-            self.output = self.output[:, :, 0:h - self.pre_pad * self.scale, 0:w - self.pre_pad * self.scale]
+            self.output = self.output[:, :, 0:h -
+                                      self.pre_pad *
+                                      self.scale, 0:w -
+                                      self.pre_pad *
+                                      self.scale]
         return self.output
 
     # @torch.no_grad()
