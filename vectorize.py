@@ -18,7 +18,7 @@ perceptors = {}
 def init(args):
     global perceptors, resolutions
 
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if args.models is not None:
         # print("Running models ", args.models)
@@ -62,18 +62,20 @@ def spew_vectors(args, inputs, outfile):
         perceptor = perceptors[clip_model]
         input_resolution = perceptor.input_resolution
         print(f"Running {clip_model} at {input_resolution}")
-        preprocess = Compose([
-            Resize(input_resolution, interpolation=Image.BICUBIC),
-            CenterCrop(input_resolution),
-            ToTensor()
-        ])
+        preprocess = Compose(
+            [
+                Resize(input_resolution, interpolation=Image.BICUBIC),
+                CenterCrop(input_resolution),
+                ToTensor(),
+            ]
+        )
         images = fetch_images(preprocess, input_files)
 
         features = do_image_features(perceptor, images)
         print(f"saving {features.shape} to {clip_model}")
         save_table[clip_model] = features.tolist()
 
-    with open(outfile, 'w') as fp:
+    with open(outfile, "w") as fp:
         json.dump(save_table, fp)
 
 
@@ -89,17 +91,18 @@ def run_avg_diff(args):
         encoded2 = np.array(table2[k])
         print(
             "Taking the difference between {} and {} vectors".format(
-                encoded1.shape,
-                encoded2.shape))
+                encoded1.shape, encoded2.shape
+            )
+        )
         m1 = np.mean(encoded1, axis=0)
         m2 = np.mean(encoded2, axis=0)
         atvec = m2 - m1
-        z_dim, = atvec.shape
+        (z_dim,) = atvec.shape
         atvecs = atvec.reshape(1, z_dim)
         print("Computed diff shape: {}".format(atvecs.shape))
         save_table[k] = atvecs.tolist()
 
-    with open(args.outfile, 'w') as fp:
+    with open(args.outfile, "w") as fp:
         json.dump(save_table, fp)
 
 
@@ -115,9 +118,10 @@ def run_svm_diff(args):
         encoded2 = np.array(table2[k])
         print(
             "Taking the svm difference between {} and {} vectors".format(
-                encoded1.shape,
-                encoded2.shape))
-        h = .02  # step size in the mesh
+                encoded1.shape, encoded2.shape
+            )
+        )
+        h = 0.02  # step size in the mesh
         C = 1.0  # SVM regularization parameter
         X_arr = []
         y_arr = []
@@ -142,75 +146,107 @@ def run_svm_diff(args):
         svn_length = np.linalg.norm(w)
 
         atvec = (mean_length / svn_length) * w
-        z_dim, = atvec.shape
+        (z_dim,) = atvec.shape
         atvecs = atvec.reshape(1, z_dim)
         print("Computed svm diff shape: {}".format(atvecs.shape))
         save_table[k] = atvecs.tolist()
 
-    with open(args.outfile, 'w') as fp:
+    with open(args.outfile, "w") as fp:
         json.dump(save_table, fp)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Do vectory things")
     parser.add_argument(
-        "--models",
+        "--models", type=str, help="CLIP model", default=None, dest="models"
+    )
+    parser.add_argument(
+        "--inputs", type=str, help="Images to process", default=None, dest="inputs"
+    )
+    parser.add_argument(
+        "--avg-diff",
+        dest="avg_diff",
         type=str,
-        help="CLIP model",
         default=None,
-        dest='models')
+        help="Two vector files to average and then diff",
+    )
     parser.add_argument(
-        "--inputs",
+        "--svm-diff",
+        dest="svm_diff",
         type=str,
-        help="Images to process",
         default=None,
-        dest='inputs')
-    parser.add_argument("--avg-diff", dest='avg_diff', type=str, default=None,
-                        help="Two vector files to average and then diff")
-    parser.add_argument("--svm-diff", dest='svm_diff', type=str, default=None,
-                        help="Two vector files to average and then svm diff")
-    parser.add_argument("--z-dim", dest='z_dim', type=int, default=100,
-                        help="z dimension of vectors")
-    parser.add_argument("--encoded-vectors", type=str, default=None,
-                        help="Comma separated list of json arrays")
-    parser.add_argument("--encoded-true", type=str, default=None,
-                        help="Comma separated list of json arrays (true)")
-    parser.add_argument("--encoded-false", type=str, default=None,
-                        help="Comma separated list of json arrays (false)")
+        help="Two vector files to average and then svm diff",
+    )
     parser.add_argument(
-        '--thresh',
-        dest='thresh',
-        default=False,
-        action='store_true',
-        help="Compute thresholds for attribute vectors classifiers")
+        "--z-dim", dest="z_dim", type=int, default=100, help="z dimension of vectors"
+    )
     parser.add_argument(
-        '--svm',
-        dest='svm',
+        "--encoded-vectors",
+        type=str,
+        default=None,
+        help="Comma separated list of json arrays",
+    )
+    parser.add_argument(
+        "--encoded-true",
+        type=str,
+        default=None,
+        help="Comma separated list of json arrays (true)",
+    )
+    parser.add_argument(
+        "--encoded-false",
+        type=str,
+        default=None,
+        help="Comma separated list of json arrays (false)",
+    )
+    parser.add_argument(
+        "--thresh",
+        dest="thresh",
         default=False,
-        action='store_true',
-        help="Use SVM for computing attribute vectors")
-    parser.add_argument("--limit", dest='limit', type=int, default=None,
-                        help="Limit number of inputs when computing atvecs")
+        action="store_true",
+        help="Compute thresholds for attribute vectors classifiers",
+    )
+    parser.add_argument(
+        "--svm",
+        dest="svm",
+        default=False,
+        action="store_true",
+        help="Use SVM for computing attribute vectors",
+    )
+    parser.add_argument(
+        "--limit",
+        dest="limit",
+        type=int,
+        default=None,
+        help="Limit number of inputs when computing atvecs",
+    )
     parser.add_argument(
         "--attribute-vectors",
-        dest='attribute_vectors',
+        dest="attribute_vectors",
         default=None,
-        help="use json file as source of attribute vectors")
+        help="use json file as source of attribute vectors",
+    )
     parser.add_argument(
         "--attribute-thresholds",
-        dest='attribute_thresholds',
+        dest="attribute_thresholds",
         default=None,
-        help="use these non-zero values for binary classifier thresholds")
-    parser.add_argument("--attribute-set", dest='attribute_set', default="all",
-                        help="score ROC/accuracy against true/false/all")
+        help="use these non-zero values for binary classifier thresholds",
+    )
     parser.add_argument(
-        '--attribute-indices',
-        dest='attribute_indices',
+        "--attribute-set",
+        dest="attribute_set",
+        default="all",
+        help="score ROC/accuracy against true/false/all",
+    )
+    parser.add_argument(
+        "--attribute-indices",
+        dest="attribute_indices",
         default=None,
         type=str,
-        help="indices to select specific attribute vectors")
-    parser.add_argument('--outfile', dest='outfile', default=None,
-                        help="Output json file for vectors.")
+        help="indices to select specific attribute vectors",
+    )
+    parser.add_argument(
+        "--outfile", dest="outfile", default=None, help="Output json file for vectors."
+    )
     args = parser.parse_args()
 
     if args.avg_diff:
@@ -225,5 +261,5 @@ def main():
     spew_vectors(args, args.inputs, args.outfile)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

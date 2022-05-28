@@ -17,6 +17,7 @@ def rect_from_corners(p0, p1):
     pts = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
     return pts
 
+
 # canonical interpolation function, like https://p5js.org/reference/#/p5/map
 
 
@@ -102,7 +103,7 @@ def gkern(size, gamma):
     https://stackoverflow.com/a/43346070/6028830
     """
     sig = size / gamma
-    ax = np.linspace(-(size - 1) / 2., (size - 1) / 2., size)
+    ax = np.linspace(-(size - 1) / 2.0, (size - 1) / 2.0, size)
     gauss = np.exp(-0.5 * np.square(ax) / np.square(sig))
     kernel = -np.outer(gauss, gauss)
     kernel = (kernel - kernel.min()) / (kernel.max() - kernel.min())
@@ -119,31 +120,36 @@ class PixelDrawer(DrawingInterface):
             type=int,
             help="Pixel size (width height)",
             default=None,
-            dest='pixel_size')
+            dest="pixel_size",
+        )
         parser.add_argument(
             "--pixel_scale",
             type=float,
             help="Pixel scale",
             default=None,
-            dest='pixel_scale')
+            dest="pixel_scale",
+        )
         parser.add_argument(
             "--pixel_type",
             type=str,
             help="rect, rectshift, hex, tri, diamond, knit",
             default="rect",
-            dest='pixel_type')
+            dest="pixel_type",
+        )
         parser.add_argument(
             "--pixel_edge_check",
             type=str2bool,
             help="ensure grid is symmetric",
             default=True,
-            dest='pixel_edge_check')
+            dest="pixel_edge_check",
+        )
         parser.add_argument(
             "--pixel_iso_check",
             type=str2bool,
             help="ensure tri and hex shapes are w/h scaled",
             default=True,
-            dest='pixel_iso_check')
+            dest="pixel_iso_check",
+        )
         return parser
 
     def __init__(self, settings):
@@ -190,7 +196,8 @@ class PixelDrawer(DrawingInterface):
             self.num_rows = self.canvas_height
         if shrink:
             print(
-                'pixel grid size should not be larger than output pixel size: reducing pixel grid')
+                "pixel grid size should not be larger than output pixel size: reducing pixel grid"
+            )
 
         print(f"Running pixeldrawer with {self.num_cols}x{self.num_rows} grid")
 
@@ -244,21 +251,19 @@ class PixelDrawer(DrawingInterface):
             tensor_cell_width = tensor_shape[3] / num_cols
             tensor_cell_height = tensor_shape[2] / num_rows
             if int(tensor_cell_width) < max_tensor_num_subsamples:
-                tensor_subsamples_x = [
-                    i for i in range(
-                        int(tensor_cell_width))]
+                tensor_subsamples_x = [i for i in range(int(tensor_cell_width))]
             else:
                 step_size_x = tensor_cell_width / max_tensor_num_subsamples
-                tensor_subsamples_x = [int(i * step_size_x)
-                                       for i in range(max_tensor_num_subsamples)]
+                tensor_subsamples_x = [
+                    int(i * step_size_x) for i in range(max_tensor_num_subsamples)
+                ]
             if int(tensor_cell_height) < max_tensor_num_subsamples:
-                tensor_subsamples_y = [
-                    i for i in range(
-                        int(tensor_cell_height))]
+                tensor_subsamples_y = [i for i in range(int(tensor_cell_height))]
             else:
                 step_size_y = tensor_cell_height / max_tensor_num_subsamples
-                tensor_subsamples_y = [int(i * step_size_y)
-                                       for i in range(max_tensor_num_subsamples)]
+                tensor_subsamples_y = [
+                    int(i * step_size_y) for i in range(max_tensor_num_subsamples)
+                ]
 
             # print(tensor_shape, tensor_cell_width, tensor_cell_height,tensor_subsamples_x,tensor_subsamples_y)
 
@@ -280,7 +285,8 @@ class PixelDrawer(DrawingInterface):
                 cur_x = (col_offset + c) * cell_width
                 if init_tensor is None:
                     cell_color = torch.tensor(
-                        [random.random(), random.random(), random.random(), 1.0])
+                        [random.random(), random.random(), random.random(), 1.0]
+                    )
                 else:
                     try:
                         rgb_sum = [0, 0, 0]
@@ -289,28 +295,43 @@ class PixelDrawer(DrawingInterface):
                             cur_subsample_x = tensor_cur_x + t_x
                             for t_y in tensor_subsamples_y:
                                 cur_subsample_y = tensor_cur_y + t_y
-                                if(cur_subsample_x < tensor_shape[3] and cur_subsample_y < tensor_shape[2]):
+                                if (
+                                    cur_subsample_x < tensor_shape[3]
+                                    and cur_subsample_y < tensor_shape[2]
+                                ):
                                     rgb_count += 1
-                                    rgb_sum[0] += scaled_init_tensor[0][int(
-                                        cur_subsample_y)][int(cur_subsample_x)]
-                                    rgb_sum[1] += scaled_init_tensor[1][int(
-                                        cur_subsample_y)][int(cur_subsample_x)]
-                                    rgb_sum[2] += scaled_init_tensor[2][int(
-                                        cur_subsample_y)][int(cur_subsample_x)]
+                                    rgb_sum[0] += scaled_init_tensor[0][
+                                        int(cur_subsample_y)
+                                    ][int(cur_subsample_x)]
+                                    rgb_sum[1] += scaled_init_tensor[1][
+                                        int(cur_subsample_y)
+                                    ][int(cur_subsample_x)]
+                                    rgb_sum[2] += scaled_init_tensor[2][
+                                        int(cur_subsample_y)
+                                    ][int(cur_subsample_x)]
                                 else:
                                     print(
-                                        f"Ignoring out of bounds entry: {cur_subsample_x},{cur_subsample_y}")
+                                        f"Ignoring out of bounds entry: {cur_subsample_x},{cur_subsample_y}"
+                                    )
                         if rgb_count == 0:
                             print(
-                                "init cell count is 0, this shouldn't happen. but it did?")
+                                "init cell count is 0, this shouldn't happen. but it did?"
+                            )
                             rgb_count = 1
                         cell_color = torch.tensor(
-                            [rgb_sum[0] / rgb_count, rgb_sum[1] / rgb_count, rgb_sum[2] / rgb_count, 1.0])
+                            [
+                                rgb_sum[0] / rgb_count,
+                                rgb_sum[1] / rgb_count,
+                                rgb_sum[2] / rgb_count,
+                                1.0,
+                            ]
+                        )
                     except BaseException as error:
                         print("WTF", error)
                         mono_color = random.random()
                         cell_color = torch.tensor(
-                            [mono_color, mono_color, mono_color, 1.0])
+                            [mono_color, mono_color, mono_color, 1.0]
+                        )
                         raise error
                 colors.append(cell_color)
                 p0 = [cur_x, cur_y]
@@ -331,13 +352,17 @@ class PixelDrawer(DrawingInterface):
 
                 # path = pydiffvg.Rect(p_min=torch.tensor(p0), p_max=torch.tensor(p1))
                 shapes.append(path)
-                path_group = pydiffvg.ShapeGroup(shape_ids=torch.tensor(
-                    [len(shapes) - 1]), stroke_color=None, fill_color=cell_color)
+                path_group = pydiffvg.ShapeGroup(
+                    shape_ids=torch.tensor([len(shapes) - 1]),
+                    stroke_color=None,
+                    fill_color=cell_color,
+                )
                 shape_groups.append(path_group)
 
         # Just some diffvg setup
         scene_args = pydiffvg.RenderFunction.serialize_scene(
-            canvas_width, canvas_height, shapes, shape_groups)
+            canvas_width, canvas_height, shapes, shape_groups
+        )
         render = pydiffvg.RenderFunction.apply
         img = render(canvas_width, canvas_height, 2, 2, 0, None, *scene_args)
 
@@ -349,16 +374,15 @@ class PixelDrawer(DrawingInterface):
         return color_vars, img, shapes, shape_groups
 
     def init_from_tensor(self, init_tensor):
-        self.color_vars, self.img, self.shapes, self.shape_groups = (
-            self.encode_image(init_tensor)
+        self.color_vars, self.img, self.shapes, self.shape_groups = self.encode_image(
+            init_tensor
         )
 
     def get_opts(self, decay_divisor=1):
         # Optimizers
         # points_optim = torch.optim.Adam(points_vars, lr=1.0)
         # width_optim = torch.optim.Adam(stroke_width_vars, lr=0.1)
-        color_optim = torch.optim.Adam(
-            self.color_vars, lr=0.03 / decay_divisor)
+        color_optim = torch.optim.Adam(self.color_vars, lr=0.03 / decay_divisor)
         self.opts = [color_optim]
         return self.opts
 
@@ -384,7 +408,8 @@ class PixelDrawer(DrawingInterface):
 
         render = pydiffvg.RenderFunction.apply
         scene_args = pydiffvg.RenderFunction.serialize_scene(
-            self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)
+            self.canvas_width, self.canvas_height, self.shapes, self.shape_groups
+        )
         img = render(
             self.canvas_width,
             self.canvas_height,
@@ -392,7 +417,8 @@ class PixelDrawer(DrawingInterface):
             2,
             cur_iteration,
             None,
-            *scene_args)
+            *scene_args,
+        )
         img_h, img_w = img.shape[0], img.shape[1]
         alpha = img[:, :, 3:4]
 
@@ -400,11 +426,9 @@ class PixelDrawer(DrawingInterface):
             # resolution of the perlin noise
             res = [1, 2, 4, 8, 16][random.randint(0, 4)]
             noise = generate_fractal_noise_3d((img_h, img_w, 3), (res, res, 1))
-            img = alpha * img[:,
-                              :,
-                              :3] + (1 - alpha) * torch.tensor(noise,
-                                                               dtype=torch.float32,
-                                                               device=self.device)
+            img = alpha * img[:, :, :3] + (1 - alpha) * torch.tensor(
+                noise, dtype=torch.float32, device=self.device
+            )
         # else:
         #     img = alpha * img[:, :, :3]
 
@@ -438,8 +462,7 @@ class PixelDrawer(DrawingInterface):
         with torch.no_grad():
             for group in self.shape_groups:
                 group.fill_color.data[:3].clamp_(0.0, 1.0)
-                group.fill_color.data[3].clamp_(
-                    0.0 if self.transparent else 1.0, 1.0)
+                group.fill_color.data[3].clamp_(0.0 if self.transparent else 1.0, 1.0)
 
     def get_z(self):
         groups = []
@@ -472,4 +495,5 @@ class PixelDrawer(DrawingInterface):
             self.canvas_width,
             self.canvas_height,
             self.shapes,
-            self.shape_groups)
+            self.shape_groups,
+        )

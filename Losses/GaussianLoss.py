@@ -5,7 +5,7 @@ from Losses.LossInterface import LossInterface
 def gaussian_fn(M, std):
     n = torch.arange(0, M) - (M - 1.0) / 2.0
     sig2 = 2 * std * std
-    w = torch.exp(-n ** 2 / sig2)
+    w = torch.exp(-(n**2) / sig2)
     return w
 
 
@@ -28,35 +28,28 @@ class GaussianLoss(LossInterface):
             type=float,
             help="gaussian's weight",
             default=1,
-            dest='gaussian_weight')
+            dest="gaussian_weight",
+        )
         parser.add_argument(
             "--gaussian_std",
             nargs=2,
             type=float,
             help="gaussian's std for both x and y",
-            default=(
-                40,
-                40),
-            dest='gaussian_std')
+            default=(40, 40),
+            dest="gaussian_std",
+        )
         parser.add_argument(
             "--gaussian_color",
             nargs=3,
             type=float,
             help="color for gaussian to optimize to",
-            default=(
-                255,
-                255,
-                255),
-            dest='gaussian_color')
+            default=(255, 255, 255),
+            dest="gaussian_color",
+        )
         return parser
 
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
-        gaus = gkern(
-            out.size()[2],
-            out.size()[3],
-            *
-            args.gaussian_std).to(
-            self.device)
+        gaus = gkern(out.size()[2], out.size()[3], *args.gaussian_std).to(self.device)
         color = torch.zeros(out.size()).to(self.device)
         Rval, Gval, Bval = args.gaussian_color
         color[:, 0, :, :] = Rval / 255

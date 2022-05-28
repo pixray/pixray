@@ -24,9 +24,12 @@ class ClampWithGrad(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_in):
-        input, = ctx.saved_tensors
-        return grad_in * \
-            (grad_in * (input - input.clamp(ctx.min, ctx.max)) >= 0), None, None
+        (input,) = ctx.saved_tensors
+        return (
+            grad_in * (grad_in * (input - input.clamp(ctx.min, ctx.max)) >= 0),
+            None,
+            None,
+        )
 
 
 clamp_with_grad = ClampWithGrad.apply
@@ -42,7 +45,8 @@ class SuperResolutionDrawer(DrawingInterface):
             type=str,
             help="Super resolution model",
             default="RealESRGAN_x4plus",
-            dest="super_resolution_model")
+            dest="super_resolution_model",
+        )
         return parser
 
     def __init__(self, settings):
@@ -52,10 +56,12 @@ class SuperResolutionDrawer(DrawingInterface):
     def load_model(self, settings, device):
         global global_model_cache
 
-        checkpoint_path = f'models/super_resolution_{self.super_resolution_model}.ckpt'
+        checkpoint_path = f"models/super_resolution_{self.super_resolution_model}.ckpt"
         if not os.path.exists(checkpoint_path):
             wget_file(
-                superresolution_checkpoint_table[self.super_resolution_model], checkpoint_path)
+                superresolution_checkpoint_table[self.super_resolution_model],
+                checkpoint_path,
+            )
 
         self.model = RRDBNet(
             num_in_ch=3,
@@ -63,7 +69,8 @@ class SuperResolutionDrawer(DrawingInterface):
             num_feat=64,
             num_block=23,
             num_grow_ch=32,
-            scale=4)
+            scale=4,
+        )
 
         self.upsampler = RealESRGANer(
             scale=4,
@@ -88,10 +95,12 @@ class SuperResolutionDrawer(DrawingInterface):
             self.z.copy_(new_z)
 
     def get_z_from_tensor(self, ref_tensor):
-        return F.interpolate((ref_tensor + 1) / 2,
-                             size=(torch.tensor(ref_tensor.shape[-2:]) // 4).tolist(),
-                             mode="bilinear",
-                             align_corners=False)
+        return F.interpolate(
+            (ref_tensor + 1) / 2,
+            size=(torch.tensor(ref_tensor.shape[-2:]) // 4).tolist(),
+            mode="bilinear",
+            align_corners=False,
+        )
 
     def get_num_resolutions(self):
         return None

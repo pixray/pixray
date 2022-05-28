@@ -20,33 +20,24 @@ class FftDrawer(DrawingInterface):
             type=str,
             help="use fft or dwt or pixel",
             default="fft",
-            dest='fft_use')
+            dest="fft_use",
+        )
+        parser.add_argument("--fft_decay", default=1.5, type=float, dest="fft_decay")
         parser.add_argument(
-            '--fft_decay',
-            default=1.5,
-            type=float,
-            dest='fft_decay')
+            "--fft_wave",
+            default="coif2",
+            help="wavelets: db[1..], coif[1..], haar, dmey",
+            dest="fft_wave",
+        )
+        parser.add_argument("--fft_sharp", default=0.3, type=float, dest="fft_sharp")
+        parser.add_argument("--fft_colors", default=1.5, type=float, dest="fft_colors")
         parser.add_argument(
-            '--fft_wave',
-            default='coif2',
-            help='wavelets: db[1..], coif[1..], haar, dmey',
-            dest='fft_wave')
-        parser.add_argument(
-            '--fft_sharp',
+            "--fft_lrate",
             default=0.3,
             type=float,
-            dest='fft_sharp')
-        parser.add_argument(
-            '--fft_colors',
-            default=1.5,
-            type=float,
-            dest='fft_colors')
-        parser.add_argument(
-            '--fft_lrate',
-            default=0.3,
-            type=float,
-            help='Learning rate',
-            dest='fft_lrate')
+            help="Learning rate",
+            dest="fft_lrate",
+        )
         return parser
 
     def __init__(self, settings):
@@ -79,15 +70,18 @@ class FftDrawer(DrawingInterface):
         if self.fft_use == "dwt":
             print("Using DWT instead of FFT")
             params, image_f, sz = dwt_image(
-                shape, self.wave, self.sharp, self.colors, resume=resume)
+                shape, self.wave, self.sharp, self.colors, resume=resume
+            )
         elif self.fft_use == "pixel":
             params, image_f, sz = pixel_image(shape, sd=1, resume=resume)
         elif self.fft_use == "fft":
             params, image_f, sz = fft_image(
-                shape, sd=0.01, decay_power=self.decay, resume=resume)
+                shape, sd=0.01, decay_power=self.decay, resume=resume
+            )
         else:
             raise ValueError(
-                f"fft drawer does not know how to apply fft_use={self.fft_use}")
+                f"fft drawer does not know how to apply fft_use={self.fft_use}"
+            )
         self.params = params
         self.image_f = to_valid_rgb(image_f, colors=1.5)
 

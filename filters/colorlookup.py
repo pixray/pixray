@@ -27,6 +27,7 @@ class ColorLookup(FilterInterface):
     """
     Maps to fixed color table
     """
+
     @staticmethod
     def add_settings(parser):
         parser.add_argument(
@@ -34,7 +35,8 @@ class ColorLookup(FilterInterface):
             type=float,
             help="loss scaling",
             default=10.0,
-            dest='lookup_beta')
+            dest="lookup_beta",
+        )
         return parser
 
     def __init__(self, settings, device):
@@ -48,8 +50,7 @@ class ColorLookup(FilterInterface):
             # eventually no table would mean make up your own table?
             color_table = default_color_table
 
-        print(
-            f"color table has {len(color_table)} entries like {color_table[0:5]}")
+        print(f"color table has {len(color_table)} entries like {color_table[0:5]}")
         self.color_table = torch.FloatTensor(color_table).to(device)
 
     # https://discuss.pytorch.org/t/how-to-find-k-nearest-neighbor-of-a-tensor/51593
@@ -67,23 +68,20 @@ class ColorLookup(FilterInterface):
 
         # project and flatten out space, so (B, C, H, W) -> (B*H*W, C)
         # reshape z -> (batch, height, width, channel) and flatten
-        z3 = rearrange(z3, 'b c h w -> b h w c').contiguous()
+        z3 = rearrange(z3, "b c h w -> b h w c").contiguous()
 
         ind = torch.cdist(z3, self.color_table).argmin(axis=-1)
-        z_q = torch.index_select(
-            self.color_table,
-            0,
-            ind.flatten()).view(
-            z3.shape)
+        z_q = torch.index_select(self.color_table, 0, ind.flatten()).view(z3.shape)
 
-        loss = self.beta * torch.mean((z_q.detach() - z3)**2) + \
-            torch.mean((z_q - z3.detach()) ** 2)
+        loss = self.beta * torch.mean((z_q.detach() - z3) ** 2) + torch.mean(
+            (z_q - z3.detach()) ** 2
+        )
 
         # preserve gradients
         z_q = z3 + (z_q - z3).detach()
 
         # reshape back to match original input shape
-        z_q = rearrange(z_q, 'b h w c -> b c h w').contiguous()
+        z_q = rearrange(z_q, "b h w c -> b c h w").contiguous()
         if do_alpha:
             # z_q = torch.stack([z_q, alpha], dim=1)
             z[:, 0:3, :, :] = z_q

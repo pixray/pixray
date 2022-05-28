@@ -22,35 +22,36 @@ class LineDrawer(DrawingInterface):
     @staticmethod
     def add_settings(parser):
         parser.add_argument(
-            "--strokes",
-            type=int,
-            help="number strokes",
-            default=24,
-            dest='strokes')
+            "--strokes", type=int, help="number strokes", default=24, dest="strokes"
+        )
         parser.add_argument(
             "--stroke_length",
             type=int,
             help="stroke length",
             default=8,
-            dest='stroke_length')
+            dest="stroke_length",
+        )
         parser.add_argument(
             "--min_stroke_width",
             type=float,
             help="min width (percent of height)",
             default=0.5,
-            dest='min_stroke_width')
+            dest="min_stroke_width",
+        )
         parser.add_argument(
             "--max_stroke_width",
             type=float,
             help="max width (percent of height)",
             default=2,
-            dest='max_stroke_width')
+            dest="max_stroke_width",
+        )
         parser.add_argument(
             "--allow_paper_color",
             type=str2bool,
             help="allow paper color to change",
             default=False,
-            dest='allow_paper_color')
+            dest="allow_paper_color",
+        )
         return parser
 
     def __init__(self, settings):
@@ -64,7 +65,7 @@ class LineDrawer(DrawingInterface):
     def load_model(self, settings, device):
         # Use GPU if available
         pydiffvg.set_use_gpu(torch.cuda.is_available())
-        device = torch.device('cuda')
+        device = torch.device("cuda")
         pydiffvg.set_device(device)
 
         canvas_width, canvas_height = self.canvas_width, self.canvas_height
@@ -83,8 +84,11 @@ class LineDrawer(DrawingInterface):
         shapes.append(path)
         # https://encycolorpedia.com/f2eecb
         cell_color = torch.tensor([242 / 255.0, 238 / 255.0, 203 / 255.0, 1.0])
-        path_group = pydiffvg.ShapeGroup(shape_ids=torch.tensor(
-            [len(shapes) - 1]), stroke_color=None, fill_color=cell_color)
+        path_group = pydiffvg.ShapeGroup(
+            shape_ids=torch.tensor([len(shapes) - 1]),
+            stroke_color=None,
+            fill_color=cell_color,
+        )
         shape_groups.append(path_group)
 
         if settings.allow_paper_color:
@@ -94,23 +98,30 @@ class LineDrawer(DrawingInterface):
         # Initialize Random Curves
         for i in range(num_paths):
             num_segments = self.stroke_length
-            num_control_points = torch.zeros(
-                num_segments, dtype=torch.int32) + 2
+            num_control_points = torch.zeros(num_segments, dtype=torch.int32) + 2
             points = []
             radius = 0.5
             radius_x = 0.5  # radius * canvas_height / canvas_width
-            p0 = (0.5 + radius_x * (random.random() - 0.5),
-                  0.5 + radius * (random.random() - 0.5))
+            p0 = (
+                0.5 + radius_x * (random.random() - 0.5),
+                0.5 + radius * (random.random() - 0.5),
+            )
             points.append(p0)
             for j in range(num_segments):
                 radius = 1.0 / (num_segments + 2)
                 radius_x = radius * canvas_height / canvas_width
-                p1 = (p0[0] + radius_x * (random.random() - 0.5),
-                      p0[1] + radius * (random.random() - 0.5))
-                p2 = (p1[0] + radius_x * (random.random() - 0.5),
-                      p1[1] + radius * (random.random() - 0.5))
-                p3 = (p2[0] + radius_x * (random.random() - 0.5),
-                      p2[1] + radius * (random.random() - 0.5))
+                p1 = (
+                    p0[0] + radius_x * (random.random() - 0.5),
+                    p0[1] + radius * (random.random() - 0.5),
+                )
+                p2 = (
+                    p1[0] + radius_x * (random.random() - 0.5),
+                    p1[1] + radius * (random.random() - 0.5),
+                )
+                p3 = (
+                    p2[0] + radius_x * (random.random() - 0.5),
+                    p2[1] + radius * (random.random() - 0.5),
+                )
                 points.append(p1)
                 points.append(p2)
                 points.append(p3)
@@ -121,18 +132,22 @@ class LineDrawer(DrawingInterface):
             path = pydiffvg.Path(
                 num_control_points=num_control_points,
                 points=points,
-                stroke_width=torch.tensor(
-                    max_width / 10),
-                is_closed=False)
+                stroke_width=torch.tensor(max_width / 10),
+                is_closed=False,
+            )
             shapes.append(path)
             s_col = [0, 0, 0, 1]
-            path_group = pydiffvg.ShapeGroup(shape_ids=torch.tensor(
-                [len(shapes) - 1]), fill_color=None, stroke_color=torch.tensor(s_col))
+            path_group = pydiffvg.ShapeGroup(
+                shape_ids=torch.tensor([len(shapes) - 1]),
+                fill_color=None,
+                stroke_color=torch.tensor(s_col),
+            )
             shape_groups.append(path_group)
 
         # Just some diffvg setup
         scene_args = pydiffvg.RenderFunction.serialize_scene(
-            canvas_width, canvas_height, shapes, shape_groups)
+            canvas_width, canvas_height, shapes, shape_groups
+        )
         render = pydiffvg.RenderFunction.apply
         img = render(canvas_width, canvas_height, 2, 2, 0, None, *scene_args)
 
@@ -159,15 +174,11 @@ class LineDrawer(DrawingInterface):
 
     def get_opts(self, decay_divisor):
         # Optimizers
-        points_optim = torch.optim.Adam(
-            self.points_vars, lr=1.0 / decay_divisor)
-        width_optim = torch.optim.Adam(
-            self.stroke_width_vars,
-            lr=0.1 / decay_divisor)
+        points_optim = torch.optim.Adam(self.points_vars, lr=1.0 / decay_divisor)
+        width_optim = torch.optim.Adam(self.stroke_width_vars, lr=0.1 / decay_divisor)
         opts = [points_optim, width_optim]
         if len(self.color_vars) > 0:
-            color_optim = torch.optim.Adam(
-                self.color_vars, lr=0.01 / decay_divisor)
+            color_optim = torch.optim.Adam(self.color_vars, lr=0.01 / decay_divisor)
             opts.append(color_optim)
         return opts
 
@@ -192,7 +203,8 @@ class LineDrawer(DrawingInterface):
     def synth(self, cur_iteration):
         render = pydiffvg.RenderFunction.apply
         scene_args = pydiffvg.RenderFunction.serialize_scene(
-            self.canvas_width, self.canvas_height, self.shapes, self.shape_groups)
+            self.canvas_width, self.canvas_height, self.shapes, self.shape_groups
+        )
         img = render(
             self.canvas_width,
             self.canvas_height,
@@ -200,17 +212,11 @@ class LineDrawer(DrawingInterface):
             2,
             cur_iteration,
             None,
-            *scene_args)
-        img = img[:,
-                  :,
-                  3:4] * img[:,
-                             :,
-                             :3] + torch.ones(img.shape[0],
-                                              img.shape[1],
-                                              3,
-                                              device=pydiffvg.get_device()) * (1 - img[:,
-                                                                                       :,
-                                                                                       3:4])
+            *scene_args
+        )
+        img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(
+            img.shape[0], img.shape[1], 3, device=pydiffvg.get_device()
+        ) * (1 - img[:, :, 3:4])
         img = img[:, :, :3]
         img = img.unsqueeze(0)
         img = img.permute(0, 3, 1, 2)  # NHWC -> NCHW
@@ -251,4 +257,5 @@ class LineDrawer(DrawingInterface):
             self.canvas_width,
             self.canvas_height,
             self.shapes,
-            self.shape_groups)
+            self.shape_groups,
+        )

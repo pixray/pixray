@@ -11,7 +11,7 @@ def main():
         sys.exit(1)
 
     settings_file = sys.argv.pop(1)
-    with open(settings_file, 'r') as stream:
+    with open(settings_file, "r") as stream:
         try:
             base_settings = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
@@ -26,5 +26,5 @@ def main():
     pixray.do_run(settings)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

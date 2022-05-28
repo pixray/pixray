@@ -15,9 +15,12 @@ class ClampWithGrad(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_in):
-        input, = ctx.saved_tensors
-        return grad_in * \
-            (grad_in * (input - input.clamp(ctx.min, ctx.max)) >= 0), None, None
+        (input,) = ctx.saved_tensors
+        return (
+            grad_in * (grad_in * (input - input.clamp(ctx.min, ctx.max)) >= 0),
+            None,
+            None,
+        )
 
 
 clamp_with_grad = ClampWithGrad.apply
@@ -32,13 +35,15 @@ class FastPixelDrawer(DrawingInterface):
             type=int,
             help="Pixel size (width height)",
             default=None,
-            dest='pixel_size')
+            dest="pixel_size",
+        )
         parser.add_argument(
             "--pixel_scale",
             type=float,
             help="Pixel scale",
             default=None,
-            dest='pixel_scale')
+            dest="pixel_scale",
+        )
         return parser
 
     def __init__(self, settings):
@@ -74,10 +79,10 @@ class FastPixelDrawer(DrawingInterface):
             self.num_rows = self.canvas_height
         if shrink:
             print(
-                'pixel grid size should not be larger than output pixel size: reducing pixel grid')
+                "pixel grid size should not be larger than output pixel size: reducing pixel grid"
+            )
 
-        print(
-            f"Running fast pixeldrawer with {self.num_cols}x{self.num_rows} grid")
+        print(f"Running fast pixeldrawer with {self.num_cols}x{self.num_rows} grid")
 
         self.pixel_size = tuple([self.num_rows, self.num_cols])
         self.output_size = tuple(reversed(settings.size))
@@ -102,7 +107,8 @@ class FastPixelDrawer(DrawingInterface):
             (ref_tensor + 1) / 2,
             size=self.pixel_size,
             mode="bilinear",
-            align_corners=False)
+            align_corners=False,
+        )
 
     def get_num_resolutions(self):
         return None

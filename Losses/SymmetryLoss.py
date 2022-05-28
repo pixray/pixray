@@ -14,7 +14,8 @@ class SymmetryLoss(LossInterface):
             type=float,
             help="how much symmetry is weighted in loss",
             default=1,
-            dest='symmetry_weight')
+            dest="symmetry_weight",
+        )
         return parser
 
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):

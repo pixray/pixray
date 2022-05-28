@@ -8,6 +8,7 @@ class WallpaperFilter(FilterInterface):
     """
     Random tiled shifts in x and y with no loss
     """
+
     @staticmethod
     def add_settings(parser):
         parser.add_argument(
@@ -15,13 +16,15 @@ class WallpaperFilter(FilterInterface):
             type=str,
             help="none, shift, horizontal",
             default=None,
-            dest='wallpaper_type')
+            dest="wallpaper_type",
+        )
         parser.add_argument(
             "--wallpaper_edge_match",
             type=int,
             help="force repeating match in pixels",
             default=0,
-            dest='wallpaper_edge_match')
+            dest="wallpaper_edge_match",
+        )
         return parser
 
     def __init__(self, settings, device):

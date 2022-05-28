@@ -10,7 +10,7 @@ from torch.nn import functional as F
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-class RealESRGANer():
+class RealESRGANer:
     """A helper class for upsampling images with RealESRGAN.
     Args:
         scale (int): Upsampling scale factor used in the networks. It is usually 2 or 4.
@@ -25,14 +25,8 @@ class RealESRGANer():
     """
 
     def __init__(
-            self,
-            scale,
-            model_path,
-            model=None,
-            tile=0,
-            tile_pad=10,
-            pre_pad=10,
-            half=False):
+        self, scale, model_path, model=None, tile=0, tile_pad=10, pre_pad=10, half=False
+    ):
         self.scale = scale
         self.tile_size = tile
         self.tile_pad = tile_pad
@@ -41,24 +35,22 @@ class RealESRGANer():
         self.half = half
 
         # initialize model
-        self.device = torch.device(
-            'cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # if the model_path starts with https, it will first download models to
         # the folder: realesrgan/weights
-        if model_path.startswith('https://'):
+        if model_path.startswith("https://"):
             model_path = load_file_from_url(
                 url=model_path,
-                model_dir=os.path.join(
-                    ROOT_DIR,
-                    'realesrgan/weights'),
+                model_dir=os.path.join(ROOT_DIR, "realesrgan/weights"),
                 progress=True,
-                file_name=None)
-        loadnet = torch.load(model_path, map_location=torch.device('cpu'))
+                file_name=None,
+            )
+        loadnet = torch.load(model_path, map_location=torch.device("cpu"))
         # prefer to use params_ema
-        if 'params_ema' in loadnet:
-            keyname = 'params_ema'
+        if "params_ema" in loadnet:
+            keyname = "params_ema"
         else:
-            keyname = 'params'
+            keyname = "params"
         model.load_state_dict(loadnet[keyname], strict=True)
         model.eval()
         self.model = model.to(self.device)
@@ -66,8 +58,7 @@ class RealESRGANer():
             self.model = self.model.half()
 
     def pre_process(self, img):
-        """Pre-process, such as pre-pad and mod pad, so that the images can be divisible
-        """
+        """Pre-process, such as pre-pad and mod pad, so that the images can be divisible"""
         # img is pytorch tensor
         self.img = img.to(self.device)
         if self.half:
@@ -75,8 +66,7 @@ class RealESRGANer():
 
         # pre_pad
         if self.pre_pad != 0:
-            self.img = F.pad(
-                self.img, (0, self.pre_pad, 0, self.pre_pad), 'reflect')
+            self.img = F.pad(self.img, (0, self.pre_pad, 0, self.pre_pad), "reflect")
         # mod pad for divisible borders
         if self.scale == 2:
             self.mod_scale = 2
@@ -85,12 +75,13 @@ class RealESRGANer():
         if self.mod_scale is not None:
             self.mod_pad_h, self.mod_pad_w = 0, 0
             _, _, h, w = self.img.size()
-            if (h % self.mod_scale != 0):
-                self.mod_pad_h = (self.mod_scale - h % self.mod_scale)
-            if (w % self.mod_scale != 0):
-                self.mod_pad_w = (self.mod_scale - w % self.mod_scale)
+            if h % self.mod_scale != 0:
+                self.mod_pad_h = self.mod_scale - h % self.mod_scale
+            if w % self.mod_scale != 0:
+                self.mod_pad_w = self.mod_scale - w % self.mod_scale
             self.img = F.pad(
-                self.img, (0, self.mod_pad_w, 0, self.mod_pad_h), 'reflect')
+                self.img, (0, self.mod_pad_w, 0, self.mod_pad_h), "reflect"
+            )
 
     def process(self):
         # model inference
@@ -133,18 +124,20 @@ class RealESRGANer():
                 input_tile_width = input_end_x - input_start_x
                 input_tile_height = input_end_y - input_start_y
                 tile_idx = y * tiles_x + x + 1
-                input_tile = self.img[:,
-                                      :,
-                                      input_start_y_pad:input_end_y_pad,
-                                      input_start_x_pad:input_end_x_pad]
+                input_tile = self.img[
+                    :,
+                    :,
+                    input_start_y_pad:input_end_y_pad,
+                    input_start_x_pad:input_end_x_pad,
+                ]
 
                 # upscale tile
                 try:
                     # with torch.no_grad():
                     output_tile = self.model(input_tile)
                 except RuntimeError as error:
-                    print('Error', error)
-                print(f'\tTile {tile_idx}/{tiles_x * tiles_y}')
+                    print("Error", error)
+                print(f"\tTile {tile_idx}/{tiles_x * tiles_y}")
 
                 # output tile area on total image
                 output_start_x = input_start_x * self.scale
@@ -153,43 +146,44 @@ class RealESRGANer():
                 output_end_y = input_end_y * self.scale
 
                 # output tile area without padding
-                output_start_x_tile = (
-                    input_start_x - input_start_x_pad) * self.scale
+                output_start_x_tile = (input_start_x - input_start_x_pad) * self.scale
                 output_end_x_tile = output_start_x_tile + input_tile_width * self.scale
-                output_start_y_tile = (
-                    input_start_y - input_start_y_pad) * self.scale
+                output_start_y_tile = (input_start_y - input_start_y_pad) * self.scale
                 output_end_y_tile = output_start_y_tile + input_tile_height * self.scale
 
                 # put tile into output image
-                self.output[:,
-                            :,
-                            output_start_y:output_end_y,
-                            output_start_x:output_end_x] = output_tile[:,
-                                                                       :,
-                                                                       output_start_y_tile:output_end_y_tile,
-                                                                       output_start_x_tile:output_end_x_tile]
+                self.output[
+                    :, :, output_start_y:output_end_y, output_start_x:output_end_x
+                ] = output_tile[
+                    :,
+                    :,
+                    output_start_y_tile:output_end_y_tile,
+                    output_start_x_tile:output_end_x_tile,
+                ]
 
     def post_process(self):
         # remove extra pad
         if self.mod_scale is not None:
             _, _, h, w = self.output.size()
-            self.output = self.output[:, :, 0:h -
-                                      self.mod_pad_h *
-                                      self.scale, 0:w -
-                                      self.mod_pad_w *
-                                      self.scale]
+            self.output = self.output[
+                :,
+                :,
+                0 : h - self.mod_pad_h * self.scale,
+                0 : w - self.mod_pad_w * self.scale,
+            ]
         # remove prepad
         if self.pre_pad != 0:
             _, _, h, w = self.output.size()
-            self.output = self.output[:, :, 0:h -
-                                      self.pre_pad *
-                                      self.scale, 0:w -
-                                      self.pre_pad *
-                                      self.scale]
+            self.output = self.output[
+                :,
+                :,
+                0 : h - self.pre_pad * self.scale,
+                0 : w - self.pre_pad * self.scale,
+            ]
         return self.output
 
     # @torch.no_grad()
-    def enhance(self, img, outscale=None, alpha_upsampler='realesrgan'):
+    def enhance(self, img, outscale=None, alpha_upsampler="realesrgan"):
         h_input, w_input = img.shape[-2:]
 
         self.pre_process(img)
@@ -232,7 +226,6 @@ class PrefetchReader(threading.Thread):
 
 
 class IOConsumer(threading.Thread):
-
     def __init__(self, opt, que, qid):
         super().__init__()
         self._queue = que
@@ -242,10 +235,10 @@ class IOConsumer(threading.Thread):
     def run(self):
         while True:
             msg = self._queue.get()
-            if isinstance(msg, str) and msg == 'quit':
+            if isinstance(msg, str) and msg == "quit":
                 break
 
-            output = msg['output']
-            save_path = msg['save_path']
+            output = msg["output"]
+            save_path = msg["save_path"]
             cv2.imwrite(save_path, output)
-        print(f'IO worker {self.qid} is done.')
+        print(f"IO worker {self.qid} is done.")

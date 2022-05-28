@@ -1,4 +1,3 @@
-
 import torch
 
 from Losses.LossInterface import LossInterface
@@ -15,7 +14,8 @@ class SaturationLoss(LossInterface):
             type=float,
             help="strength of pallete loss effect",
             default=1,
-            dest='saturation_weight')
+            dest="saturation_weight",
+        )
         return parser
 
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
@@ -30,7 +30,7 @@ class SaturationLoss(LossInterface):
             yb_std, yb_mean = torch.std_mean(yb)
             std_rggb = torch.sqrt(rg_std**2 + yb_std**2)
             mean_rggb = torch.sqrt(rg_mean**2 + yb_mean**2)
-            colorfullness = std_rggb + .3 * mean_rggb
+            colorfullness = std_rggb + 0.3 * mean_rggb
             all_loss.append(-colorfullness * args.saturation_weight / 10.0)
 
         return all_loss

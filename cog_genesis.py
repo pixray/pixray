@@ -14,8 +14,7 @@ class GenesisPredictor(cog.Predictor):
 
     # Define the input types for a prediction
     @cog.input("title", type=str, default="")
-    @cog.input("quality", type=str,
-               options=["draft", "mintable"], default="draft")
+    @cog.input("quality", type=str, options=["draft", "mintable"], default="draft")
     @cog.input("optional_settings", type=str, default="\n")
     def predict(self, title, quality, optional_settings):
         """Run a single prediction on the model"""
@@ -23,24 +22,23 @@ class GenesisPredictor(cog.Predictor):
 
         pixray.reset_settings()
 
-        if(quality == "draft"):
+        if quality == "draft":
             pixray.add_settings(
                 output="outputs/genesis_draft.png",
                 quality="draft",
                 scale=2.5,
-                iterations=100)
+                iterations=100,
+            )
         else:
             pixray.add_settings(
-                output="outputs/genesis.png",
-                quality="best",
-                scale=4,
-                iterations=350)
+                output="outputs/genesis.png", quality="best", scale=4, iterations=350
+            )
 
         # apply settings in order
         title = title.strip()
         if title == "" or title == "(untitled)":
             title = "Wow, that looks amazing!|Trending on Artstation"
-            pixray.add_settings(custom_loss='saturation')
+            pixray.add_settings(custom_loss="saturation")
 
         # initially assume prompt is title (this can be overridden)
         pixray.add_settings(prompts=title)

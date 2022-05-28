@@ -13,9 +13,8 @@ import os
 
 # TODO: this is very hacky, must fix this later (submodule dependency)
 VDIFF_PATH = os.path.join(
-    os.path.dirname(
-        os.path.realpath(__file__)),
-    'v-diffusion-pytorch')
+    os.path.dirname(os.path.realpath(__file__)), "v-diffusion-pytorch"
+)
 sys.path.append(VDIFF_PATH)
 
 
@@ -41,9 +40,12 @@ class ClampWithGrad(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_in):
-        input, = ctx.saved_tensors
-        return grad_in * \
-            (grad_in * (input - input.clamp(ctx.min, ctx.max)) >= 0), None, None
+        (input,) = ctx.saved_tensors
+        return (
+            grad_in * (grad_in * (input - input.clamp(ctx.min, ctx.max)) >= 0),
+            None,
+            None,
+        )
 
 
 clamp_with_grad = ClampWithGrad.apply
@@ -63,20 +65,23 @@ class VdiffDrawer(DrawingInterface):
             "--vdiff_model",
             type=str,
             help="VDIFF model from [yfcc_2, yfcc_1, cc12m_1, cc12m_1_cfg]",
-            default='yfcc_2',
-            dest='vdiff_model')
+            default="yfcc_2",
+            dest="vdiff_model",
+        )
         parser.add_argument(
             "--vdiff_schedule",
             type=str,
             help="VDIFF schedule [default, log]",
             default="default",
-            dest='vdiff_schedule')
+            dest="vdiff_schedule",
+        )
         parser.add_argument(
             "--vdiff_skip",
             type=float,
             help="skip a percentage of the way into the decay schedule (0-100)",
             default=0,
-            dest='vdiff_skip')
+            dest="vdiff_skip",
+        )
         return parser
 
     def __init__(self, settings):
@@ -95,19 +100,21 @@ class VdiffDrawer(DrawingInterface):
 
     def load_model(self, settings, device):
         model = get_model(self.vdiff_model)()
-        checkpoint = f'models/{self.vdiff_model}.pth'
+        checkpoint = f"models/{self.vdiff_model}.pth"
 
         if not (os.path.exists(checkpoint) and os.path.isfile(checkpoint)):
             wget_file(model_urls[self.vdiff_model], checkpoint)
 
-        model.load_state_dict(torch.load(checkpoint, map_location='cpu'))
-        if device.type == 'cuda':
+        model.load_state_dict(torch.load(checkpoint, map_location="cpu"))
+        if device.type == "cuda":
             model = model.half()
         model = model.to(device).eval().requires_grad_(False)
 
-        if hasattr(model, 'clip_model'):
+        if hasattr(model, "clip_model"):
             self.clip_model = model.clip_model
-            assert self.clip_model in self.active_clip_models, f"try adding {self.clip_model} to clip_models settings - vdiff model {self.vdiff_model} needs it but it is not active"
+            assert (
+                self.clip_model in self.active_clip_models
+            ), f"try adding {self.clip_model} to clip_models settings - vdiff model {self.vdiff_model} needs it but it is not active"
         else:
             self.clip_model = None
 
@@ -128,42 +135,44 @@ class VdiffDrawer(DrawingInterface):
         # compute self.t based on vdiff_skip
         top_val = map_number(self.vdiff_skip, 0, 100, 1, 0)
         # print("Using a max for vdiff skip of ", top_val)
-        self.t = torch.linspace(
-            top_val,
-            0,
-            self.iterations + 2,
-            device=self.device)[
-            :-1]
+        self.t = torch.linspace(top_val, 0, self.iterations + 2, device=self.device)[
+            :-1
+        ]
         # print("self.t is ", self.t)
 
         self.x = torch.randn(
-            [1, 3, self.gen_height, self.gen_width], device=self.device)
+            [1, 3, self.gen_height, self.gen_width], device=self.device
+        )
 
-        if self.schedule == 'log':
+        if self.schedule == "log":
             self.steps = utils.get_log_schedule(self.t)
         else:
             self.steps = utils.get_spliced_ddpm_cosine_schedule(self.t)
 
         # [model, steps, eta, extra_args, ts, alphas, sigmas]
         self.sample_state = sampling.sample_setup(
-            self.model, self.x, self.steps, self.eta, {})
+            self.model, self.x, self.steps, self.eta, {}
+        )
 
         # todo: maybe scheduld should adjust better due to init_skip?
         if init_tensor is not None:
             # reverse-center crop
             new_x = torch.zeros(
-                [1, 3, self.gen_height, self.gen_width], device=self.device)
+                [1, 3, self.gen_height, self.gen_width], device=self.device
+            )
             margin_x = int((self.gen_width - self.canvas_width) / 2)
             margin_y = int((self.gen_height - self.canvas_height) / 2)
-            if (margin_x != 0 or margin_y != 0):
-                new_x[:, :, margin_y:(margin_y +
-                                      self.canvas_height), margin_x:(margin_x +
-                                                                     self.canvas_width)] = init_tensor
+            if margin_x != 0 or margin_y != 0:
+                new_x[
+                    :,
+                    :,
+                    margin_y : (margin_y + self.canvas_height),
+                    margin_x : (margin_x + self.canvas_width),
+                ] = init_tensor
             else:
                 new_x = init_tensor
             # by default the image is 99% based on init_tensor (for now)
-            self.x = new_x * \
-                self.sample_state[5][0] + self.x * self.sample_state[6][0]
+            self.x = new_x * self.sample_state[5][0] + self.x * self.sample_state[6][0]
 
         self.x.requires_grad_(True)
         self.pred = None
@@ -180,15 +189,13 @@ class VdiffDrawer(DrawingInterface):
 
     def makenoise(self, cur_it):
         return sampling.sample_noise(
-            self.sample_state,
-            self.x,
-            cur_it,
-            self.pred,
-            self.v).detach()
+            self.sample_state, self.x, cur_it, self.pred, self.v
+        ).detach()
 
     def synth(self, cur_iteration):
         pred, v, next_x = sampling.sample_step(
-            self.sample_state, self.x, cur_iteration, self.pred, self.v)
+            self.sample_state, self.x, cur_iteration, self.pred, self.v
+        )
         self.pred = pred.detach()
         self.v = v.detach()
         pixels = clamp_with_grad(pred.add(1).div(2), 0, 1)
@@ -196,11 +203,13 @@ class VdiffDrawer(DrawingInterface):
         # center crop
         margin_x = int((self.gen_width - self.canvas_width) / 2)
         margin_y = int((self.gen_height - self.canvas_height) / 2)
-        if (margin_x != 0 or margin_y != 0):
-            pixels = pixels[:,
-                            :,
-                            margin_y:(margin_y + self.canvas_height),
-                            margin_x:(margin_x + self.canvas_width)]
+        if margin_x != 0 or margin_y != 0:
+            pixels = pixels[
+                :,
+                :,
+                margin_y : (margin_y + self.canvas_height),
+                margin_x : (margin_x + self.canvas_width),
+            ]
 
         # save a copy for the next iteration
         return pixels

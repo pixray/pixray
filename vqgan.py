@@ -11,36 +11,38 @@ import os.path
 from DrawingInterface import DrawingInterface
 
 import sys
-sys.path.append('taming-transformers')
+
+sys.path.append("taming-transformers")
 
 
 vqgan_config_table = {
-    "imagenet_f16_1024": 'http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_1024.yaml',
-    "imagenet_f16_16384": 'https://heibox.uni-heidelberg.de/d/a7530b09fed84f80a887/files/?p=%2Fconfigs%2Fmodel.yaml&dl=1',
-    "imagenet_f16_16384m": 'http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_16384.yaml',
-    "openimages_f16_8192": 'https://heibox.uni-heidelberg.de/d/2e5662443a6b4307b470/files/?p=%2Fconfigs%2Fmodel.yaml&dl=1',
-    "coco": 'https://dl.nmkd.de/ai/clip/coco/coco.yaml',
-    "faceshq": 'https://drive.google.com/uc?export=download&id=1fHwGx_hnBtC8nsq7hesJvs-Klv-P0gzT',
-    "wikiart_1024": 'https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_1024.yaml',
-    "wikiart_1024m": 'http://mirror.io.community/blob/vqgan/wikiart.yaml',
-    "wikiart_16384": 'https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_16384.yaml',
-    "wikiart_16384m": 'http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.yaml',
-    "wikiart_16384m2": 'http://mirror.io.community/blob/vqgan/wikiart_16384.yaml',
-    "sflckr": 'https://heibox.uni-heidelberg.de/d/73487ab6e5314cb5adba/files/?p=%2Fconfigs%2F2020-11-09T13-31-51-project.yaml&dl=1',
+    "imagenet_f16_1024": "http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_1024.yaml",
+    "imagenet_f16_16384": "https://heibox.uni-heidelberg.de/d/a7530b09fed84f80a887/files/?p=%2Fconfigs%2Fmodel.yaml&dl=1",
+    "imagenet_f16_16384m": "http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_16384.yaml",
+    "openimages_f16_8192": "https://heibox.uni-heidelberg.de/d/2e5662443a6b4307b470/files/?p=%2Fconfigs%2Fmodel.yaml&dl=1",
+    "coco": "https://dl.nmkd.de/ai/clip/coco/coco.yaml",
+    "faceshq": "https://drive.google.com/uc?export=download&id=1fHwGx_hnBtC8nsq7hesJvs-Klv-P0gzT",
+    "wikiart_1024": "https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_1024.yaml",
+    "wikiart_1024m": "http://mirror.io.community/blob/vqgan/wikiart.yaml",
+    "wikiart_16384": "https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_16384.yaml",
+    "wikiart_16384m": "http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.yaml",
+    "wikiart_16384m2": "http://mirror.io.community/blob/vqgan/wikiart_16384.yaml",
+    "sflckr": "https://heibox.uni-heidelberg.de/d/73487ab6e5314cb5adba/files/?p=%2Fconfigs%2F2020-11-09T13-31-51-project.yaml&dl=1",
 }
 vqgan_checkpoint_table = {
-    "imagenet_f16_1024": 'http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_1024.ckpt',
-    "imagenet_f16_16384": 'https://heibox.uni-heidelberg.de/d/a7530b09fed84f80a887/files/?p=%2Fckpts%2Flast.ckpt&dl=1',
-    "imagenet_f16_16384m": 'http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_16384.ckpt',
-    "openimages_f16_8192": 'https://heibox.uni-heidelberg.de/d/2e5662443a6b4307b470/files/?p=%2Fckpts%2Flast.ckpt&dl=1',
-    "coco": 'https://dl.nmkd.de/ai/clip/coco/coco.ckpt',
-    "faceshq": 'https://app.koofr.net/content/links/a04deec9-0c59-4673-8b37-3d696fe63a5d/files/get/last.ckpt?path=%2F2020-11-13T21-41-45_faceshq_transformer%2Fcheckpoints%2Flast.ckpt',
-    "wikiart_1024": 'https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_1024.ckpt',
-    "wikiart_1024m": 'http://mirror.io.community/blob/vqgan/wikiart.ckpt',
-    "wikiart_16384": 'https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_16384.ckpt',
-    "wikiart_16384m": 'http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.ckpt',
-    "wikiart_16384m2": 'http://mirror.io.community/blob/vqgan/wikiart_16384.ckpt',
-    "sflckr": 'https://heibox.uni-heidelberg.de/d/73487ab6e5314cb5adba/files/?p=%2Fcheckpoints%2Flast.ckpt&dl=1'}
+    "imagenet_f16_1024": "http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_1024.ckpt",
+    "imagenet_f16_16384": "https://heibox.uni-heidelberg.de/d/a7530b09fed84f80a887/files/?p=%2Fckpts%2Flast.ckpt&dl=1",
+    "imagenet_f16_16384m": "http://mirror.io.community/blob/vqgan/vqgan_imagenet_f16_16384.ckpt",
+    "openimages_f16_8192": "https://heibox.uni-heidelberg.de/d/2e5662443a6b4307b470/files/?p=%2Fckpts%2Flast.ckpt&dl=1",
+    "coco": "https://dl.nmkd.de/ai/clip/coco/coco.ckpt",
+    "faceshq": "https://app.koofr.net/content/links/a04deec9-0c59-4673-8b37-3d696fe63a5d/files/get/last.ckpt?path=%2F2020-11-13T21-41-45_faceshq_transformer%2Fcheckpoints%2Flast.ckpt",
+    "wikiart_1024": "https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_1024.ckpt",
+    "wikiart_1024m": "http://mirror.io.community/blob/vqgan/wikiart.ckpt",
+    "wikiart_16384": "https://github.com/pixray/pixray/releases/download/v1.7.1/vqgan_wikiart_16384.ckpt",
+    "wikiart_16384m": "http://eaidata.bmk.sh/data/Wikiart_16384/wikiart_f16_16384_8145600.ckpt",
+    "wikiart_16384m2": "http://mirror.io.community/blob/vqgan/wikiart_16384.ckpt",
+    "sflckr": "https://heibox.uni-heidelberg.de/d/73487ab6e5314cb5adba/files/?p=%2Fcheckpoints%2Flast.ckpt&dl=1",
+}
 
 
 class ReplaceGrad(torch.autograd.Function):
@@ -58,8 +60,11 @@ replace_grad = ReplaceGrad.apply
 
 
 def vector_quantize(x, codebook):
-    d = x.pow(2).sum(dim=-1, keepdim=True) + \
-        codebook.pow(2).sum(dim=1) - 2 * x @ codebook.T
+    d = (
+        x.pow(2).sum(dim=-1, keepdim=True)
+        + codebook.pow(2).sum(dim=1)
+        - 2 * x @ codebook.T
+    )
     indices = d.argmin(-1)
     x_q = F.one_hot(indices, codebook.shape[0]).to(d.dtype) @ codebook
     return replace_grad(x_q, x)
@@ -75,9 +80,12 @@ class ClampWithGrad(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_in):
-        input, = ctx.saved_tensors
-        return grad_in * \
-            (grad_in * (input - input.clamp(ctx.min, ctx.max)) >= 0), None, None
+        (input,) = ctx.saved_tensors
+        return (
+            grad_in * (grad_in * (input - input.clamp(ctx.min, ctx.max)) >= 0),
+            None,
+            None,
+        )
 
 
 clamp_with_grad = ClampWithGrad.apply
@@ -92,20 +100,23 @@ class VqganDrawer(DrawingInterface):
             "--vqgan_model",
             type=str,
             help="VQGAN model",
-            default='imagenet_f16_16384',
-            dest='vqgan_model')
+            default="imagenet_f16_16384",
+            dest="vqgan_model",
+        )
         parser.add_argument(
             "--vqgan_config",
             type=str,
             help="VQGAN config",
             default=None,
-            dest='vqgan_config')
+            dest="vqgan_config",
+        )
         parser.add_argument(
             "--vqgan_checkpoint",
             type=str,
             help="VQGAN checkpoint",
             default=None,
-            dest='vqgan_checkpoint')
+            dest="vqgan_checkpoint",
+        )
         return parser
 
     def __init__(self, settings):
@@ -118,20 +129,19 @@ class VqganDrawer(DrawingInterface):
         gumbel = False
 
         if settings.vqgan_config is None:
-            config_path = f'models/vqgan_{self.vqgan_model}.yaml'
+            config_path = f"models/vqgan_{self.vqgan_model}.yaml"
         else:
             config_path = settings.config_path
 
         if settings.vqgan_checkpoint is None:
-            checkpoint_path = f'models/vqgan_{self.vqgan_model}.ckpt'
+            checkpoint_path = f"models/vqgan_{self.vqgan_model}.ckpt"
         else:
             checkpoint_path = settings.checkpoint_path
 
         if not os.path.exists(config_path):
             wget_file(vqgan_config_table[self.vqgan_model], config_path)
         if not os.path.exists(checkpoint_path):
-            wget_file(
-                vqgan_checkpoint_table[self.vqgan_model], checkpoint_path)
+            wget_file(vqgan_checkpoint_table[self.vqgan_model], checkpoint_path)
 
         if checkpoint_path in global_model_cache:
             print("reusing cached copy of model ", checkpoint_path)
@@ -141,23 +151,27 @@ class VqganDrawer(DrawingInterface):
         else:
             # TODO: unload if cache not empty?
             config = OmegaConf.load(config_path)
-            if config.model.target == 'taming.models.vqgan.VQModel':
+            if config.model.target == "taming.models.vqgan.VQModel":
                 model = vqgan.VQModel(**config.model.params)
                 model.eval().requires_grad_(False)
                 model.init_from_ckpt(checkpoint_path)
-            elif config.model.target == 'taming.models.vqgan.GumbelVQ':
+            elif config.model.target == "taming.models.vqgan.GumbelVQ":
                 model = vqgan.GumbelVQ(**config.model.params)
                 model.eval().requires_grad_(False)
                 model.init_from_ckpt(checkpoint_path)
                 gumbel = True
-            elif config.model.target == 'taming.models.cond_transformer.Net2NetTransformer':
+            elif (
+                config.model.target
+                == "taming.models.cond_transformer.Net2NetTransformer"
+            ):
                 parent_model = cond_transformer.Net2NetTransformer(
-                    **config.model.params)
+                    **config.model.params
+                )
                 parent_model.eval().requires_grad_(False)
                 parent_model.init_from_ckpt(checkpoint_path)
                 model = parent_model.first_stage_model
             else:
-                raise ValueError(f'unknown model type: {config.model.target}')
+                raise ValueError(f"unknown model type: {config.model.target}")
             del model.loss
             model = model.to(device)
             cache_entry = {"model": model, "gumbel": gumbel}
@@ -171,17 +185,21 @@ class VqganDrawer(DrawingInterface):
         if gumbel:
             self.e_dim = 256
             self.n_toks = model.quantize.n_embed
-            self.z_min = model.quantize.embed.weight.min(
-                dim=0).values[None, :, None, None]
-            self.z_max = model.quantize.embed.weight.max(
-                dim=0).values[None, :, None, None]
+            self.z_min = model.quantize.embed.weight.min(dim=0).values[
+                None, :, None, None
+            ]
+            self.z_max = model.quantize.embed.weight.max(dim=0).values[
+                None, :, None, None
+            ]
         else:
             self.e_dim = model.quantize.e_dim
             self.n_toks = model.quantize.n_e
-            self.z_min = model.quantize.embedding.weight.min(
-                dim=0).values[None, :, None, None]
-            self.z_max = model.quantize.embedding.weight.max(
-                dim=0).values[None, :, None, None]
+            self.z_min = model.quantize.embedding.weight.min(dim=0).values[
+                None, :, None, None
+            ]
+            self.z_max = model.quantize.embedding.weight.max(dim=0).values[
+                None, :, None, None
+            ]
 
     def get_opts(self, decay_divisor):
         return None
@@ -189,9 +207,8 @@ class VqganDrawer(DrawingInterface):
     def rand_init(self, toksX, toksY):
         # legacy init
         one_hot = F.one_hot(
-            torch.randint(
-                self.n_toks, [
-                    toksY * toksX], device=self.device), n_toks).float()
+            torch.randint(self.n_toks, [toksY * toksX], device=self.device), n_toks
+        ).float()
         if self.gumbel:
             self.z = one_hot @ self.model.quantize.embed.weight
         else:
@@ -219,17 +236,14 @@ class VqganDrawer(DrawingInterface):
     def synth(self, cur_iteration):
         if self.gumbel:
             z_q = vector_quantize(
-                self.z.movedim(
-                    1, 3), self.model.quantize.embed.weight).movedim(
-                3, 1)       # Vector quantize
+                self.z.movedim(1, 3), self.model.quantize.embed.weight
+            ).movedim(
+                3, 1
+            )  # Vector quantize
         else:
             z_q = vector_quantize(
-                self.z.movedim(
-                    1,
-                    3),
-                self.model.quantize.embedding.weight).movedim(
-                3,
-                1)
+                self.z.movedim(1, 3), self.model.quantize.embedding.weight
+            ).movedim(3, 1)
         return clamp_with_grad(self.model.decode(z_q).add(1).div(2), 0, 1)
 
     @torch.no_grad()
@@ -252,9 +266,10 @@ class VqganDrawer(DrawingInterface):
         return self.z.clone()
         # return model, gumbel
 
+
 # EXTERNAL INTERFACE
 # load_vqgan_model
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

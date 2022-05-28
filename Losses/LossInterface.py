@@ -1,7 +1,7 @@
 import argparse
 
 
-class LossInterface():
+class LossInterface:
     def __init__(self, device=None):
         self.device = device
 
