@@ -1,3 +1,8 @@
 [flake8]
-ignore = E203,W503,E501,E741,E402
+ignore = E203,
+	 W503,
+	 E501,
+	 E741,
+	 # TODO: we should re-enable the following after some refactoring
+	 E402
 exclude = ./src/*,./env/*,./SLIP/*,./v-diffusion-pytorch/*
