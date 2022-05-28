@@ -1,7 +1,6 @@
 # Originally made by Katherine Crowson (https://github.com/crowsonkb, https://twitter.com/RiversHaveWings)
 # The original BigGAN+CLIP method was by https://twitter.com/advadnoun
 
-from diffusion import get_model, sampling, utils
 from util import wget_file, map_number
 import math
 from torchvision.transforms import functional as TF
@@ -29,6 +28,7 @@ model_urls = {
     "wikiart_256": "https://the-eye.eu/public/AI/models/v-diffusion/wikiart_256.pth",
 }
 
+from diffusion import get_model, sampling, utils
 
 class ClampWithGrad(torch.autograd.Function):
     @staticmethod
