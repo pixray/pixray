@@ -1,9 +1,6 @@
 # code adapted from
 # https://github.com/facebookresearch/SLIP/issues/2#issuecomment-1001052198
 
-import utils
-from tokenizer import SimpleTokenizer
-import models
 from util import wget_file
 import sys
 import os
@@ -101,6 +98,9 @@ class CLIP_Base:
 SLIP_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "SLIP")
 # print("APPENDING PATH ", SLIP_PATH)
 sys.path.append(SLIP_PATH)
+import models
+from tokenizer import SimpleTokenizer
+import utils
 
 
 class SLIP_Base:
