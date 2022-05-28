@@ -71,7 +71,6 @@ class LineDrawer(DrawingInterface):
         canvas_width, canvas_height = self.canvas_width, self.canvas_height
         num_paths = self.num_paths
         max_width = settings.max_stroke_width * canvas_height / 100
-        min_width = settings.min_stroke_width * canvas_height / 100
 
         shapes = []
         shape_groups = []

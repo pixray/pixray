@@ -42,8 +42,6 @@ class ResmemLoss(LossInterface):
         return parser
 
     def get_loss1(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
-        device = self.device
-
         # print(out)
         # print(out.shape)
         image_x = recenter(out)
@@ -57,8 +55,6 @@ class ResmemLoss(LossInterface):
         return the_loss
 
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
-        device = self.device
-
         # print(cur_cutouts.keys())
         images = cur_cutouts[224]
         # print(images.shape)

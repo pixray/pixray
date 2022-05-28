@@ -1,5 +1,5 @@
 import unittest
-from pixray import *
+from pixray import argparse, setup_parser, parse_unit, apply_overlay, get_learning_rate_drops
 
 
 class TestPixrayMethods(unittest.TestCase):

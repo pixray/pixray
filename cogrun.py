@@ -1,7 +1,7 @@
 from cog import BasePredictor, Input, Path
 from typing import Iterator
-import yaml
 import os
+import sys
 import yaml
 
 from util import get_single_rgb
@@ -48,7 +48,7 @@ class BasePixrayPredictor(BasePredictor):
         settings = pixray.apply_settings()
         pixray.do_init(settings)
         run_complete = False
-        while run_complete == False:
+        while run_complete is False:
             run_complete = pixray.do_run(settings, return_display=True)
             output_file = os.path.join(settings.outdir, settings.output)
             temp_copy = create_temporary_copy(output_file)

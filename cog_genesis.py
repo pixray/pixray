@@ -1,6 +1,5 @@
 import cog
 import pixray
-import yaml
 import pathlib
 import os
 import yaml
@@ -58,7 +57,7 @@ class GenesisPredictor(cog.Predictor):
         settings = pixray.apply_settings()
         pixray.do_init(settings)
         run_complete = False
-        while run_complete == False:
+        while run_complete is False:
             run_complete = pixray.do_run(settings, return_display=True)
             temp_copy = create_temporary_copy(settings.output)
             yield pathlib.Path(os.path.realpath(temp_copy))

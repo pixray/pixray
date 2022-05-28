@@ -1,5 +1,5 @@
 import unittest
-from util import *
+from util import parse_unit, get_file_path, split_pipes
 
 
 class TestUtilMethods(unittest.TestCase):

@@ -2,8 +2,6 @@ import torch
 from torch import nn
 from Losses.LossInterface import LossInterface
 
-import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 import torchvision.transforms as transforms
@@ -180,9 +178,9 @@ def fold_laplace_pyramid(pyramid):
 
 
 def sample_indices(feat_content, feat_style):
-    indices = None
+    # indices = None
     const = 128**2  # 32k or so
-    feat_dims = feat_style.shape[1]
+    # feat_dims = feat_style.shape[1]
     big_size = feat_content.shape[2] * feat_content.shape[3]  # num feaxels
 
     stride_x = int(max(math.floor(math.sqrt(big_size // const)), 1))
@@ -484,7 +482,7 @@ def strotss_loss(out_tensor, style_tensor, content_weight=1.0 * 16.0, extractor=
 
     lr = 2e-3
 
-    scale_last = max(content_full.shape[2], content_full.shape[3])
+    # scale_last = max(content_full.shape[2], content_full.shape[3])
     scales = []
     for scale in range(10):
         divisor = 2**scale

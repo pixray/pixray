@@ -1,9 +1,8 @@
 import torch
 from torch import nn
 
-from util import get_single_rgb
+from util import get_single_rgb, real_glob, map_number
 from PIL import Image
-from util import *
 from urllib.request import urlopen
 import torchvision.transforms.functional as TF
 

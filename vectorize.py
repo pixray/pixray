@@ -121,7 +121,7 @@ def run_svm_diff(args):
                 encoded1.shape, encoded2.shape
             )
         )
-        h = 0.02  # step size in the mesh
+        # h = 0.02  # step size in the mesh
         C = 1.0  # SVM regularization parameter
         X_arr = []
         y_arr = []

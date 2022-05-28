@@ -40,7 +40,6 @@ import logging
 from urllib.request import urlopen
 import os
 import subprocess
-import json
 import yaml
 import glob
 from types import SimpleNamespace
@@ -550,8 +549,8 @@ class MakeCutouts(nn.Module):
     def forward(self, input, spot=None):
         global global_aspect_width, cur_iteration
         sideY, sideX = input.shape[2:4]
-        max_size = min(sideX, sideY)
-        min_size = min(sideX, sideY, self.cut_size)
+        # max_size = min(sideX, sideY)
+        # min_size = min(sideX, sideY, self.cut_size)
         cutouts = []
         mask_indexes = None
 
@@ -618,7 +617,7 @@ class MakeCutouts(nn.Module):
             batch = torch.cat([batch1, batch2])
             # print(batch.shape)
             self.transforms = torch.cat([transforms1, transforms2])
-            ## batch, self.transforms = self.augs(torch.cat(cutouts, dim=0))
+            # batch, self.transforms = self.augs(torch.cat(cutouts, dim=0))
             # if cur_iteration < 4:
             #     for j in range(4):
             #         TF.to_pil_image(batch[j].cpu()).save(f"live_im_{cur_iteration:02d}_{j:02d}_{spot}.png")
@@ -746,7 +745,7 @@ def do_init(args):
     # print("-----------> NUMR ", num_resolutions)
     # as of torch 1.8, jit produces errors. The below code no longer works with 1.10
     # jit = True if float(torch.__version__[:3]) < 1.8 else False
-    jit = False
+    # jit = False
 
     if num_resolutions is not None:
         f = 2 ** (num_resolutions - 1)
@@ -1171,8 +1170,6 @@ def do_init(args):
     if args.custom_loss:
         print(f"using custom losses: {str(custom_loss_names)}")
 
-    cur_iteration = 0
-
 
 # dreaded unsorted globals (for now)
 z_orig = None
@@ -1265,10 +1262,8 @@ def checkdrop(args, iter, losses):
     drop_loss_time = False
 
     loss_sum = sum(losses)
-    is_new_best = False
     num_cycles_not_best = 0
     if loss_sum < best_loss:
-        is_new_best = True
         best_loss = loss_sum
         best_iter = iter
         best_z = drawer.get_z_copy()
@@ -2801,7 +2796,6 @@ def add_custom_loss(name, customloss):
 
 def command_line_override():
     global global_pixray_settings
-    settingsDict = None
     vq_parser = setup_parser()
     settings = process_args(vq_parser)
     return settings

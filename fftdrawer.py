@@ -3,7 +3,9 @@ from DrawingInterface import DrawingInterface
 from torchvision.utils import save_image
 
 from aphantasia.image import to_valid_rgb, fft_image, dwt_image, pixel_image
+from PIL import Image
 import torch
+import numpy as np
 
 # canonical interpolation function, like https://p5js.org/reference/#/p5/map
 
@@ -54,9 +56,6 @@ class FftDrawer(DrawingInterface):
 
     def load_model(self, settings, device):
         self.device = device
-
-    def get_opts(self):
-        return self.opts
 
     def rand_init(self, toksX, toksY):
         self.init_from_tensor(None)
@@ -114,7 +113,7 @@ class FftDrawer(DrawingInterface):
         img = np.transpose(img, (1, 2, 0))
         img = np.clip(img, 0, 1)
         img = np.uint8(img * 255)
-        pimg = PIL.Image.fromarray(img, mode="RGB")
+        pimg = Image.fromarray(img, mode="RGB")
         return pimg
 
     def clip_z(self):

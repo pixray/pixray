@@ -42,7 +42,7 @@ def get_file_path(directory, filename, suffix):
     return str(Path(directory, filename).with_suffix(suffix))
 
 
-####### argparse bools ##########
+# -------- argparse bools -------- #
 
 
 def str2bool(v):
@@ -84,7 +84,7 @@ def split_pipes(attribute):
     return [phrase.strip() for phrase in attribute.split("|")]
 
 
-####### PALETTE SECTION ##########
+# -------- PALETTE SECTION -------- #
 
 # canonical interpolation function, like https://p5js.org/reference/#/p5/map
 
@@ -268,9 +268,9 @@ def palette_from_section(s):
             # Get last 3 digits to get number of colors total
             total_colors_count = int(hex_data[-7:-4], 16)
             # I have no idea what does it do
-            misterious_count = int(hex_data[-4:-3], 16)
+            # mysterious_count = int(hex_data[-4:-3], 16)
             # Get last 3 digits to get number of nontransparent colors
-            colors_count = int(hex_data[-3:], 16)
+            # colors_count = int(hex_data[-3:], 16)
 
             # Decode colors from hex to string and split it by 6 (because
             # colors are #1c1c1c)

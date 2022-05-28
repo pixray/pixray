@@ -110,23 +110,23 @@ class SLIP_Base:
 
         # HA HA HA, this could be a lookup table but I'm too lazy to change it
         if model_name == "SLIP_VITS16":
-            ckpt_file = f"slip_small_100ep.pt"
+            ckpt_file = "slip_small_100ep.pt"
         elif model_name == "SLIP_VITB16":
-            ckpt_file = f"slip_base_100ep.pt"
+            ckpt_file = "slip_base_100ep.pt"
         elif model_name == "SLIP_VITL16":
-            ckpt_file = f"slip_large_100ep.pt"
+            ckpt_file = "slip_large_100ep.pt"
         elif model_name == "SIMCLR_VITS16":
-            ckpt_file = f"simclr_small_25ep.pt"
+            ckpt_file = "simclr_small_25ep.pt"
         elif model_name == "CLIP_VITS16":
-            ckpt_file = f"clip_small_25ep.pt"
+            ckpt_file = "clip_small_25ep.pt"
         elif model_name == "CLIP_VITB16":
-            ckpt_file = f"clip_base_25ep.pt"
+            ckpt_file = "clip_base_25ep.pt"
         elif model_name == "CLIP_VITL16":
-            ckpt_file = f"clip_large_25ep.pt"
+            ckpt_file = "clip_large_25ep.pt"
         elif model_name == "SLIP_CC3M":
-            ckpt_file = f"slip_base_cc3m_40ep.pt"
+            ckpt_file = "slip_base_cc3m_40ep.pt"
         elif model_name == "SLIP_CC12M":
-            ckpt_file = f"slip_base_cc12m_35ep.pt"
+            ckpt_file = "slip_base_cc12m_35ep.pt"
         else:
             print(f"slip model {model_name} not known, aborting")
             sys.exit(1)

@@ -228,9 +228,6 @@ class PixelDrawer(DrawingInterface):
         pydiffvg.set_device(device)
         self.device = device
 
-    def get_opts(self):
-        return self.opts
-
     def rand_init(self, toksX, toksY):
         self.init_from_tensor(None)
 
@@ -481,7 +478,6 @@ class PixelDrawer(DrawingInterface):
         return shape_groups_copy
 
     def set_z(self, new_z):
-        l = len(new_z)
         for l in range(len(new_z)):
             active_group = self.shape_groups[l]
             new_group = new_z[l]
