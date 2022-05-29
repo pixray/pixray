@@ -11,10 +11,6 @@ from torchvision import transforms
 
 from clip import clip
 
-import models
-from SLIP.tokenizer import SimpleTokenizer
-import utils
-
 all_slip_models = [
     "SLIP_VITS16",
     "SLIP_VITB16",
@@ -97,6 +93,14 @@ class CLIP_Base:
         )
         return text_embeddings / text_embeddings.norm(dim=-1, keepdim=True)
 
+
+# TODO: this is very hacky, must fix this later (submodule dependency)
+SLIP_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "SLIP")
+# print("APPENDING PATH ", SLIP_PATH)
+sys.path.append(SLIP_PATH)
+import models
+from tokenizer import SimpleTokenizer
+import utils
 
 
 class SLIP_Base:
