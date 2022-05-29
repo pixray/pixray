@@ -5,4 +5,4 @@ ignore = E203,
 	 E741,
 	 # TODO: we should re-enable the following after some refactoring
 	 E402
-exclude = ./src/*,./env/*,./SLIP/*,./v-diffusion-pytorch/*
+exclude = ./src/*,./env/*,./SLIP/*,./v-diffusion-pytorch/*,./diffvg/*

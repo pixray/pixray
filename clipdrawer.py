@@ -207,7 +207,3 @@ class ClipDrawer(DrawingInterface):
 
 # EXTERNAL INTERFACE
 # load_vqgan_model
-
-
-if __name__ == "__main__":
-    main()
