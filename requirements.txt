@@ -26,7 +26,7 @@ torch-tools==0.1.5
 
 # can use CompVis/taming-transformers when https://github.com/CompVis/taming-transformers/pull/81 is merged
 git+https://github.com/bfirsh/taming-transformers.git@7a6e64ee
-git+https://github.com/openai/CLIP@40f5484
+git+https://github.com/openai/CLIP
 git+https://github.com/pvigier/perlin-numpy@6f077f8
 
 # diffvg: these are minimal requirements for just the pixeldraw / linedraw etc drawers
