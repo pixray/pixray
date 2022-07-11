@@ -7,7 +7,7 @@ from codecs import encode
 from PIL import Image
 import urllib.request
 from colorthief import ColorThief
-import subprocess
+import requests
 import datetime
 import os
 
@@ -260,13 +260,25 @@ def palette_from_string(s):
 
 
 # downloader
+# https://stackoverflow.com/questions/16694907/download-large-file-in-python-with-requests
 def wget_file(url, out):
     try:
         print(f"Downloading {out} from {url}, please wait")
-        output = subprocess.check_output(['wget', '-O', out, url])
-    except subprocess.CalledProcessError as cpe:
-        output = cpe.output
-        print("Ignoring non-zero exit: ", output)
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(out, 'wb') as f:
+                # download in 1-Megabyte chunks
+                for chunk in r.iter_content(chunk_size=1048576):
+                    f.write(chunk)
+    except requests.exceptions.HTTPError as e:
+        print("A connection error occurred while attempting to download the file:")
+        print(e)
+    except IOError as e:
+        print("A File I/O error occurred while attempting to download the file:")
+        print(e)
+    except Exception as e:
+        print("An unexpected error occurred while attempting to download the file:")
+        print(e)
 
 # filename templates - can fill in placeholders for %DATE%, %SIZE% and %SEQ%
 # TODO: load more of these settings into the template_dict
