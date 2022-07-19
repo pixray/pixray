@@ -1,29 +1,29 @@
+from util import wget_file, map_number
 import torch
-import sys
 import os
-from torch import nn, optim
 from Losses.LossInterface import LossInterface
 import resmem
-from resmem import ResMem, transformer
+from resmem import ResMem
 from torchvision import transforms
 
-recenter = transforms.Compose((
-    transforms.Resize((256, 256)),
-    transforms.CenterCrop(227),
+recenter = transforms.Compose(
+    (
+        transforms.Resize((256, 256)),
+        transforms.CenterCrop(227),
     )
 )
 
-from util import wget_file, map_number
-resmem_url = 'https://github.com/pixray/resmem/releases/download/1.1.3_model/model.pt'
+resmem_url = "https://github.com/pixray/resmem/releases/download/1.1.3_model/model.pt"
+
 
 class ResmemLoss(LossInterface):
-    def __init__(self,**kwargs):
+    def __init__(self, **kwargs):
         # make sure resmem has model file
         if not os.path.exists(resmem.path):
-            wget_file(resmem_url, resmem.path)        
+            wget_file(resmem_url, resmem.path)
 
         # TODO: device should be part of init
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         super().__init__(**kwargs)
         self.model = ResMem(pretrained=True).to(self.device)
@@ -32,12 +32,16 @@ class ResmemLoss(LossInterface):
 
     @staticmethod
     def add_settings(parser):
-        parser.add_argument("--symmetry_weight", type=float, help="how much symmetry is weighted in loss", default=1, dest='symmetry_weight')
+        parser.add_argument(
+            "--symmetry_weight",
+            type=float,
+            help="how much symmetry is weighted in loss",
+            default=1,
+            dest="symmetry_weight",
+        )
         return parser
-   
-    def get_loss1(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
-        device = self.device
 
+    def get_loss1(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
         # print(out)
         # print(out.shape)
         image_x = recenter(out)
@@ -51,8 +55,6 @@ class ResmemLoss(LossInterface):
         return the_loss
 
     def get_loss(self, cur_cutouts, out, args, globals=None, lossGlobals=None):
-        device = self.device
-
         # print(cur_cutouts.keys())
         images = cur_cutouts[224]
         # print(images.shape)

@@ -1,13 +1,11 @@
 import cog
-from pathlib import Path
-import torch
 import pixray
-import yaml
 import pathlib
 import os
 import yaml
 
 from cogrun import create_temporary_copy
+
 
 class GenesisPredictor(cog.Predictor):
     def setup(self):
@@ -23,16 +21,23 @@ class GenesisPredictor(cog.Predictor):
 
         pixray.reset_settings()
 
-        if(quality=="draft"):
-            pixray.add_settings(output="outputs/genesis_draft.png", quality="draft", scale=2.5, iterations=100)
+        if quality == "draft":
+            pixray.add_settings(
+                output="outputs/genesis_draft.png",
+                quality="draft",
+                scale=2.5,
+                iterations=100,
+            )
         else:
-            pixray.add_settings(output="outputs/genesis.png", quality="best", scale=4, iterations=350)
+            pixray.add_settings(
+                output="outputs/genesis.png", quality="best", scale=4, iterations=350
+            )
 
         # apply settings in order
         title = title.strip()
         if title == "" or title == "(untitled)":
             title = "Wow, that looks amazing!|Trending on Artstation"
-            pixray.add_settings(custom_loss='saturation')
+            pixray.add_settings(custom_loss="saturation")
 
         # initially assume prompt is title (this can be overridden)
         pixray.add_settings(prompts=title)
@@ -52,7 +57,7 @@ class GenesisPredictor(cog.Predictor):
         settings = pixray.apply_settings()
         pixray.do_init(settings)
         run_complete = False
-        while run_complete == False:
+        while run_complete is False:
             run_complete = pixray.do_run(settings, return_display=True)
             temp_copy = create_temporary_copy(settings.output)
             yield pathlib.Path(os.path.realpath(temp_copy))

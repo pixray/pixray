@@ -1,56 +1,68 @@
+from typing import Dict, Optional, cast
+from Losses.AestheticLoss import AestheticLoss
+from Losses.ResmemLoss import ResmemLoss
+from Losses.StyleLoss import StyleLoss
+from Losses.EdgeLoss import EdgeLoss
+from Losses.SmoothnessLoss import SmoothnessLoss
+from Losses.SymmetryLoss import SymmetryLoss
+from Losses.SaturationLoss import SaturationLoss
+from Losses.PaletteLoss import PaletteLoss
+from Losses.LossInterface import LossInterface
+from vdiff import VdiffDrawer
+from vqgan import VqganDrawer
+from util import palette_from_string, real_glob
+from PIL import ImageFile, Image, PngImagePlugin
+from filters.tiler import TilerFilter
+from filters.wallpaper import WallpaperFilter
+from filters.colorlookup import ColorLookup
+import random
+import imageio
+import numpy as np
+import kornia.augmentation as K
+import kornia
+from clip import clip
+from torchvision.transforms import (
+    CenterCrop,
+    Compose,
+    InterpolationMode,
+    Resize,
+    ToTensor,
+)
+from slip import get_clip_perceptor
+from util import str2bool, get_file_path, emit_filename, split_pipes, parse_unit
+from perlin_numpy import generate_fractal_noise_2d
+from torch_optimizer import DiffGrad, AdamP
 import argparse
 import json
 import math
 import logging
 
 from urllib.request import urlopen
-import sys
 import os
 import subprocess
-import json
 import yaml
 import glob
-from braceexpand import braceexpand
 from types import SimpleNamespace
 
 import os.path
 
-from omegaconf import OmegaConf
 import hashlib
 
-import time
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
-from torchvision import transforms
 from torchvision.transforms import functional as TF
 from torchvision.utils import save_image
-torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead to OOM. False is more deterministic.
-#torch.use_deterministic_algorithms(True)		# NR: grid_sampler_2d_backward_cuda does not have a deterministic implementation
 
-from torch_optimizer import DiffGrad, AdamP
-from perlin_numpy import generate_fractal_noise_2d
-from util import str2bool, get_file_path, emit_filename, split_pipes, parse_unit
+# NR: True is a bit faster, but can lead to OOM. False is more deterministic.
+torch.backends.cudnn.benchmark = False
+# torch.use_deterministic_algorithms(True)                # NR:
+# grid_sampler_2d_backward_cuda does not have a deterministic
+# implementation
 
-from slip import get_clip_perceptor
-
-from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize, InterpolationMode
 
 # installed by doing `pip install git+https://github.com/openai/CLIP`
-from clip import clip
 
-import kornia
-import kornia.augmentation as K
-import numpy as np
-import imageio
-import re
-import random
-
-from einops import rearrange
-
-from filters.colorlookup import ColorLookup
-from filters.wallpaper import WallpaperFilter
-from filters.tiler import TilerFilter
 
 filters_class_table = {
     "lookup": ColorLookup,
@@ -58,18 +70,13 @@ filters_class_table = {
     "wallpaper": WallpaperFilter,
 }
 
-from PIL import ImageFile, Image, PngImagePlugin
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # or 'border'
-global_padding_mode = 'reflection'
+global_padding_mode = "reflection"
 global_aspect_width = 1
 global_spot_file = None
 
-from util import palette_from_string, real_glob
-
-from vqgan import VqganDrawer
-from vdiff import VdiffDrawer
 
 class_table = {
     "vqgan": VqganDrawer,
@@ -78,55 +85,44 @@ class_table = {
 
 try:
     from fast_pixeldrawer import FastPixelDrawer
+
     class_table.update({"fast_pixel": FastPixelDrawer})
 except ImportError as e:
     print("--> FastPixelDrawer not supported", e)
-    pass
 
 try:
     from super_resolution import SuperResolutionDrawer
+
     class_table.update({"super_resolution": SuperResolutionDrawer})
 except ImportError as e:
     print("--> Super resolution drawer not supported", e)
-    pass
 
 try:
     from fftdrawer import FftDrawer
+
     # update class_table if these import OK
     class_table.update({"fft": FftDrawer})
 except ImportError as e:
     print("--> Not running with fft support", e)
-    pass
 
 try:
     from clipdrawer import ClipDrawer
     from pixeldrawer import PixelDrawer
     from linedrawer import LineDrawer
+
     # update class_table if these import OK
-    class_table.update({
-        "line_sketch": LineDrawer,
-        "pixel": PixelDrawer,
-        "clipdraw": ClipDrawer
-    })
+    class_table.update(
+        {"line_sketch": LineDrawer, "pixel": PixelDrawer, "clipdraw": ClipDrawer}
+    )
 except ImportError as e:
     print("--> Not running with pydiffvg drawer support ", e)
-    pass
 
 try:
-    import matplotlib.colors
+    pass
 except ImportError:
     # only needed for palette stuff
     pass
 
-from Losses.LossInterface import LossInterface
-from Losses.PaletteLoss import PaletteLoss
-from Losses.SaturationLoss import SaturationLoss
-from Losses.SymmetryLoss import SymmetryLoss
-from Losses.SmoothnessLoss import SmoothnessLoss
-from Losses.EdgeLoss import EdgeLoss
-from Losses.StyleLoss import StyleLoss
-from Losses.ResmemLoss import ResmemLoss
-from Losses.AestheticLoss import AestheticLoss
 
 loss_class_table = {
     "palette": PaletteLoss,
@@ -147,16 +143,17 @@ loss_class_table = {
 def isnotebook():
     try:
         shell = get_ipython().__class__.__name__
-        if shell == 'ZMQInteractiveShell':
-            return True   # Jupyter notebook or qtconsole
-        elif shell == 'Shell':
-            return True   # Seems to be what co-lab does
-        elif shell == 'TerminalInteractiveShell':
+        if shell == "ZMQInteractiveShell":
+            return True  # Jupyter notebook or qtconsole
+        elif shell == "Shell":
+            return True  # Seems to be what co-lab does
+        elif shell == "TerminalInteractiveShell":
             return False  # Terminal running IPython
         else:
             return False  # Other type (?)
     except NameError:
-        return False      # Probably standard Python interpreter
+        return False  # Probably standard Python interpreter
+
 
 IS_NOTEBOOK = isnotebook()
 
@@ -168,13 +165,15 @@ else:
     from tqdm import tqdm
 
 # Functions and classes
+
+
 def sinc(x):
     return torch.where(x != 0, torch.sin(math.pi * x) / (math.pi * x), x.new_ones([]))
 
 
 def lanczos(x, a):
     cond = torch.logical_and(-a < x, x < a)
-    out = torch.where(cond, sinc(x) * sinc(x/a), x.new_zeros([]))
+    out = torch.where(cond, sinc(x) * sinc(x / a), x.new_zeros([]))
     return out / out.sum()
 
 
@@ -189,28 +188,35 @@ def ramp(ratio, width):
 
 
 # NR: Testing with different intital images
-def old_random_noise_image(w,h):
-    random_image = Image.fromarray(np.random.randint(0,255,(w,h,3),dtype=np.dtype('uint8')))
+def old_random_noise_image(w, h):
+    random_image = Image.fromarray(
+        np.random.randint(0, 255, (w, h, 3), dtype=np.dtype("uint8"))
+    )
     return random_image
+
 
 def NormalizeData(data):
     return (data - np.min(data)) / (np.max(data) - np.min(data))
 
+
 # https://stats.stackexchange.com/a/289477
+
+
 def contrast_noise(n):
     n = 0.9998 * n + 0.0001
-    n1 = (n / (1-n))
+    n1 = n / (1 - n)
     n2 = np.power(n1, -2)
     n3 = 1 / (1 + n2)
     return n3
 
-def random_noise_image(w,h):
+
+def random_noise_image(w, h):
     # scale up roughly as power of 2
-    if (w>1024 or h>1024):
+    if w > 1024 or h > 1024:
         side, octp = 2048, 6
-    elif (w>512 or h>512):
+    elif w > 512 or h > 512:
         side, octp = 1024, 5
-    elif (w>256 or h>256):
+    elif w > 256 or h > 256:
         side, octp = 512, 4
     else:
         side, octp = 256, 3
@@ -218,12 +224,15 @@ def random_noise_image(w,h):
     nr = NormalizeData(generate_fractal_noise_2d((side, side), (32, 32), octp))
     ng = NormalizeData(generate_fractal_noise_2d((side, side), (32, 32), octp))
     nb = NormalizeData(generate_fractal_noise_2d((side, side), (32, 32), octp))
-    stack = np.dstack((contrast_noise(nr),contrast_noise(ng),contrast_noise(nb)))
+    stack = np.dstack((contrast_noise(nr), contrast_noise(ng), contrast_noise(nb)))
     substack = stack[:h, :w, :]
-    im = Image.fromarray((255.999 * substack).astype('uint8'))
+    im = Image.fromarray((255.999 * substack).astype("uint8"))
     return im
 
+
 # testing
+
+
 def gradient_2d(start, stop, width, height, is_horizontal):
     if is_horizontal:
         return np.tile(np.linspace(start, stop, width), (height, 1))
@@ -234,14 +243,26 @@ def gradient_2d(start, stop, width, height, is_horizontal):
 def gradient_3d(width, height, start_list, stop_list, is_horizontal_list):
     result = np.zeros((height, width, len(start_list)), dtype=float)
 
-    for i, (start, stop, is_horizontal) in enumerate(zip(start_list, stop_list, is_horizontal_list)):
+    for i, (start, stop, is_horizontal) in enumerate(
+        zip(start_list, stop_list, is_horizontal_list)
+    ):
         result[:, :, i] = gradient_2d(start, stop, width, height, is_horizontal)
 
     return result
 
-    
-def random_gradient_image(w,h):
-    array = gradient_3d(w, h, (0, 0, np.random.randint(0,255)), (np.random.randint(1,255), np.random.randint(2,255), np.random.randint(3,128)), (True, False, False))
+
+def random_gradient_image(w, h):
+    array = gradient_3d(
+        w,
+        h,
+        (0, 0, np.random.randint(0, 255)),
+        (
+            np.random.randint(1, 255),
+            np.random.randint(2, 255),
+            np.random.randint(3, 128),
+        ),
+        (True, False, False),
+    )
     random_image = Image.fromarray(np.uint8(array))
     return random_image
 
@@ -256,6 +277,7 @@ class ReplaceGrad(torch.autograd.Function):
     def backward(ctx, grad_in):
         return None, grad_in.sum_to_size(ctx.shape)
 
+
 replace_grad = ReplaceGrad.apply
 
 
@@ -266,20 +288,26 @@ def spherical_dist_loss(x, y):
 
 
 class Prompt(nn.Module):
-    def __init__(self, embed, weight=1., stop=float('-inf')):
+    def __init__(self, embed, weight=1.0, stop=float("-inf")):
         super().__init__()
-        self.register_buffer('embed', embed)
-        self.register_buffer('weight', torch.as_tensor(weight))
-        self.register_buffer('stop', torch.as_tensor(stop))
+        self.register_buffer("embed", embed)
+        self.register_buffer("weight", torch.as_tensor(weight))
+        self.register_buffer("stop", torch.as_tensor(stop))
 
     def forward(self, input):
         input_normed = F.normalize(input.unsqueeze(1), dim=2)
         embed_normed = F.normalize(self.embed.unsqueeze(0), dim=2)
         dists = input_normed.sub(embed_normed).norm(dim=2).div(2).arcsin().pow(2).mul(2)
         dists = dists * self.weight.sign()
-        return self.weight.abs() * replace_grad(dists, torch.maximum(dists, self.stop)).mean()
+        return (
+            self.weight.abs()
+            * replace_grad(dists, torch.maximum(dists, self.stop)).mean()
+        )
+
 
 # https://stackoverflow.com/q/354038
+
+
 def is_number(s):
     try:
         float(s)
@@ -287,20 +315,21 @@ def is_number(s):
     except ValueError:
         return False
 
+
 def parse_prompt(prompt):
     """Prompts can either just be text, be a text:weight pair, or a text:weight:stop triple"""
 
     # defaults
     textPrompt = prompt
     weight = 1
-    stop = float('-inf')
+    stop = float("-inf")
 
     # try to parse numbers from the right but stop as soon as that fails
     extra_numbers = []
     keep_going = True
 
     while len(extra_numbers) < 2 and keep_going:
-        vals = textPrompt.rsplit(':', 1)
+        vals = textPrompt.rsplit(":", 1)
         if len(vals) > 1 and is_number(vals[1]):
             extra_numbers.append(float(vals[1]))
             textPrompt = vals[0]
@@ -320,25 +349,39 @@ def parse_prompt(prompt):
     # print(f"parsed vals is {textPrompt}, {weight}, {stop}")
     return textPrompt, weight, stop
 
-from typing import cast, Dict, List, Optional, Tuple, Union
 
 # override class to get padding_mode
+
+
 class MyRandomPerspective(K.RandomPerspective):
     def apply_transform(
-        self, input: torch.Tensor, params: Dict[str, torch.Tensor], transform: Optional[torch.Tensor] = None
+        self,
+        input: torch.Tensor,
+        params: Dict[str, torch.Tensor],
+        transform: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         _, _, height, width = input.shape
         transform = cast(torch.Tensor, transform)
         return kornia.geometry.transform.warp_perspective(
-            input, transform, (height, width), mode=self.flags["resample"].name.lower(),
-            align_corners=self.flags["align_corners"], padding_mode=global_padding_mode
+            input,
+            transform,
+            (height, width),
+            mode=self.flags["resample"].name.lower(),
+            align_corners=self.flags["align_corners"],
+            padding_mode=global_padding_mode,
         )
 
-global_fill_color=None;
+
+global_fill_color = None
 # override class to get fill color
+
+
 class MyRandomAffine(K.RandomAffine):
     def apply_transform(
-        self, input: torch.Tensor, params: Dict[str, torch.Tensor], transform: Optional[torch.Tensor] = None
+        self,
+        input: torch.Tensor,
+        params: Dict[str, torch.Tensor],
+        transform: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         _, _, height, width = input.shape
         transform = cast(torch.Tensor, transform)
@@ -349,24 +392,33 @@ class MyRandomAffine(K.RandomAffine):
             self.flags["resample"].name.lower(),
             align_corners=self.flags["align_corners"],
             padding_mode="fill",
-            fill_value=global_fill_color
+            fill_value=global_fill_color,
         )
+
 
 class MyRandomPerspectivePadded(K.RandomPerspective):
     def apply_transform(
-        self, input: torch.Tensor, params: Dict[str, torch.Tensor], transform: Optional[torch.Tensor] = None
+        self,
+        input: torch.Tensor,
+        params: Dict[str, torch.Tensor],
+        transform: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         _, _, height, width = input.shape
         transform = cast(torch.Tensor, transform)
         return kornia.geometry.transform.warp_perspective(
-            input, transform, (height, width), mode=self.flags["resample"].name.lower(),
+            input,
+            transform,
+            (height, width),
+            mode=self.flags["resample"].name.lower(),
             align_corners=self.flags["align_corners"],
             padding_mode="fill",
-            fill_value=global_fill_color
+            fill_value=global_fill_color,
         )
 
 
 cached_spot_indexes = {}
+
+
 def fetch_spot_indexes(sideX, sideY):
     global global_spot_file
 
@@ -381,7 +433,7 @@ def fetch_spot_indexes(sideX, sideY):
         else:
             mask_image = Image.open("inputs/spot_square.png")
         # this is a one channel mask
-        mask_image = mask_image.convert('RGB')
+        mask_image = mask_image.convert("RGB")
         mask_image = mask_image.resize((sideX, sideY), Image.LANCZOS)
         mask_image_tensor = TF.to_tensor(mask_image)
         # print("ONE CHANNEL ", mask_image_tensor.shape)
@@ -393,51 +445,103 @@ def fetch_spot_indexes(sideX, sideY):
 
     return cached_spot_indexes[cache_key]
 
+
 # n = torch.ones((3,5,5))
 # f = generate.fetch_spot_indexes(5, 5)
 # f[0].shape = [60,3]
 
+
 class MakeCutouts(nn.Module):
-    def __init__(self, cut_size, cutn, cut_pow=1.):
+    def __init__(self, cut_size, cutn, cut_pow=1.0):
         global global_aspect_width
 
         super().__init__()
         self.cut_size = cut_size
         self.cutn = cutn
-        self.cutn_zoom = int(0.6*cutn)
+        self.cutn_zoom = int(0.6 * cutn)
         self.cut_pow = cut_pow
         self.transforms = None
 
         augmentations = []
         # if global_aspect_width != 1:
         #     augmentations.append(K.RandomCrop(size=(self.cut_size,self.cut_size), p=1.0, cropping_mode="resample", return_transform=True))
-        augmentations.append(MyRandomPerspective(distortion_scale=0.40, p=0.7, return_transform=True))
-        augmentations.append(K.RandomResizedCrop(size=(self.cut_size,self.cut_size), scale=(0.25,0.95),  ratio=(0.85,1.2), cropping_mode='resample', p=1.0, return_transform=True))
-        augmentations.append(K.ColorJitter(hue=0.1, saturation=0.1, p=0.8, return_transform=True))
+        augmentations.append(
+            MyRandomPerspective(distortion_scale=0.40, p=0.7, return_transform=True)
+        )
+        augmentations.append(
+            K.RandomResizedCrop(
+                size=(self.cut_size, self.cut_size),
+                scale=(0.25, 0.95),
+                ratio=(0.85, 1.2),
+                cropping_mode="resample",
+                p=1.0,
+                return_transform=True,
+            )
+        )
+        augmentations.append(
+            K.ColorJitter(hue=0.1, saturation=0.1, p=0.8, return_transform=True)
+        )
         self.augs_zoom = nn.Sequential(*augmentations)
 
         augmentations = []
         if global_aspect_width == 1:
             n_s = 0.95
-            n_t = (1-n_s)/2
-            augmentations.append(MyRandomAffine(degrees=0, translate=(n_t, n_t), scale=(n_s, n_s), p=1.0, return_transform=True))
+            n_t = (1 - n_s) / 2
+            augmentations.append(
+                MyRandomAffine(
+                    degrees=0,
+                    translate=(n_t, n_t),
+                    scale=(n_s, n_s),
+                    p=1.0,
+                    return_transform=True,
+                )
+            )
         elif global_aspect_width > 1:
-            n_s = 1/global_aspect_width
-            n_t = (1-n_s)/2
-            augmentations.append(MyRandomAffine(degrees=0, translate=(0, n_t), scale=(0.9*n_s, n_s), p=1.0, return_transform=True))
+            n_s = 1 / global_aspect_width
+            n_t = (1 - n_s) / 2
+            augmentations.append(
+                MyRandomAffine(
+                    degrees=0,
+                    translate=(0, n_t),
+                    scale=(0.9 * n_s, n_s),
+                    p=1.0,
+                    return_transform=True,
+                )
+            )
         else:
             n_s = global_aspect_width
-            n_t = (1-n_s)/2
-            augmentations.append(MyRandomAffine(degrees=0, translate=(n_t, 0), scale=(0.9*n_s, n_s), p=1.0, return_transform=True))
+            n_t = (1 - n_s) / 2
+            augmentations.append(
+                MyRandomAffine(
+                    degrees=0,
+                    translate=(n_t, 0),
+                    scale=(0.9 * n_s, n_s),
+                    p=1.0,
+                    return_transform=True,
+                )
+            )
 
         # augmentations.append(K.CenterCrop(size=(self.cut_size,self.cut_size), p=1.0, cropping_mode="resample", return_transform=True))
-        augmentations.append(K.CenterCrop(size=self.cut_size, cropping_mode='resample', p=1.0, return_transform=True))
-        augmentations.append(MyRandomPerspectivePadded(distortion_scale=0.20, p=0.7, return_transform=True))
-        augmentations.append(K.ColorJitter(hue=0.1, saturation=0.1, p=0.8, return_transform=True))
+        augmentations.append(
+            K.CenterCrop(
+                size=self.cut_size,
+                cropping_mode="resample",
+                p=1.0,
+                return_transform=True,
+            )
+        )
+        augmentations.append(
+            MyRandomPerspectivePadded(
+                distortion_scale=0.20, p=0.7, return_transform=True
+            )
+        )
+        augmentations.append(
+            K.ColorJitter(hue=0.1, saturation=0.1, p=0.8, return_transform=True)
+        )
         self.augs_wide = nn.Sequential(*augmentations)
 
         self.noise_fac = 0.1
-        
+
         # Pooling
         self.av_pool = nn.AdaptiveAvgPool2d((self.cut_size, self.cut_size))
         self.max_pool = nn.AdaptiveMaxPool2d((self.cut_size, self.cut_size))
@@ -445,8 +549,8 @@ class MakeCutouts(nn.Module):
     def forward(self, input, spot=None):
         global global_aspect_width, cur_iteration
         sideY, sideX = input.shape[2:4]
-        max_size = min(sideX, sideY)
-        min_size = min(sideX, sideY, self.cut_size)
+        # max_size = min(sideX, sideY)
+        # min_size = min(sideX, sideY, self.cut_size)
         cutouts = []
         mask_indexes = None
 
@@ -460,16 +564,20 @@ class MakeCutouts(nn.Module):
 
         for _ in range(self.cutn):
             # Pooling
-            cutout = (self.av_pool(input) + self.max_pool(input))/2
+            cutout = (self.av_pool(input) + self.max_pool(input)) / 2
 
             if mask_indexes is not None:
-                cutout[0][mask_indexes] = 0.0 # 0.5
+                cutout[0][mask_indexes] = 0.0  # 0.5
 
             if global_aspect_width != 1:
                 if global_aspect_width > 1:
-                    cutout = kornia.geometry.transform.rescale(cutout, (1, global_aspect_width))
+                    cutout = kornia.geometry.transform.rescale(
+                        cutout, (1, global_aspect_width)
+                    )
                 else:
-                    cutout = kornia.geometry.transform.rescale(cutout, (1/global_aspect_width, 1))
+                    cutout = kornia.geometry.transform.rescale(
+                        cutout, (1 / global_aspect_width, 1)
+                    )
 
             # if cur_iteration % 50 == 0 and _ == 0:
             #     print(cutout.shape)
@@ -479,10 +587,19 @@ class MakeCutouts(nn.Module):
 
         if self.transforms is not None:
             # print("Cached transforms available")
-            batch1 = kornia.geometry.transform.warp_perspective(torch.cat(cutouts[:self.cutn_zoom], dim=0), self.transforms[:self.cutn_zoom],
-                (self.cut_size, self.cut_size), padding_mode=global_padding_mode)
-            batch2 = kornia.geometry.transform.warp_perspective(torch.cat(cutouts[self.cutn_zoom:], dim=0), self.transforms[self.cutn_zoom:],
-                (self.cut_size, self.cut_size), padding_mode="fill", fill_value=global_fill_color)
+            batch1 = kornia.geometry.transform.warp_perspective(
+                torch.cat(cutouts[: self.cutn_zoom], dim=0),
+                self.transforms[: self.cutn_zoom],
+                (self.cut_size, self.cut_size),
+                padding_mode=global_padding_mode,
+            )
+            batch2 = kornia.geometry.transform.warp_perspective(
+                torch.cat(cutouts[self.cutn_zoom :], dim=0),
+                self.transforms[self.cutn_zoom :],
+                (self.cut_size, self.cut_size),
+                padding_mode="fill",
+                fill_value=global_fill_color,
+            )
             batch = torch.cat([batch1, batch2])
             # if cur_iteration < 2:
             #     for j in range(4):
@@ -490,13 +607,17 @@ class MakeCutouts(nn.Module):
             #         j_wide = j + self.cutn_zoom
             #         TF.to_pil_image(batch[j_wide].cpu()).save(f"cached_im_{cur_iteration:02d}_{j_wide:02d}_{spot}.png")
         else:
-            batch1, transforms1 = self.augs_zoom(torch.cat(cutouts[:self.cutn_zoom], dim=0))
-            batch2, transforms2 = self.augs_wide(torch.cat(cutouts[self.cutn_zoom:], dim=0))
+            batch1, transforms1 = self.augs_zoom(
+                torch.cat(cutouts[: self.cutn_zoom], dim=0)
+            )
+            batch2, transforms2 = self.augs_wide(
+                torch.cat(cutouts[self.cutn_zoom :], dim=0)
+            )
             # print(batch1.shape, batch2.shape)
             batch = torch.cat([batch1, batch2])
             # print(batch.shape)
             self.transforms = torch.cat([transforms1, transforms2])
-            ## batch, self.transforms = self.augs(torch.cat(cutouts, dim=0))
+            # batch, self.transforms = self.augs(torch.cat(cutouts, dim=0))
             # if cur_iteration < 4:
             #     for j in range(4):
             #         TF.to_pil_image(batch[j].cpu()).save(f"live_im_{cur_iteration:02d}_{j:02d}_{spot}.png")
@@ -504,7 +625,7 @@ class MakeCutouts(nn.Module):
             #         TF.to_pil_image(batch[j_wide].cpu()).save(f"live_im_{cur_iteration:02d}_{j_wide:02d}_{spot}.png")
 
         # print(batch.shape, self.transforms.shape)
-        
+
         if self.noise_fac:
             facs = batch.new_empty([self.cutn, 1, 1, 1]).uniform_(0, self.noise_fac)
             batch = batch + facs * torch.randn_like(batch)
@@ -514,39 +635,40 @@ class MakeCutouts(nn.Module):
 def resize_image(image, out_size):
     ratio = image.size[0] / image.size[1]
     area = min(image.size[0] * image.size[1], out_size[0] * out_size[1])
-    size = round((area * ratio)**0.5), round((area / ratio)**0.5)
+    size = round((area * ratio) ** 0.5), round((area / ratio) ** 0.5)
     return image.resize(size, Image.LANCZOS)
+
 
 def rebuild_optimisers(args):
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
     global drawer, filters
 
-    drop_divisor = 10 ** num_loss_drop
+    drop_divisor = 10**num_loss_drop
     new_opts = drawer.get_opts(drop_divisor)
-    if new_opts == None:
+    if new_opts is None:
         # legacy
 
-        dropped_learning_rate = args.learning_rate/drop_divisor;
+        dropped_learning_rate = args.learning_rate / drop_divisor
         # print(f"Optimizing with {args.optimiser} set to {dropped_learning_rate}")
 
-        #temporary hack
-        if args.init_image and args.drawer=="vdiff":
-            dropped_learning_rate = 0.01/drop_divisor
+        # temporary hack
+        if args.init_image and args.drawer == "vdiff":
+            dropped_learning_rate = 0.01 / drop_divisor
 
         # Set the optimiser
-        to_optimize = [ drawer.get_z() ]
+        to_optimize = [drawer.get_z()]
         if args.optimiser == "Adam":
-            opt = optim.Adam(to_optimize, lr=dropped_learning_rate)        # LR=0.1
+            opt = optim.Adam(to_optimize, lr=dropped_learning_rate)  # LR=0.1
         elif args.optimiser == "AdamW":
-            opt = optim.AdamW(to_optimize, lr=dropped_learning_rate)       # LR=0.2
+            opt = optim.AdamW(to_optimize, lr=dropped_learning_rate)  # LR=0.2
         elif args.optimiser == "Adagrad":
-            opt = optim.Adagrad(to_optimize, lr=dropped_learning_rate) # LR=0.5+
+            opt = optim.Adagrad(to_optimize, lr=dropped_learning_rate)  # LR=0.5+
         elif args.optimiser == "Adamax":
             opt = optim.Adamax(to_optimize, lr=dropped_learning_rate)  # LR=0.5+?
         elif args.optimiser == "DiffGrad":
-            opt = DiffGrad(to_optimize, lr=dropped_learning_rate)      # LR=2+?
+            opt = DiffGrad(to_optimize, lr=dropped_learning_rate)  # LR=2+?
         elif args.optimiser == "AdamP":
-            opt = AdamP(to_optimize, lr=dropped_learning_rate)     # LR=2+?
+            opt = AdamP(to_optimize, lr=dropped_learning_rate)  # LR=2+?
         # elif args.optimiser == "RAdam":
         #     opt = RAdam(to_optimize, lr=dropped_learning_rate)     # LR=2+?
 
@@ -554,7 +676,10 @@ def rebuild_optimisers(args):
 
     return new_opts
 
+
 # used for target image
+
+
 def fetch_images(preprocess, image_files):
     images = []
 
@@ -563,6 +688,7 @@ def fetch_images(preprocess, image_files):
         images.append(image)
 
     return images
+
 
 def do_image_features(model, images, image_mean, image_std):
     image_input = torch.tensor(np.stack(images)).cuda()
@@ -574,7 +700,10 @@ def do_image_features(model, images, image_mean, image_std):
 
     return image_features
 
+
 # note: this should probably be split into a setup and a session init
+
+
 def do_init(args):
     global opts, perceptors, normalize, cutoutsTable, cutoutSizeTable
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor
@@ -597,9 +726,9 @@ def do_init(args):
         # https://stackoverflow.com/a/44556106/1010653
         e_str = args.seed.encode()
         hash_digest = hashlib.sha512(e_str).digest()
-        seed = int.from_bytes(hash_digest, 'big') % 0x100000000
-    int_seed = int(seed)%(2**30)
-    print('Using seed:', seed)
+        seed = int.from_bytes(hash_digest, "big") % 0x100000000
+    int_seed = int(seed) % (2**30)
+    print("Using seed:", seed)
     global_seed_used = seed
     torch.manual_seed(seed)
     np.random.seed(int_seed)
@@ -607,19 +736,19 @@ def do_init(args):
 
     # set device only once
     if device is None:
-        device = torch.device(args.cuda_device if torch.cuda.is_available() else 'cpu')
+        device = torch.device(args.cuda_device if torch.cuda.is_available() else "cpu")
 
     drawer = class_table[args.drawer](args)
     drawer.load_model(args, device)
     num_resolutions = drawer.get_num_resolutions()
 
     # print("-----------> NUMR ", num_resolutions)
-    #as of torch 1.8, jit produces errors. The below code no longer works with 1.10
-    #jit = True if float(torch.__version__[:3]) < 1.8 else False
-    jit = False
+    # as of torch 1.8, jit produces errors. The below code no longer works with 1.10
+    # jit = True if float(torch.__version__[:3]) < 1.8 else False
+    # jit = False
 
-    if num_resolutions!=None:
-        f = 2**(num_resolutions - 1)
+    if num_resolutions is not None:
+        f = 2 ** (num_resolutions - 1)
         toksX, toksY = args.size[0] // f, args.size[1] // f
         sideX, sideY = toksX * f, toksY * f
     else:
@@ -629,7 +758,8 @@ def do_init(args):
     gside_X = sideX
     gside_Y = sideY
 
-    # model loading optimization: if all models are loaded keep things as they are
+    # model loading optimization: if all models are loaded keep things as they
+    # are
     if set(args.clip_models) <= set(perceptors.keys()):
         print("All CLIP models already loaded: ", args.clip_models)
     else:
@@ -644,7 +774,7 @@ def do_init(args):
         perceptor = perceptors[clip_model]
         cut_size = perceptor.input_resolution
         cutoutSizeTable[clip_model] = cut_size
-        if not cut_size in cutoutsTable:    
+        if cut_size not in cutoutsTable:
             make_cutouts = MakeCutouts(cut_size, args.num_cuts, cut_pow=args.cut_pow)
             cutoutsTable[cut_size] = make_cutouts
 
@@ -661,9 +791,11 @@ def do_init(args):
             # do special initializations here
             try:
                 filtInstance = filtClass(args, device=device)
-                filterClasses.append({"filter":filtInstance, "weight": weight})
+                filterClasses.append({"filter": filtInstance, "weight": weight})
             except TypeError as e:
-                print(f'error in initializing {filtClass} - this message is to provide information')
+                print(
+                    f"error in initializing {filtClass} - this message is to provide information"
+                )
                 raise TypeError(e)
         filters = filterClasses
 
@@ -674,21 +806,23 @@ def do_init(args):
     if args.init_image or args.init_noise:
         # setup init image wih pil
         # first - always start with noise or blank
-        if args.init_noise == 'pixels':
+        if args.init_noise == "pixels":
             img = random_noise_image(args.size[0], args.size[1])
-        elif args.init_noise == 'gradient':
+        elif args.init_noise == "gradient":
             img = random_gradient_image(args.size[0], args.size[1])
-        elif args.init_noise == 'snow':
+        elif args.init_noise == "snow":
             img = old_random_noise_image(args.size[0], args.size[1])
         else:
-            img = Image.new(mode="RGB", size=(args.size[0], args.size[1]), color=(255, 255, 255))
-        starting_image = img.convert('RGB')
+            img = Image.new(
+                mode="RGB", size=(args.size[0], args.size[1]), color=(255, 255, 255)
+            )
+        starting_image = img.convert("RGB")
         starting_image = starting_image.resize((sideX, sideY), Image.LANCZOS)
 
         if args.init_image:
             # now we might overlay an init image
             filelist = None
-            if 'http' in args.init_image:
+            if "http" in args.init_image:
                 init_images = [Image.open(urlopen(args.init_image))]
             else:
                 filelist = real_glob(args.init_image)
@@ -697,13 +831,13 @@ def do_init(args):
             init_image_rgba_list = []
             for init_image in init_images:
                 # this version is needed potentially for the loss function
-                init_image_rgb = init_image.convert('RGB')
+                init_image_rgb = init_image.convert("RGB")
                 init_image_rgb = init_image_rgb.resize((sideX, sideY), Image.LANCZOS)
                 init_image_tensor = TF.to_tensor(init_image_rgb)
                 init_image_tensor = init_image_tensor.to(device).unsqueeze(0)
 
                 # this version gets overlaid on the background (noise)
-                init_image_rgba = init_image.convert('RGBA')
+                init_image_rgba = init_image.convert("RGBA")
                 init_image_rgba = init_image_rgba.resize((sideX, sideY), Image.LANCZOS)
                 top_image = init_image_rgba.copy()
                 if args.init_image_alpha and args.init_image_alpha >= 0:
@@ -714,7 +848,7 @@ def do_init(args):
 
             starting_image = init_image_rgba_list[0]
 
-            save_image(init_image_tensor,"init_image_tensor.png")
+            save_image(init_image_tensor, "init_image_tensor.png")
             drawer.init_from_tensor(init_image_tensor * 2 - 1)
             z_orig = drawer.get_z_copy()
         else:
@@ -731,20 +865,22 @@ def do_init(args):
     if args.overlay_image is not None:
         # todo: maybe split this up on pipes and whatnot
         overlay_image_rgba_list = []
-        if 'http' in args.overlay_image:
+        if "http" in args.overlay_image:
             overlay_images = [Image.open(urlopen(args.overlay_image))]
         else:
             filelist = real_glob(args.overlay_image)
             overlay_images = [Image.open(f) for f in filelist]
 
         for overlay_image in overlay_images:
-            overlay_image_rgba = overlay_image.convert('RGBA')
-            overlay_image_rgba = overlay_image_rgba.resize((sideX, sideY), Image.LANCZOS)
+            overlay_image_rgba = overlay_image.convert("RGBA")
+            overlay_image_rgba = overlay_image_rgba.resize(
+                (sideX, sideY), Image.LANCZOS
+            )
             if args.overlay_alpha:
                 overlay_image_rgba.putalpha(args.overlay_alpha)
             overlay_image_rgba_list.append(overlay_image_rgba)
 
-        overlay_image_rgba_list[0].save('overlay_image0.png')
+        overlay_image_rgba_list[0].save("overlay_image0.png")
 
     global_cached_png_info = None
 
@@ -761,7 +897,7 @@ def do_init(args):
         spotOffPmsTable[clip_model] = []
 
     drawer_clip_target = None
-    if hasattr(drawer, 'clip_model') and drawer.clip_model is not None:
+    if hasattr(drawer, "clip_model") and drawer.clip_model is not None:
         print(f"drawer {drawer} needs {drawer.clip_model}")
         drawer_clip_target = drawer.clip_model
     # NR: Weights / blending
@@ -776,11 +912,15 @@ def do_init(args):
 
                 input_resolution = perceptor.input_resolution
                 # print(f"Running {clip_model} at {input_resolution}")
-                preprocess = Compose([
-                    Resize(input_resolution, interpolation=InterpolationMode.BICUBIC),
-                    CenterCrop(input_resolution),
-                    ToTensor()
-                ])
+                preprocess = Compose(
+                    [
+                        Resize(
+                            input_resolution, interpolation=InterpolationMode.BICUBIC
+                        ),
+                        CenterCrop(input_resolution),
+                        ToTensor(),
+                    ]
+                )
                 image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
                 image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
 
@@ -792,7 +932,9 @@ def do_init(args):
 
                 for path in input_files:
                     images = fetch_images(preprocess, [path])
-                    features = do_image_features(perceptor, images, image_mean, image_std)
+                    features = do_image_features(
+                        perceptor, images, image_mean, image_std
+                    )
                     pmsTarget.append(Prompt(features, weight, stop).to(device))
         else:
             for clip_model in args.clip_models:
@@ -801,11 +943,15 @@ def do_init(args):
 
                 input_resolution = perceptor.input_resolution
                 # print(f"Running {clip_model} at {input_resolution}")
-                preprocess = Compose([
-                    Resize(input_resolution, interpolation=InterpolationMode.BICUBIC),
-                    CenterCrop(input_resolution),
-                    ToTensor()
-                ])
+                preprocess = Compose(
+                    [
+                        Resize(
+                            input_resolution, interpolation=InterpolationMode.BICUBIC
+                        ),
+                        CenterCrop(input_resolution),
+                        ToTensor(),
+                    ]
+                )
                 image_mean = torch.tensor([0.48145466, 0.4578275, 0.40821073]).cuda()
                 image_std = torch.tensor([0.26862954, 0.26130258, 0.27577711]).cuda()
 
@@ -813,7 +959,7 @@ def do_init(args):
                 for target_image in args.target_images:
                     f1, weight, stop = parse_prompt(target_image)
                     # print("Target parse ", target_image, "to", f1)
-                    if 'http' in f1:
+                    if "http" in f1:
                         # note: this is currently untested...
                         infile = urlopen(f1)
                         input_files.append(infile)
@@ -822,7 +968,7 @@ def do_init(args):
                         input_files.extend(infiles)
 
                 print(input_files)
-                images = fetch_images(preprocess, input_files);
+                images = fetch_images(preprocess, input_files)
 
                 features = do_image_features(perceptor, images, image_mean, image_std)
                 if clip_model == drawer_clip_target:
@@ -836,10 +982,12 @@ def do_init(args):
         cur_labels = []
         for image_label in filelist:
             image_label = Image.open(image_label)
-            image_label_rgb = image_label.convert('RGB')
+            image_label_rgb = image_label.convert("RGB")
             image_label_rgb = image_label_rgb.resize((sideX, sideY), Image.LANCZOS)
             image_label_rgb_tensor = TF.to_tensor(image_label_rgb)
-            image_label_rgb_tensor = image_label_rgb_tensor.to(device).unsqueeze(0) * 2 - 1
+            image_label_rgb_tensor = (
+                image_label_rgb_tensor.to(device).unsqueeze(0) * 2 - 1
+            )
             z_label = drawer.get_z_from_tensor(image_label_rgb_tensor)
             cur_labels.append(z_label)
         image_embeddings = torch.stack(cur_labels)
@@ -853,7 +1001,7 @@ def do_init(args):
         z_orig = drawer.get_z_copy()
 
     # normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
-    #                                   std=[0.26862954, 0.26130258, 0.27577711])
+    # std=[0.26862954, 0.26130258, 0.27577711])
 
     # CLIP tokenize/encode
     for prompt in args.prompts:
@@ -861,7 +1009,7 @@ def do_init(args):
             pMs = pmsTable[clip_model]
             perceptor = perceptors[clip_model]
             txt, weight, stop = parse_prompt(prompt)
-            if txt[0] == '=':
+            if txt[0] == "=":
                 # hack for now to test pseudo encode shim
                 txt = txt[1:]
                 print(f"--> {clip_model} encoding {txt} with stops")
@@ -877,22 +1025,24 @@ def do_init(args):
             pMs.append(Prompt(embed, weight, stop).to(device))
 
     if drawer_clip_target is not None and len(allpromptembeds) > 0:
-        if args.drawer=="vdiff" and args.vdiff_model[:7] == "cc12m_1":
+        if args.drawer == "vdiff" and args.vdiff_model[:7] == "cc12m_1":
             target_embeds = torch.cat(allpromptembeds)
             allweights = torch.tensor(allweights, dtype=torch.float, device=device)
-            clip_embed = F.normalize(target_embeds.mul(allweights[:, None]).sum(0, keepdim=True), dim=-1)
+            clip_embed = F.normalize(
+                target_embeds.mul(allweights[:, None]).sum(0, keepdim=True), dim=-1
+            )
             print(f"clip_embed for drawer {drawer} is {clip_embed.shape}")
-            drawer.sample_state[3] = {"clip_embed":clip_embed}
+            drawer.sample_state[3] = {"clip_embed": clip_embed}
 
     for vect_prompt in args.vector_prompts:
         f1, weight, stop = parse_prompt(vect_prompt)
         # vect_promts are by nature tuned to 10% of a normal prompt
         weight = 0.1 * weight
-        if 'http' in f1:
+        if "http" in f1:
             # note: this is currently untested...
             infile = None
             infile_handle = urlopen(f1)
-        elif 'json' in f1:
+        elif "json" in f1:
             infile = f1
         else:
             infile = f"vectors/{f1}.json"
@@ -906,7 +1056,9 @@ def do_init(args):
         for clip_model in args.clip_models:
             if clip_model not in vect_table:
                 print(f"WARNING: no vector for {clip_model} in {f1}!")
-                print("Continuing without this vector... (BUT THIS RESULT MIGHT NOT BE WHAT YOU WANT 😬)")
+                print(
+                    "Continuing without this vector... (BUT THIS RESULT MIGHT NOT BE WHAT YOU WANT 😬)"
+                )
                 # time.sleep(3)
                 continue
             pMs = pmsTable[clip_model]
@@ -935,10 +1087,11 @@ def do_init(args):
             pMs = pmsTable[clip_model]
             perceptor = perceptors[clip_model]
             txt, weight, stop = parse_prompt(label)
-            texts = [template.format(txt) for template in imagenet_templates] #format with class
+            # format with class
+            texts = [template.format(txt) for template in imagenet_templates]
             # print(f"Tokenizing all of {texts}")
             # texts = clip.tokenize(texts).to(device) #tokenize
-            class_embeddings = perceptor.encode_text(texts) #embed with text encoder
+            class_embeddings = perceptor.encode_text(texts)  # embed with text encoder
             class_embeddings /= class_embeddings.norm(dim=-1, keepdim=True)
             class_embedding = class_embeddings.mean(dim=0)
             class_embedding /= class_embedding.norm()
@@ -948,7 +1101,7 @@ def do_init(args):
         pImages = pmsImageTable[clip_model]
         for path in args.image_prompts:
             img = Image.open(path)
-            pil_image = img.convert('RGB')
+            pil_image = img.convert("RGB")
             img = resize_image(pil_image, (sideX, sideY))
             pImages.append(TF.to_tensor(img).unsqueeze(0).to(device))
 
@@ -957,7 +1110,7 @@ def do_init(args):
         embed = torch.empty([1, perceptor.output_dim]).normal_(generator=gen)
         pMs.append(Prompt(embed, weight).to(device))
 
-    #custom loss 
+    # custom loss
     if args.custom_loss is not None:
         custom_losses = args.custom_loss.split(",")
         custom_losses = [loss.strip() for loss in custom_losses]
@@ -965,8 +1118,8 @@ def do_init(args):
         lossClasses = []
         for loss_chunk in custom_losses:
             # check for special delimiter
-            if loss_chunk.find('->') > 0:
-                parts = loss_chunk.split('->')
+            if loss_chunk.find("->") > 0:
+                parts = loss_chunk.split("->")
                 loss = parts[0]
                 instance_args = parts[1:]
             else:
@@ -978,45 +1131,44 @@ def do_init(args):
             try:
                 lossInstance = lossClass(device=device)
                 lossInstance.instance_settings(instance_args)
-                lossClasses.append({"loss":lossInstance, "weight": weight})
+                lossClasses.append({"loss": lossInstance, "weight": weight})
             except TypeError as e:
-                print(f'error in initializing {lossClass} - this message is to provide information')
+                print(
+                    f"error in initializing {lossClass} - this message is to provide information"
+                )
                 raise TypeError(e)
         args.custom_loss = lossClasses
 
-    #Loss args parse
+    # Loss args parse
     if args.custom_loss:
         for t in args.custom_loss:
             args = t["loss"].parse_settings(args)
 
-    #adding globals for loss
-    if args.custom_loss is not None and len(args.custom_loss)>0:
+    # adding globals for loss
+    if args.custom_loss is not None and len(args.custom_loss) > 0:
         for t in args.custom_loss:
             lossGlobals.update(t["loss"].add_globals(args))
-    
-    
+
     opts = rebuild_optimisers(args)
 
     # Output for the user
-    print('Using device:', device)
-    print('Optimising using:', args.optimiser)
+    print("Using device:", device)
+    print("Optimising using:", args.optimiser)
 
     if args.prompts:
-        print('Using text prompts:', args.prompts)
+        print("Using text prompts:", args.prompts)
     if args.spot_prompts:
-        print('Using spot prompts:', args.spot_prompts)
+        print("Using spot prompts:", args.spot_prompts)
     if args.spot_prompts_off:
-        print('Using spot off prompts:', args.spot_prompts_off)
+        print("Using spot off prompts:", args.spot_prompts_off)
     if args.image_prompts:
-        print('Using #image prompts:', len(args.image_prompts))
+        print("Using #image prompts:", len(args.image_prompts))
     if args.init_image:
-        print(f'Using initial image {args.init_image} ({len(init_image_rgba_list)})')
+        print(f"Using initial image {args.init_image} ({len(init_image_rgba_list)})")
     if args.noise_prompt_weights:
-        print('Noise prompt weights:', args.noise_prompt_weights)
+        print("Noise prompt weights:", args.noise_prompt_weights)
     if args.custom_loss:
-        print(f'using custom losses: {str(custom_loss_names)}')
-
-    cur_iteration = 0
+        print(f"using custom losses: {str(custom_loss_names)}")
 
 
 # dreaded unsorted globals (for now)
@@ -1030,21 +1182,21 @@ filters = None
 init_image_tensor = None
 target_image_tensor = None
 pmsTable = None
-spotPmsTable = None 
-spotOffPmsTable = None 
+spotPmsTable = None
+spotOffPmsTable = None
 pmsImageTable = None
 pmsTargetTable = None
-gside_X=None
-gside_Y=None
-init_image_rgba_list=[]
-overlay_image_rgba_list=None
-overlay_image_rgba=None
-cur_iteration=None
-cur_anim_index=None
-anim_output_files=[]
-anim_cur_zs=[]
-anim_next_zs=[]
-best_loss = None 
+gside_X = None
+gside_Y = None
+init_image_rgba_list = []
+overlay_image_rgba_list = None
+overlay_image_rgba = None
+cur_iteration = None
+cur_anim_index = None
+anim_output_files = []
+anim_cur_zs = []
+anim_next_zs = []
+best_loss = None
 best_iter = None
 best_z = None
 num_loss_drop = 0
@@ -1057,23 +1209,36 @@ cutoutSizeTable = {}
 
 # persistent globals
 perceptors = {}
-device=None
+device = None
 
-#loss globals
+# loss globals
 lossGlobals = {}
 
 # on re-runs this should reset most important globals
+
+
 def reset_session_globals():
     global cutoutsTable, cutoutSizeTable
     cutoutsTable = {}
     cutoutSizeTable = {}
 
+
 def make_gif(args, iter):
     gif_output = os.path.join(args.animation_dir, "anim.gif")
     if os.path.exists(gif_output):
         os.remove(gif_output)
-    cmd = ['ffmpeg', '-framerate', '10', '-pattern_type', 'glob',
-           '-i', f"{args.animation_dir}/*.png", '-loop', '0', gif_output]
+    cmd = [
+        "ffmpeg",
+        "-framerate",
+        "10",
+        "-pattern_type",
+        "glob",
+        "-i",
+        f"{args.animation_dir}/*.png",
+        "-loop",
+        "0",
+        gif_output,
+    ]
     try:
         output = subprocess.check_output(cmd)
     except subprocess.CalledProcessError as cpe:
@@ -1082,10 +1247,12 @@ def make_gif(args, iter):
 
     return gif_output
 
+
 # !ffmpeg \
 #   -framerate 10 -pattern_type glob \
 #   -i '{animation_output}/*_*.png' \
 #   -loop 0 {animation_output}/final.gif
+
 
 @torch.no_grad()
 def checkdrop(args, iter, losses):
@@ -1095,10 +1262,8 @@ def checkdrop(args, iter, losses):
     drop_loss_time = False
 
     loss_sum = sum(losses)
-    is_new_best = False
     num_cycles_not_best = 0
-    if (loss_sum < best_loss):
-        is_new_best = True
+    if loss_sum < best_loss:
         best_loss = loss_sum
         best_iter = iter
         best_z = drawer.get_z_copy()
@@ -1108,12 +1273,15 @@ def checkdrop(args, iter, losses):
             drop_loss_time = True
     return drop_loss_time
 
+
 # for a release just bake in the version to prevent git subprocess lookup
 git_official_release_version = None
 git_fallback_version = "v1.9.1+"
 
 # https://stackoverflow.com/a/40170206/1010653
 # Return the git revision as a string
+
+
 def git_version():
     global git_official_release_version, git_fallback_version
     if git_official_release_version is not None:
@@ -1122,26 +1290,29 @@ def git_version():
     def _minimal_ext_cmd(cmd):
         # construct minimal environment
         env = {}
-        for k in ['SYSTEMROOT', 'PATH']:
+        for k in ["SYSTEMROOT", "PATH"]:
             v = os.environ.get(k)
             if v is not None:
                 env[k] = v
         # LANGUAGE is used on win32
-        env['LANGUAGE'] = 'C'
-        env['LANG'] = 'C'
-        env['LC_ALL'] = 'C'
-        out = subprocess.Popen(cmd, stdout = subprocess.PIPE, env=env).communicate()[0]
+        env["LANGUAGE"] = "C"
+        env["LANG"] = "C"
+        env["LC_ALL"] = "C"
+        out = subprocess.Popen(cmd, stdout=subprocess.PIPE, env=env).communicate()[0]
         return out
 
     try:
-        out = _minimal_ext_cmd(['git', 'describe', '--always'])
-        GIT_REVISION = out.strip().decode('ascii')
+        out = _minimal_ext_cmd(["git", "describe", "--always"])
+        GIT_REVISION = out.strip().decode("ascii")
     except OSError:
         GIT_REVISION = git_fallback_version
 
     return GIT_REVISION
 
-global_cached_png_info=None
+
+global_cached_png_info = None
+
+
 def getPngInfo():
     global global_cached_png_info
     if global_cached_png_info is None:
@@ -1153,7 +1324,8 @@ def getPngInfo():
             info.add_text(f"pixray_{k}", str(global_given_args[k]))
         info.add_text("pixray_seed_used", str(global_seed_used))
         global_cached_png_info = info
-    return global_cached_png_info 
+    return global_cached_png_info
+
 
 @torch.no_grad()
 def checkin(args, iter, losses):
@@ -1163,22 +1335,24 @@ def checkin(args, iter, losses):
     num_cycles_not_best = iter - best_iter
 
     if losses is not None:
-        losses_str = ', '.join(f'{loss.item():2.3g}' for loss in losses)
-        writestr = f'iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str}'
+        losses_str = ", ".join(f"{loss.item():2.3g}" for loss in losses)
+        writestr = (
+            f"iter: {iter}, loss: {sum(losses).item():1.3g}, losses: {losses_str}"
+        )
     else:
-        writestr = f'iter: {iter}, finished'
+        writestr = f"iter: {iter}, finished"
 
     if args.animation_dir is not None:
-        writestr = f'anim: {cur_anim_index}/{len(anim_output_files)} {writestr}'
+        writestr = f"anim: {cur_anim_index}/{len(anim_output_files)} {writestr}"
     else:
-        writestr = f'{writestr} (-{num_cycles_not_best}=>{best_loss:2.4g})'
+        writestr = f"{writestr} (-{num_cycles_not_best}=>{best_loss:2.4g})"
 
     timg, img_alpha = do_synth_and_filter(args, cur_iteration, [], to_file=True)
     img = TF.to_pil_image(timg[0].cpu())
     # print(f"Gonna save {timg.shape} and {img}")
     # img = drawer.to_image()
     if cur_anim_index is None:
-        outfile = get_file_path(args.outdir, args.output, '.png')
+        outfile = get_file_path(args.outdir, args.output, ".png")
     else:
         outfile = anim_output_files[cur_anim_index]
     img.save(outfile, pnginfo=getPngInfo())
@@ -1186,19 +1360,23 @@ def checkin(args, iter, losses):
         step_path = os.path.join(args.outdir, "steps")
         if not os.path.isdir(step_path):
             os.makedirs(step_path)
-        imageio.imwrite(get_file_path(step_path, f'frame_{cur_iteration:04d}', '.png'), np.array(img))
+        imageio.imwrite(
+            get_file_path(step_path, f"frame_{cur_iteration:04d}", ".png"),
+            np.array(img),
+        )
     if cur_anim_index == len(anim_output_files) - 1:
         # save gif
         gif_output = make_gif(args, iter)
         if IS_NOTEBOOK and iter % args.display_every == 0:
             clear_output()
-            display.display(display.Image(open(gif_output,'rb').read()))
+            display.display(display.Image(open(gif_output, "rb").read()))
     if IS_NOTEBOOK and iter % args.display_every == 0:
         if cur_anim_index is None or iter == 0:
             if args.display_clear:
                 clear_output()
             display.display(display.Image(outfile))
     tqdm.write(writestr)
+
 
 def do_synth_and_filter(args, cur_iteration, loss_list, to_file=False):
     global device, global_fill_color
@@ -1209,30 +1387,31 @@ def do_synth_and_filter(args, cur_iteration, loss_list, to_file=False):
     # else:
     #     out = drawer.synth(cur_iteration)
 
-    if filters is not None and len(filters)>0:
+    if filters is not None and len(filters) > 0:
         for f in filters:
             filtclass = f["filter"]
             filtweight = f["weight"]
-            out, new_losses = filtclass(out);
-            if type(new_losses) is not list and type(new_losses) is not tuple:
+            out, new_losses = filtclass(out)
+            if not isinstance(new_losses, list) and not isinstance(new_losses, tuple):
                 loss_list.append(filtweight * new_losses)
             else:
                 # warning: this path might be untested by current losses?
                 weighted_losses = [(filtweight * l) for l in new_losses]
                 loss_list += weighted_losses
 
-
     alpha = None
     # flatten to 3 channel
-    _B,C,_H,_W = out.shape
+    _B, C, _H, _W = out.shape
     if C == 4:
-        colors = out[:,0:3,:,:]
+        colors = out[:, 0:3, :, :]
         if args.transparent:
             if not to_file:
                 # random squash
                 # print(f"Flattening {out.shape} on {global_fill_color[0]}")
-                alpha = out[:,3,:,:]
-                bg_shade = global_fill_color[0] * torch.ones(size=(_B,3,_H,_W), device=device, dtype=torch.float)
+                alpha = out[:, 3, :, :]
+                bg_shade = global_fill_color[0] * torch.ones(
+                    size=(_B, 3, _H, _W), device=device, dtype=torch.float
+                )
                 out = alpha * colors + (1 - alpha) * bg_shade
                 TF.to_pil_image(out[0].cpu()).save("flat.png")
         else:
@@ -1240,22 +1419,25 @@ def do_synth_and_filter(args, cur_iteration, loss_list, to_file=False):
 
     return out, alpha
 
+
 def ascend_txt(args):
-    global cur_iteration, cur_anim_index, perceptors, cutoutsTable, cutoutSizeTable # normalize, 
+    global cur_iteration, cur_anim_index, perceptors, cutoutsTable, cutoutSizeTable  # normalize,
     global z_orig, im_targets, z_labels, init_image_tensor, target_image_tensor, drawer
     global pmsTable, pmsImageTable, spotPmsTable, spotOffPmsTable, global_padding_mode, global_fill_color
     global pmsTargetTable
     global lossGlobals
 
-    if (cur_iteration%2 == 0):
-        global_padding_mode = 'reflection'
+    if cur_iteration % 2 == 0:
+        global_padding_mode = "reflection"
     else:
-        global_padding_mode = 'border'
+        global_padding_mode = "border"
 
     color_fill = random.random()
     # print("Color fill is ", color_fill)
     # color_fill = 1.0
-    global_fill_color =torch.tensor([color_fill,color_fill,color_fill], device=device, dtype=torch.float)
+    global_fill_color = torch.tensor(
+        [color_fill, color_fill, color_fill], device=device, dtype=torch.float
+    )
 
     result = []
     out, img_alpha = do_synth_and_filter(args, cur_iteration, result)
@@ -1301,7 +1483,7 @@ def ascend_txt(args):
         # add target frame prompts if applicable
         if cur_anim_index is not None and len(pmsTargetTable[clip_model]) > 0:
             num_anim_frames = len(pmsTargetTable[clip_model])
-            pmsTarget = [ pmsTargetTable[clip_model][cur_anim_index % num_anim_frames] ]
+            pmsTarget = [pmsTargetTable[clip_model][cur_anim_index % num_anim_frames]]
             for prompt in pmsTarget:
                 result.append(prompt(iii))
 
@@ -1312,12 +1494,13 @@ def ascend_txt(args):
         # if animating select one pImage, otherwise use them all
         if cur_anim_index is not None and len(pmsImageTable[clip_model]) > 0:
             num_anim_frames = len(pmsImageTable[clip_model])
-            pImages = [ pmsImageTable[clip_model][cur_anim_index % num_anim_frames] ]
+            pImages = [pmsImageTable[clip_model][cur_anim_index % num_anim_frames]]
         else:
             pImages = pmsImageTable[clip_model]
-        
+
         for timg in pImages:
-            # note: this caches and reuses the transforms - a bit of a hack but it works
+            # note: this caches and reuses the transforms - a bit of a hack but
+            # it works
 
             if args.image_prompt_shuffle:
                 # print("Disabling cached transforms")
@@ -1335,7 +1518,6 @@ def ascend_txt(args):
         for prompt in transient_pMs:
             result.append(prompt(iii))
 
-
     for cutoutSize in cutoutsTable:
         # clear the transform "cache"
         make_cutouts = cutoutsTable[cutoutSize]
@@ -1343,19 +1525,20 @@ def ascend_txt(args):
 
     if args.image_labels is not None:
         for z_label in z_labels:
-            f = drawer.get_z().reshape(1,-1)
-            f2 = z_label.reshape(1,-1)
+            f = drawer.get_z().reshape(1, -1)
+            f2 = z_label.reshape(1, -1)
             cur_loss = spherical_dist_loss(f, f2) * args.image_label_weight
             result.append(cur_loss)
 
     # main init_weight uses spherical loss
     if args.init_weight:
-        f = drawer.get_z().reshape(1,-1)
-        f2 = z_orig.reshape(1,-1)
+        f = drawer.get_z().reshape(1, -1)
+        f2 = z_orig.reshape(1, -1)
         cur_loss = spherical_dist_loss(f, f2) * args.init_weight
         result.append(cur_loss[0])
 
-    # these three init_weight variants offer mse_loss, mse_loss in pixel space, and cos loss
+    # these three init_weight variants offer mse_loss, mse_loss in pixel
+    # space, and cos loss
     if args.init_weight_dist:
         cur_loss = F.mse_loss(drawer.get_z(), z_orig) * args.init_weight_dist / 2
         result.append(cur_loss)
@@ -1368,29 +1551,31 @@ def ascend_txt(args):
             result.append(cur_loss)
 
     if args.init_weight_cos:
-        f = drawer.get_z().reshape(1,-1)
-        f2 = z_orig.reshape(1,-1)
+        f = drawer.get_z().reshape(1, -1)
+        f2 = z_orig.reshape(1, -1)
         y = torch.ones_like(f[0])
         cur_loss = F.cosine_embedding_loss(f, f2, y) * args.init_weight_cos
         result.append(cur_loss)
-    
+
     needed_globals = {
         # used to be for palette loss - now left as an example
-        "cur_iteration":cur_iteration,
+        "cur_iteration": cur_iteration,
         "embeds": iii,
     }
 
     if img_alpha is not None and args.transparent_weight != 0:
-        t_loss = args.transparent_weight*torch.mean(img_alpha)
+        t_loss = args.transparent_weight * torch.mean(img_alpha)
         # print(f"with weight {args.transparent_weight} the loss is {t_loss}")
         result.append(t_loss)
-    
-    if args.custom_loss is not None and len(args.custom_loss)>0:
+
+    if args.custom_loss is not None and len(args.custom_loss) > 0:
         for t in args.custom_loss:
             lossclass = t["loss"]
             lossweight = t["weight"]
-            new_losses = lossclass.get_loss(cur_cutouts, out, args, globals = needed_globals, lossGlobals = lossGlobals)
-            if type(new_losses) is not list and type(new_losses) is not tuple:
+            new_losses = lossclass.get_loss(
+                cur_cutouts, out, args, globals=needed_globals, lossGlobals=lossGlobals
+            )
+            if not isinstance(new_losses, list) and not isinstance(new_losses, tuple):
                 result.append(lossweight * new_losses)
             else:
                 # warning: this path might be untested by current losses?
@@ -1399,11 +1584,14 @@ def ascend_txt(args):
 
     if args.make_video:
         video_folder = os.path.join(args.outdir, "video")
-        img = np.array(out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8))[:,:,:]
+        img = np.array(
+            out.mul(255).clamp(0, 255)[0].cpu().detach().numpy().astype(np.uint8)
+        )[:, :, :]
         img = np.transpose(img, (1, 2, 0))
-        imageio.imwrite(f'{video_folder}/frame_{cur_iteration:04d}.png', np.array(img))
+        imageio.imwrite(f"{video_folder}/frame_{cur_iteration:04d}.png", np.array(img))
 
     return result
+
 
 def re_average_z(args):
     global gside_X, gside_Y
@@ -1411,33 +1599,43 @@ def re_average_z(args):
 
     # old_z = z.clone()
     cur_z_image = drawer.to_image()
-    cur_z_image = cur_z_image.convert('RGB')
+    cur_z_image = cur_z_image.convert("RGB")
     if overlay_image_rgba:
         # print("applying overlay image")
         cur_z_image.paste(overlay_image_rgba, (0, 0), mask=overlay_image_rgba)
         # cur_z_image.save("overlaid.png")
     cur_z_image = cur_z_image.resize((gside_X, gside_Y), Image.LANCZOS)
-    drawer.reapply_from_tensor(TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1)
+    drawer.reapply_from_tensor(
+        TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1
+    )
+
 
 def init_anim_z(args, init_rgba):
     global gside_X, gside_Y
     global device, drawer
 
     cur_z_image = init_rgba.copy()
-    drawer.reapply_from_tensor(TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1)
+    drawer.reapply_from_tensor(
+        TF.to_tensor(cur_z_image).to(device).unsqueeze(0) * 2 - 1
+    )
+
 
 # torch.autograd.set_detect_anomaly(True)
 
+
 def apply_overlay(args, cur_it):
-    return args.overlay_image is not None and \
-            (cur_it % args.overlay_every) == args.overlay_offset and \
-            ((args.overlay_until is None) or (cur_it < args.overlay_until))
+    return (
+        args.overlay_image is not None
+        and (cur_it % args.overlay_every) == args.overlay_offset
+        and ((args.overlay_until is None) or (cur_it < args.overlay_until))
+    )
+
 
 def train(args, cur_it):
     global drawer, opts
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
     global overlay_image_rgba, overlay_image_rgba_list, cur_anim_index, init_image_rgba_list
-    
+
     rebuild_opts_when_done = False
 
     lossAll = None
@@ -1452,12 +1650,16 @@ def train(args, cur_it):
         if cur_it == 0 and len(init_image_rgba_list) > 0:
             if cur_anim_index is not None:
                 num_anim_frames = len(init_image_rgba_list)
-                init_anim_z(args, init_image_rgba_list[cur_anim_index % num_anim_frames])
+                init_anim_z(
+                    args, init_image_rgba_list[cur_anim_index % num_anim_frames]
+                )
 
         if apply_overlay(args, cur_it):
             if cur_anim_index is not None:
                 num_anim_frames = len(overlay_image_rgba_list)
-                overlay_image_rgba = overlay_image_rgba_list[cur_anim_index % num_anim_frames]
+                overlay_image_rgba = overlay_image_rgba_list[
+                    cur_anim_index % num_anim_frames
+                ]
             re_average_z(args)
 
         # num_batches = args.batches * (num_loss_drop + 1)
@@ -1486,12 +1688,12 @@ def train(args, cur_it):
 
         drawer.clip_z()
 
-    if args.drawer == "vdiff" and cur_it>=1:
+    if args.drawer == "vdiff" and cur_it >= 1:
         lr = drawer.sample_state[6][cur_it] / drawer.sample_state[5][cur_it]
         drawer.x = drawer.makenoise(cur_it)
         drawer.x.requires_grad_()
-        to_optimize = [ drawer.x ]
-        opt = optim.Adam(to_optimize, lr=min(lr*0.001,0.01))
+        to_optimize = [drawer.x]
+        opt = optim.Adam(to_optimize, lr=min(lr * 0.001, 0.01))
         opts = [opt]
     if cur_it == args.iterations:
         # this resetting to best is currently disabled
@@ -1511,6 +1713,7 @@ def train(args, cur_it):
         opts = rebuild_optimisers(args)
     return True
 
+
 imagenet_templates = [
     "itap of a {}.",
     "a bad photo of the {}.",
@@ -1521,22 +1724,36 @@ imagenet_templates = [
     "a photo of the small {}.",
 ]
 
-def check_new_filelist(filelist_old_source, filelist_old, filelist_cur_source, filelist_cur):
+
+def check_new_filelist(
+    filelist_old_source, filelist_old, filelist_cur_source, filelist_cur
+):
     if filelist_old_source is None:
-        print(f"==> setting animation filelist to {filelist_cur_source} ({len(filelist_cur)} files)")
+        print(
+            f"==> setting animation filelist to {filelist_cur_source} ({len(filelist_cur)} files)"
+        )
         return filelist_cur_source, filelist_cur
     elif len(filelist_old) > len(filelist_cur):
-        print(f"==> anim filelist {filelist_cur_source} only has {len(filelist_cur)} files - sticking with {filelist_old_source}")
+        print(
+            f"==> anim filelist {filelist_cur_source} only has {len(filelist_cur)} files - sticking with {filelist_old_source}"
+        )
         return filelist_old_source, filelist_old
     elif len(filelist_old) == len(filelist_cur):
-        print(f"==> anim filelist {filelist_cur_source} also has {len(filelist_cur)} files - sticking with {filelist_old_source}")
+        print(
+            f"==> anim filelist {filelist_cur_source} also has {len(filelist_cur)} files - sticking with {filelist_old_source}"
+        )
         return filelist_old_source, filelist_old
     elif len(filelist_old) < len(filelist_cur):
-        print(f"==> anim filelist {filelist_cur_source} has {len(filelist_cur)} files - switching from {filelist_old_source}")
+        print(
+            f"==> anim filelist {filelist_cur_source} has {len(filelist_cur)} files - switching from {filelist_old_source}"
+        )
         return filelist_cur_source, filelist_cur
+
 
 # return only once to run only one iteration
 # returns True when complete, False otherwise
+
+
 def do_run(args, return_display=False):
     global cur_iteration, cur_anim_index
     global anim_cur_zs, anim_next_zs, anim_output_files
@@ -1553,20 +1770,28 @@ def do_run(args, return_display=False):
         filelist_source = None
         if args.overlay_image is not None:
             filelist_cur = real_glob(args.overlay_image)
-            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "overlay_images", filelist_cur)
+            filelist_source, filelist = check_new_filelist(
+                filelist_source, filelist, "overlay_images", filelist_cur
+            )
         if args.target_images is not None and len(args.target_images) > 0:
             filelist_cur = []
             for target_image in args.target_images:
                 f1, weight, stop = parse_prompt(target_image)
                 infiles = real_glob(f1)
                 filelist_cur.extend(infiles)
-            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "target_images", filelist_cur)
+            filelist_source, filelist = check_new_filelist(
+                filelist_source, filelist, "target_images", filelist_cur
+            )
         if args.init_image is not None:
             filelist_cur = real_glob(args.init_image)
-            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "init_images", filelist_cur)
+            filelist_source, filelist = check_new_filelist(
+                filelist_source, filelist, "init_images", filelist_cur
+            )
         if args.image_prompts is not None and len(args.image_prompts) > 0:
             filelist = args.image_prompts
-            filelist_source, filelist = check_new_filelist(filelist_source, filelist, "image_prompts", filelist_cur)
+            filelist_source, filelist = check_new_filelist(
+                filelist_source, filelist, "image_prompts", filelist_cur
+            )
         num_anim_frames = len(filelist)
         for target_image in filelist:
             basename = os.path.basename(target_image)
@@ -1583,7 +1808,8 @@ def do_run(args, return_display=False):
             while True:
                 cur_images = []
                 for i in range(num_anim_frames):
-                    # do merge frames here from cur->next when we are ready to be fancy
+                    # do merge frames here from cur->next when we are ready to
+                    # be fancy
                     cur_anim_index = i
                     # anim_cur_zs[cur_anim_index] = anim_next_zs[cur_anim_index]
                     cur_iteration = step_iteration
@@ -1601,11 +1827,13 @@ def do_run(args, return_display=False):
                 for i in range(num_anim_frames):
                     prev_i = (i + num_anim_frames - 1) % num_anim_frames
                     base_image = cur_images[i].copy()
-                    prev_image = cur_images[prev_i].copy().convert('RGBA')
+                    prev_image = cur_images[prev_i].copy().convert("RGBA")
                     prev_image.putalpha(args.animation_alpha)
                     base_image.paste(prev_image, (0, 0), prev_image)
                     # base_image.save(f"overlaid_{i:02d}.png")
-                    drawer.reapply_from_tensor(TF.to_tensor(base_image).to(device).unsqueeze(0) * 2 - 1)
+                    drawer.reapply_from_tensor(
+                        TF.to_tensor(base_image).to(device).unsqueeze(0) * 2 - 1
+                    )
                     anim_cur_zs[i] = drawer.get_z_copy()
     else:
         try:
@@ -1617,9 +1845,13 @@ def do_run(args, return_display=False):
                         if cur_iteration == args.iterations:
                             break
                         cur_iteration += 1
-                        if not hasattr(args, 'skip_args'):
+                        if not hasattr(args, "skip_args"):
                             pbar.update()
-                        if keep_going and return_display and cur_iteration % args.display_every == 0:
+                        if (
+                            keep_going
+                            and return_display
+                            and cur_iteration % args.display_every == 0
+                        ):
                             # print("Returning after iteration ", cur_iteration)
                             return False
                     except RuntimeError as e:
@@ -1637,6 +1869,7 @@ def do_run(args, return_display=False):
 
     return True
 
+
 def step_to_video(args):
     step_folder = os.path.join(args.outdir, "steps")
     output_file = os.path.join(step_folder, "output.mp4")
@@ -1645,174 +1878,584 @@ def step_to_video(args):
     les_frame = []
     for frame_path in les_frame_path:
         les_frame.append(Image.open(frame_path))
-    
+
     min_fps = 10
     max_fps = 60
     total_frames = len(les_frame)
     length = 14
-    fps = int(np.clip(total_frames/length,min_fps,max_fps))
+    fps = int(np.clip(total_frames / length, min_fps, max_fps))
     from subprocess import Popen, PIPE
-    p = Popen(['ffmpeg',
-               '-y',
-               '-f', 'image2pipe',
-               '-vcodec', 'png',
-               '-r', str(fps),
-               '-i',
-               '-',
-               '-vcodec', 'libx264',
-               '-r', str(fps),
-               '-pix_fmt', 'yuv420p',
-               '-crf', '17',
-               '-preset', 'veryslow',
-               output_file], stdin=PIPE)
-    for im in tqdm(les_frame + [les_frame[-1]]*fps):
-        im.save(p.stdin, 'PNG')
+
+    p = Popen(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "image2pipe",
+            "-vcodec",
+            "png",
+            "-r",
+            str(fps),
+            "-i",
+            "-",
+            "-vcodec",
+            "libx264",
+            "-r",
+            str(fps),
+            "-pix_fmt",
+            "yuv420p",
+            "-crf",
+            "17",
+            "-preset",
+            "veryslow",
+            output_file,
+        ],
+        stdin=PIPE,
+    )
+    for im in tqdm(les_frame + [les_frame[-1]] * fps):
+        im.save(p.stdin, "PNG")
     p.stdin.close()
     p.wait()
+
 
 def do_video(args):
     global cur_iteration
     video_folder = os.path.join(args.outdir, "video")
 
     # Video generation
-    init_frame = 1 # This is the frame where the video will start
-    last_frame = cur_iteration # You can change to the number of the last frame you want to generate. It will raise an error if that number of frames does not exist.
+    init_frame = 1  # This is the frame where the video will start
+    # You can change to the number of the last frame you want to generate. It
+    # will raise an error if that number of frames does not exist.
+    last_frame = cur_iteration
 
     min_fps = 10
     max_fps = 60
 
-    total_frames = last_frame-init_frame
+    total_frames = last_frame - init_frame
 
-    length = 14 # Desired time of the video in seconds
+    length = 14  # Desired time of the video in seconds
 
     frames = []
-    tqdm.write('Generating video...')
-    for i in range(init_frame,last_frame): #
-        frames.append(Image.open(f'{video_folder}/frame_{i:04d}.png'))
+    tqdm.write("Generating video...")
+    for i in range(init_frame, last_frame):
+        frames.append(Image.open(f"{video_folder}/frame_{i:04d}.png"))
 
-    #fps = last_frame/10
-    fps = int(np.clip(total_frames/length,min_fps,max_fps))
+    # fps = last_frame/10
+    fps = int(np.clip(total_frames / length, min_fps, max_fps))
 
     from subprocess import Popen, PIPE
-    output_file = get_file_path(args.outdir, args.output, '.mp4')
-    p = Popen(['ffmpeg',
-               '-y',
-               '-f', 'image2pipe',
-               '-vcodec', 'png',
-               '-r', str(fps),
-               '-i',
-               '-',
-               '-vcodec', 'libx264',
-               '-r', str(fps),
-               '-pix_fmt', 'yuv420p',
-               '-crf', '17',
-               '-preset', 'veryslow',
-               '-metadata', f'comment={args.prompts}',
-               output_file], stdin=PIPE)
+
+    output_file = get_file_path(args.outdir, args.output, ".mp4")
+    p = Popen(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "image2pipe",
+            "-vcodec",
+            "png",
+            "-r",
+            str(fps),
+            "-i",
+            "-",
+            "-vcodec",
+            "libx264",
+            "-r",
+            str(fps),
+            "-pix_fmt",
+            "yuv420p",
+            "-crf",
+            "17",
+            "-preset",
+            "veryslow",
+            "-metadata",
+            f"comment={args.prompts}",
+            output_file,
+        ],
+        stdin=PIPE,
+    )
     for im in tqdm(frames + [frames[-1]] * fps):
-        im.save(p.stdin, 'PNG')
+        im.save(p.stdin, "PNG")
     p.stdin.close()
     p.wait()
+
 
 # this dictionary is used for settings in the notebook
 global_pixray_settings = {}
 # this dictionary documents all non-default args
 global_given_args = {}
 
+
 def setup_parser(vq_parser):
     # Create the parser
     # vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
 
     # Add the arguments
-    vq_parser.add_argument("-p",    "--prompts", type=str, help="Text prompts", default=[], dest='prompts')
-    vq_parser.add_argument("-sp",   "--spot", type=str, help="Spot Text prompts", default=[], dest='spot_prompts')
-    vq_parser.add_argument("-spo",  "--spot_off", type=str, help="Spot off Text prompts", default=[], dest='spot_prompts_off')
-    vq_parser.add_argument("-spf",  "--spot_file", type=str, help="Custom spot file", default=None, dest='spot_file')
-    vq_parser.add_argument("-l",    "--labels", type=str, help="ImageNet labels", default=[], dest='labels')
-    vq_parser.add_argument("-vp",   "--vector_prompts", type=str, help="Vector prompts", default="textoff", dest='vector_prompts')
-    vq_parser.add_argument("-ip",   "--image_prompts", type=str, help="Image prompts", default=[], dest='image_prompts')
-    vq_parser.add_argument("-ipw",  "--image_prompt_weight", type=float, help="Weight for image prompt", default=None, dest='image_prompt_weight')
-    vq_parser.add_argument("-ips",  "--image_prompt_shuffle", type=str2bool, help="Shuffle image prompts", default=False, dest='image_prompt_shuffle')
-    vq_parser.add_argument("-il",   "--image_labels", type=str, help="Image prompts", default=None, dest='image_labels')
-    vq_parser.add_argument("-ilw",  "--image_label_weight", type=float, help="Weight for image prompt", default=1.0, dest='image_label_weight')
-    vq_parser.add_argument("-i",    "--iterations", type=int, help="Number of iterations", default=None, dest='iterations')
-    vq_parser.add_argument("-se",   "--save_every", type=str, help="Save image iterations", default=10, dest='save_every')
-    vq_parser.add_argument("-si",   "--save_intermediates", type=str2bool, help="Save image iterations as intermediate files", default=True, dest='save_intermediates')
-    vq_parser.add_argument("-de",   "--display_every", type=str, help="Display image iterations", default=20, dest='display_every')
-    vq_parser.add_argument("-dc",   "--display_clear", type=str2bool, help="Clear dispaly when updating", default=False, dest='display_clear')
-    vq_parser.add_argument("-ove",  "--overlay_every", type=str, help="Overlay image iterations", default="10 iterations", dest='overlay_every')
-    vq_parser.add_argument("-ovo",  "--overlay_offset", type=str, help="Overlay image iteration offset", default="0 iterations", dest='overlay_offset')
-    vq_parser.add_argument("-ovu",  "--overlay_until", type=str, help="Last iteration to continue applying overlay image", default=None, dest='overlay_until')
-    vq_parser.add_argument("-ovi",  "--overlay_image", type=str, help="Overlay image (if not init)", default=None, dest='overlay_image')
-    vq_parser.add_argument(         "--quality", type=str, help="draft, normal, better, best", default="normal", dest='quality')
-    vq_parser.add_argument("-asp",  "--aspect", type=str, help="widescreen, square", default="widescreen", dest='aspect')
-    vq_parser.add_argument("-ezs",  "--ezsize", type=str, help="small, medium, large", default=None, dest='ezsize')
-    vq_parser.add_argument("-sca",  "--scale", type=float, help="scale (instead of ezsize)", default=None, dest='scale')
-    vq_parser.add_argument("-ova",  "--overlay_alpha", type=int, help="Overlay alpha (0-255)", default=None, dest='overlay_alpha')    
-    vq_parser.add_argument("-s",    "--size", nargs=2, type=int, help="Image size (width height)", default=None, dest='size')
-    vq_parser.add_argument("-ii",   "--init_image", type=str, help="Initial image", default=None, dest='init_image')
-    vq_parser.add_argument("-iia",  "--init_image_alpha", type=int, help="Init image alpha (0-255)", default=200, dest='init_image_alpha')
-    vq_parser.add_argument("-in",   "--init_noise", type=str, help="Initial noise image (pixels or gradient)", default="pixels", dest='init_noise')
-    vq_parser.add_argument("-ti",   "--target_images", type=str, help="Target images", default=None, dest='target_images')
-    vq_parser.add_argument("-anim", "--animation_dir", type=str, help="Animation output dir", default=None, dest='animation_dir')    
-    vq_parser.add_argument("-ana",  "--animation_alpha", type=int, help="Forward blend for consistency", default=128, dest='animation_alpha')
-    vq_parser.add_argument("-iw",   "--init_weight", type=float, help="Initial weight (main=spherical)", default=None, dest='init_weight')
-    vq_parser.add_argument("-iwd",  "--init_weight_dist", type=float, help="Initial weight dist loss", default=0., dest='init_weight_dist')
-    vq_parser.add_argument("-iwc",  "--init_weight_cos", type=float, help="Initial weight cos loss", default=0., dest='init_weight_cos')
-    vq_parser.add_argument("-iwp",  "--init_weight_pix", type=float, help="Initial weight pix loss", default=0., dest='init_weight_pix')
-    vq_parser.add_argument(         "--perceptors", type=str, help="perceptors (clip/slip/mixed)", default="clip", dest='perceptors')
-    vq_parser.add_argument(         "--clip_models", type=str, help="CLIP model", default=None, dest='clip_models')
-    vq_parser.add_argument("-nps",  "--noise_prompt_seeds", nargs="*", type=int, help="Noise prompt seeds", default=[], dest='noise_prompt_seeds')
-    vq_parser.add_argument("-npw",  "--noise_prompt_weights", nargs="*", type=float, help="Noise prompt weights", default=[], dest='noise_prompt_weights')
-    vq_parser.add_argument("-lr",   "--learning_rate", type=float, help="Learning rate", default=0.2, dest='learning_rate')
-    vq_parser.add_argument("-lrd",  "--learning_rate_drops", nargs="*", type=str, help="When to drop learning rate (relative to iterations)", default=[75], dest='learning_rate_drops')
-    vq_parser.add_argument("-as",   "--auto_stop", type=str2bool, help="Auto stopping", default=False, dest='auto_stop')
-    vq_parser.add_argument("-cuts", "--num_cuts", type=int, help="Number of cuts", default=None, dest='num_cuts')
-    vq_parser.add_argument("-bats", "--batches", type=int, help="How many batches of cuts", default=None, dest='batches')
-    vq_parser.add_argument("-cutp", "--cut_power", type=float, help="Cut power", default=1., dest='cut_pow')
-    vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest='seed')
-    vq_parser.add_argument("-opt",  "--optimiser", type=str, help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)", default='Adam', dest='optimiser')
-    vq_parser.add_argument("-vid",  "--video", type=str2bool, help="Create video frames?", default=False, dest='make_video')
-    vq_parser.add_argument("-d",    "--deterministic", type=str2bool, help="Enable cudnn.deterministic?", default=False, dest='cudnn_determinism')
-    vq_parser.add_argument("-cud",  "--cuda_device", type=str, help="The Cuda device you want to use. (Typically 'cuda:0','cuda:1','cuda:2', etc...)", default='cuda:0', dest='cuda_device')
-    vq_parser.add_argument("--palette", type=str, help="target palette", default=None, dest='palette')
-    vq_parser.add_argument("--transparent", type=str2bool, help="enable transparent outputs", default=False, dest='transparent')
-    vq_parser.add_argument("--transparent_weight", type=float, help="strenght of transparent loss", default=0., dest='transparent_weight')
-    vq_parser.add_argument("--alpha_use_g", type=str2bool, help="use gaussian mask weighting", default=False, dest='alpha_use_g')
-    vq_parser.add_argument("--alpha_gamma", type=float, help="width-relative sigma for the alpha gaussian", default=4., dest='alpha_gamma')
-    vq_parser.add_argument("--output", type=str, help="Output filename", default="output.png", dest='output')
-    vq_parser.add_argument("--outdir", type=str, help="Output file directory", default='outputs/%DATE%_%SEQ%', dest='outdir')
+    vq_parser.add_argument(
+        "-p", "--prompts", type=str, help="Text prompts", default=[], dest="prompts"
+    )
+    vq_parser.add_argument(
+        "-sp",
+        "--spot",
+        type=str,
+        help="Spot Text prompts",
+        default=[],
+        dest="spot_prompts",
+    )
+    vq_parser.add_argument(
+        "-spo",
+        "--spot_off",
+        type=str,
+        help="Spot off Text prompts",
+        default=[],
+        dest="spot_prompts_off",
+    )
+    vq_parser.add_argument(
+        "-spf",
+        "--spot_file",
+        type=str,
+        help="Custom spot file",
+        default=None,
+        dest="spot_file",
+    )
+    vq_parser.add_argument(
+        "-l", "--labels", type=str, help="ImageNet labels", default=[], dest="labels"
+    )
+    vq_parser.add_argument(
+        "-vp",
+        "--vector_prompts",
+        type=str,
+        help="Vector prompts",
+        default="textoff",
+        dest="vector_prompts",
+    )
+    vq_parser.add_argument(
+        "-ip",
+        "--image_prompts",
+        type=str,
+        help="Image prompts",
+        default=[],
+        dest="image_prompts",
+    )
+    vq_parser.add_argument(
+        "-ipw",
+        "--image_prompt_weight",
+        type=float,
+        help="Weight for image prompt",
+        default=None,
+        dest="image_prompt_weight",
+    )
+    vq_parser.add_argument(
+        "-ips",
+        "--image_prompt_shuffle",
+        type=str2bool,
+        help="Shuffle image prompts",
+        default=False,
+        dest="image_prompt_shuffle",
+    )
+    vq_parser.add_argument(
+        "-il",
+        "--image_labels",
+        type=str,
+        help="Image prompts",
+        default=None,
+        dest="image_labels",
+    )
+    vq_parser.add_argument(
+        "-ilw",
+        "--image_label_weight",
+        type=float,
+        help="Weight for image prompt",
+        default=1.0,
+        dest="image_label_weight",
+    )
+    vq_parser.add_argument(
+        "-i",
+        "--iterations",
+        type=int,
+        help="Number of iterations",
+        default=None,
+        dest="iterations",
+    )
+    vq_parser.add_argument(
+        "-se",
+        "--save_every",
+        type=str,
+        help="Save image iterations",
+        default=10,
+        dest="save_every",
+    )
+    vq_parser.add_argument(
+        "-si",
+        "--save_intermediates",
+        type=str2bool,
+        help="Save image iterations as intermediate files",
+        default=True,
+        dest="save_intermediates",
+    )
+    vq_parser.add_argument(
+        "-de",
+        "--display_every",
+        type=str,
+        help="Display image iterations",
+        default=20,
+        dest="display_every",
+    )
+    vq_parser.add_argument(
+        "-dc",
+        "--display_clear",
+        type=str2bool,
+        help="Clear dispaly when updating",
+        default=False,
+        dest="display_clear",
+    )
+    vq_parser.add_argument(
+        "-ove",
+        "--overlay_every",
+        type=str,
+        help="Overlay image iterations",
+        default="10 iterations",
+        dest="overlay_every",
+    )
+    vq_parser.add_argument(
+        "-ovo",
+        "--overlay_offset",
+        type=str,
+        help="Overlay image iteration offset",
+        default="0 iterations",
+        dest="overlay_offset",
+    )
+    vq_parser.add_argument(
+        "-ovu",
+        "--overlay_until",
+        type=str,
+        help="Last iteration to continue applying overlay image",
+        default=None,
+        dest="overlay_until",
+    )
+    vq_parser.add_argument(
+        "-ovi",
+        "--overlay_image",
+        type=str,
+        help="Overlay image (if not init)",
+        default=None,
+        dest="overlay_image",
+    )
+    vq_parser.add_argument(
+        "--quality",
+        type=str,
+        help="draft, normal, better, best",
+        default="normal",
+        dest="quality",
+    )
+    vq_parser.add_argument(
+        "-asp",
+        "--aspect",
+        type=str,
+        help="widescreen, square",
+        default="widescreen",
+        dest="aspect",
+    )
+    vq_parser.add_argument(
+        "-ezs",
+        "--ezsize",
+        type=str,
+        help="small, medium, large",
+        default=None,
+        dest="ezsize",
+    )
+    vq_parser.add_argument(
+        "-sca",
+        "--scale",
+        type=float,
+        help="scale (instead of ezsize)",
+        default=None,
+        dest="scale",
+    )
+    vq_parser.add_argument(
+        "-ova",
+        "--overlay_alpha",
+        type=int,
+        help="Overlay alpha (0-255)",
+        default=None,
+        dest="overlay_alpha",
+    )
+    vq_parser.add_argument(
+        "-s",
+        "--size",
+        nargs=2,
+        type=int,
+        help="Image size (width height)",
+        default=None,
+        dest="size",
+    )
+    vq_parser.add_argument(
+        "-ii",
+        "--init_image",
+        type=str,
+        help="Initial image",
+        default=None,
+        dest="init_image",
+    )
+    vq_parser.add_argument(
+        "-iia",
+        "--init_image_alpha",
+        type=int,
+        help="Init image alpha (0-255)",
+        default=200,
+        dest="init_image_alpha",
+    )
+    vq_parser.add_argument(
+        "-in",
+        "--init_noise",
+        type=str,
+        help="Initial noise image (pixels or gradient)",
+        default="pixels",
+        dest="init_noise",
+    )
+    vq_parser.add_argument(
+        "-ti",
+        "--target_images",
+        type=str,
+        help="Target images",
+        default=None,
+        dest="target_images",
+    )
+    vq_parser.add_argument(
+        "-anim",
+        "--animation_dir",
+        type=str,
+        help="Animation output dir",
+        default=None,
+        dest="animation_dir",
+    )
+    vq_parser.add_argument(
+        "-ana",
+        "--animation_alpha",
+        type=int,
+        help="Forward blend for consistency",
+        default=128,
+        dest="animation_alpha",
+    )
+    vq_parser.add_argument(
+        "-iw",
+        "--init_weight",
+        type=float,
+        help="Initial weight (main=spherical)",
+        default=None,
+        dest="init_weight",
+    )
+    vq_parser.add_argument(
+        "-iwd",
+        "--init_weight_dist",
+        type=float,
+        help="Initial weight dist loss",
+        default=0.0,
+        dest="init_weight_dist",
+    )
+    vq_parser.add_argument(
+        "-iwc",
+        "--init_weight_cos",
+        type=float,
+        help="Initial weight cos loss",
+        default=0.0,
+        dest="init_weight_cos",
+    )
+    vq_parser.add_argument(
+        "-iwp",
+        "--init_weight_pix",
+        type=float,
+        help="Initial weight pix loss",
+        default=0.0,
+        dest="init_weight_pix",
+    )
+    vq_parser.add_argument(
+        "--perceptors",
+        type=str,
+        help="perceptors (clip/slip/mixed)",
+        default="clip",
+        dest="perceptors",
+    )
+    vq_parser.add_argument(
+        "--clip_models", type=str, help="CLIP model", default=None, dest="clip_models"
+    )
+    vq_parser.add_argument(
+        "-nps",
+        "--noise_prompt_seeds",
+        nargs="*",
+        type=int,
+        help="Noise prompt seeds",
+        default=[],
+        dest="noise_prompt_seeds",
+    )
+    vq_parser.add_argument(
+        "-npw",
+        "--noise_prompt_weights",
+        nargs="*",
+        type=float,
+        help="Noise prompt weights",
+        default=[],
+        dest="noise_prompt_weights",
+    )
+    vq_parser.add_argument(
+        "-lr",
+        "--learning_rate",
+        type=float,
+        help="Learning rate",
+        default=0.2,
+        dest="learning_rate",
+    )
+    vq_parser.add_argument(
+        "-lrd",
+        "--learning_rate_drops",
+        nargs="*",
+        type=str,
+        help="When to drop learning rate (relative to iterations)",
+        default=[75],
+        dest="learning_rate_drops",
+    )
+    vq_parser.add_argument(
+        "-as",
+        "--auto_stop",
+        type=str2bool,
+        help="Auto stopping",
+        default=False,
+        dest="auto_stop",
+    )
+    vq_parser.add_argument(
+        "-cuts",
+        "--num_cuts",
+        type=int,
+        help="Number of cuts",
+        default=None,
+        dest="num_cuts",
+    )
+    vq_parser.add_argument(
+        "-bats",
+        "--batches",
+        type=int,
+        help="How many batches of cuts",
+        default=None,
+        dest="batches",
+    )
+    vq_parser.add_argument(
+        "-cutp",
+        "--cut_power",
+        type=float,
+        help="Cut power",
+        default=1.0,
+        dest="cut_pow",
+    )
+    vq_parser.add_argument("--seed", type=str, help="Seed", default=None, dest="seed")
+    vq_parser.add_argument(
+        "-opt",
+        "--optimiser",
+        type=str,
+        help="Optimiser (Adam, AdamW, Adagrad, Adamax, DiffGrad, or AdamP)",
+        default="Adam",
+        dest="optimiser",
+    )
+    vq_parser.add_argument(
+        "-vid",
+        "--video",
+        type=str2bool,
+        help="Create video frames?",
+        default=False,
+        dest="make_video",
+    )
+    vq_parser.add_argument(
+        "-d",
+        "--deterministic",
+        type=str2bool,
+        help="Enable cudnn.deterministic?",
+        default=False,
+        dest="cudnn_determinism",
+    )
+    vq_parser.add_argument(
+        "-cud",
+        "--cuda_device",
+        type=str,
+        help="The Cuda device you want to use. (Typically 'cuda:0','cuda:1','cuda:2', etc...)",
+        default="cuda:0",
+        dest="cuda_device",
+    )
+    vq_parser.add_argument(
+        "--palette", type=str, help="target palette", default=None, dest="palette"
+    )
+    vq_parser.add_argument(
+        "--transparent",
+        type=str2bool,
+        help="enable transparent outputs",
+        default=False,
+        dest="transparent",
+    )
+    vq_parser.add_argument(
+        "--transparent_weight",
+        type=float,
+        help="strenght of transparent loss",
+        default=0.0,
+        dest="transparent_weight",
+    )
+    vq_parser.add_argument(
+        "--alpha_use_g",
+        type=str2bool,
+        help="use gaussian mask weighting",
+        default=False,
+        dest="alpha_use_g",
+    )
+    vq_parser.add_argument(
+        "--alpha_gamma",
+        type=float,
+        help="width-relative sigma for the alpha gaussian",
+        default=4.0,
+        dest="alpha_gamma",
+    )
+    vq_parser.add_argument(
+        "--output",
+        type=str,
+        help="Output filename",
+        default="output.png",
+        dest="output",
+    )
+    vq_parser.add_argument(
+        "--outdir",
+        type=str,
+        help="Output file directory",
+        default="outputs/%DATE%_%SEQ%",
+        dest="outdir",
+    )
 
     return vq_parser
 
+
 def process_args(vq_parser, namespace=None):
     global global_aspect_width
-    global cur_iteration, cur_anim_index, anim_output_files, anim_cur_zs, anim_next_zs;
+    global cur_iteration, cur_anim_index, anim_output_files, anim_cur_zs, anim_next_zs
     global global_spot_file, global_given_args
     global best_loss, best_iter, best_z, num_loss_drop, max_loss_drops, iter_drop_delay
 
-    if namespace == None:
+    if namespace is None:
         # command line: use ARGV to get args
         args = vq_parser.parse_args()
-    elif isnotebook() or hasattr(namespace, 'skip_args'):
+    elif isnotebook() or hasattr(namespace, "skip_args"):
         args = vq_parser.parse_args(args=[], namespace=namespace)
     else:
         # sometimes there are both settings and cmd line
-        args = vq_parser.parse_args(namespace=namespace)        
+        args = vq_parser.parse_args(namespace=namespace)
 
     # https://stackoverflow.com/a/66765255/1010653
     global_given_args = {
-            opt.dest: getattr(args, opt.dest)
-            for opt in vq_parser._option_string_actions.values()
-            if hasattr(args, opt.dest) and opt.default != getattr(args, opt.dest)
-        }
+        opt.dest: getattr(args, opt.dest)
+        for opt in vq_parser._option_string_actions.values()
+        if hasattr(args, opt.dest) and opt.default != getattr(args, opt.dest)
+    }
     # print("NON DEFAULT ARGS ARE")
     # print(global_given_args)
     # sys.exit(0)
 
     # resolve outdir from template if necessary
     # TODO: should we delay template filling?
-    args.outdir = emit_filename(args.outdir);
+    args.outdir = emit_filename(args.outdir)
     if (args.outdir != "") and (not os.path.exists(args.outdir)):
         os.makedirs(args.outdir)
 
@@ -1822,59 +2465,59 @@ def process_args(vq_parser, namespace=None):
         torch.backends.cudnn.deterministic = True
 
     quality_to_clip_models_table = {
-        'clip': {
-            'draft': 'ViT-B/16',
-            'normal': 'ViT-B/32,ViT-B/16',
-            'better': 'RN50,ViT-B/32,ViT-B/16',
-            'best': 'RN50x4,ViT-B/32,ViT-B/16',
-            'supreme': 'RN50x4,RN101,ViT-B/32,ViT-B/16'
+        "clip": {
+            "draft": "ViT-B/16",
+            "normal": "ViT-B/32,ViT-B/16",
+            "better": "RN50,ViT-B/32,ViT-B/16",
+            "best": "RN50x4,ViT-B/32,ViT-B/16",
+            "supreme": "RN50x4,RN101,ViT-B/32,ViT-B/16",
         },
-        'slip': {
-            'draft': 'SLIP_VITB16',
-            'normal': 'SLIP_VITB16,SLIP_CC3M',
-            'better': 'SLIP_VITB16,SLIP_CC3M,SLIP_CC12M',
-            'best': 'SLIP_VITB16,SLIP_CC3M,SLIP_CC12M,SLIP_VITS16',
-            'supreme': 'SLIP_VITB16,SLIP_CC3M,SLIP_CC12M,SLIP_VITS16,SLIP_VITL16'
+        "slip": {
+            "draft": "SLIP_VITB16",
+            "normal": "SLIP_VITB16,SLIP_CC3M",
+            "better": "SLIP_VITB16,SLIP_CC3M,SLIP_CC12M",
+            "best": "SLIP_VITB16,SLIP_CC3M,SLIP_CC12M,SLIP_VITS16",
+            "supreme": "SLIP_VITB16,SLIP_CC3M,SLIP_CC12M,SLIP_VITS16,SLIP_VITL16",
         },
-        'mixed': {
-            'draft': 'ViT-B/16',
-            'normal': 'ViT-B/16,SLIP_VITB16',
-            'better': 'RN50,ViT-B/16,SLIP_VITB16',
-            'best': 'RN50x4,ViT-B/16,SLIP_VITB16',
-            'supreme': 'RN50x4,RN101,ViT-B/16,SLIP_VITB16'
-        }
+        "mixed": {
+            "draft": "ViT-B/16",
+            "normal": "ViT-B/16,SLIP_VITB16",
+            "better": "RN50,ViT-B/16,SLIP_VITB16",
+            "best": "RN50x4,ViT-B/16,SLIP_VITB16",
+            "supreme": "RN50x4,RN101,ViT-B/16,SLIP_VITB16",
+        },
     }
 
     quality_to_iterations_table = {
-        'draft': 200,
-        'normal': 250,
-        'better': 300,
-        'best': 350,
-        'supreme': 400
+        "draft": 200,
+        "normal": 250,
+        "better": 300,
+        "best": 350,
+        "supreme": 400,
     }
     quality_to_scale_table = {
-        'draft': 1,
-        'normal': 2,
-        'better': 3,
-        'best': 4,
-        'supreme': 5
+        "draft": 1,
+        "normal": 2,
+        "better": 3,
+        "best": 4,
+        "supreme": 5,
     }
     # this should be replaced with logic that does somethings
     # smart based on available memory (eg: size, num_models, etc)
     quality_to_num_cuts_table = {
-        'draft': 24,
-        'normal': 30,
-        'better': 36,
-        'best': 12,
-        'supreme': 8
+        "draft": 24,
+        "normal": 30,
+        "better": 36,
+        "best": 12,
+        "supreme": 8,
     }
 
     quality_to_batches_table = {
-        'draft': 1,
-        'normal': 1,
-        'better': 1,
-        'best': 2,
-        'supreme': 4
+        "draft": 1,
+        "normal": 1,
+        "better": 1,
+        "best": 2,
+        "supreme": 4,
     }
 
     if args.quality not in quality_to_clip_models_table[args.perceptors]:
@@ -1892,15 +2535,13 @@ def process_args(vq_parser, namespace=None):
     if args.ezsize is None and args.scale is None:
         args.scale = quality_to_scale_table[args.quality]
 
-    size_to_scale_table = {
-        'small': 1,
-        'medium': 2,
-        'large': 4
-    }
+    size_to_scale_table = {"small": 1, "medium": 2, "large": 4}
     aspect_to_size_table = {
-        'square': [144, 144],
-        'portrait': [128, 160],
-        'widescreen': [192, 108]  # vqgan trims to 192x96, 384x208, 576x320, 768x432, 960x528, 1152x640, etc
+        "square": [144, 144],
+        "portrait": [128, 160],
+        # vqgan trims to 192x96, 384x208, 576x320, 768x432, 960x528, 1152x640,
+        # etc
+        "widescreen": [192, 108],
     }
 
     # determine size if not set
@@ -1917,13 +2558,13 @@ def process_args(vq_parser, namespace=None):
             base_width = int(size_scale * base_size[0])
             base_height = int(size_scale * base_size[1])
             args.size = [base_width, base_height]
-        elif args.aspect =="retain" and args.init_image is not None:
+        elif args.aspect == "retain" and args.init_image is not None:
             img_pil = Image.open(real_glob(args.init_image)[0])
-            w,h = img_pil.size
-            asp = h/w #w is base
-            h = int(144*asp*size_scale)
-            w = int(144*size_scale)
-            args.size = [w,h]
+            w, h = img_pil.size
+            asp = h / w  # w is base
+            h = int(144 * asp * size_scale)
+            w = int(144 * size_scale)
+            args.size = [w, h]
         else:
             print("aspect not understood, aborting -> ", args.aspect)
             exit(1)
@@ -1939,11 +2580,19 @@ def process_args(vq_parser, namespace=None):
     args.spot_prompts_off = split_pipes(args.spot_prompts_off)
     args.labels = split_pipes(args.labels)
 
-    args.overlay_offset = parse_unit(args.overlay_offset, args.iterations, "overlay_offset", "i")
-    args.overlay_until = parse_unit(args.overlay_until, args.iterations, "overlay_until", "i")
-    args.overlay_every = parse_unit(args.overlay_every, args.iterations, "overlay_every", "i")
+    args.overlay_offset = parse_unit(
+        args.overlay_offset, args.iterations, "overlay_offset", "i"
+    )
+    args.overlay_until = parse_unit(
+        args.overlay_until, args.iterations, "overlay_until", "i"
+    )
+    args.overlay_every = parse_unit(
+        args.overlay_every, args.iterations, "overlay_every", "i"
+    )
 
-    args.display_every = parse_unit(args.display_every, args.iterations, "display_every", "i")
+    args.display_every = parse_unit(
+        args.display_every, args.iterations, "display_every", "i"
+    )
     args.save_every = parse_unit(args.save_every, args.iterations, "save_every", "i")
 
     # Split target images using the pipe character
@@ -1956,7 +2605,9 @@ def process_args(vq_parser, namespace=None):
             # print("----> EMPTY VECTOR PROMPT")
             args.vector_prompts = []
         else:
-            args.vector_prompts = [phrase.strip() for phrase in args.vector_prompts.split("|")]
+            args.vector_prompts = [
+                phrase.strip() for phrase in args.vector_prompts.split("|")
+            ]
     else:
         # print("----> NO VECTOR PROMPT")
         args.vector_prompts = []
@@ -1976,10 +2627,12 @@ def process_args(vq_parser, namespace=None):
         if not os.path.exists(video_folder):
             os.mkdir(video_folder)
 
-    args.learning_rate_drops = get_learning_rate_drops(args.learning_rate_drops, args.iterations);
+    args.learning_rate_drops = get_learning_rate_drops(
+        args.learning_rate_drops, args.iterations
+    )
 
     # reset global animation variables
-    cur_iteration=0
+    cur_iteration = 0
     best_iter = cur_iteration
     best_loss = 1e20
     num_loss_drop = 0
@@ -1987,24 +2640,30 @@ def process_args(vq_parser, namespace=None):
     iter_drop_delay = 12
     best_z = None
 
-    cur_anim_index=None
-    anim_output_files=[]
-    anim_cur_zs=[]
-    anim_next_zs=[]
+    cur_anim_index = None
+    anim_output_files = []
+    anim_cur_zs = []
+    anim_next_zs = []
 
     global_spot_file = args.spot_file
 
     return args
 
+
 def get_learning_rate_drops(learning_rate_drops, iterations):
     if learning_rate_drops is None:
         return []
-    
-    return [parse_unit(n, iterations-1, "learning_rate_drops") for n in learning_rate_drops]
+
+    return [
+        parse_unit(n, iterations - 1, "learning_rate_drops")
+        for n in learning_rate_drops
+    ]
+
 
 def reset_settings():
     global global_pixray_settings
     global_pixray_settings = {}
+
 
 def add_settings(**kwargs):
     global global_pixray_settings
@@ -2016,6 +2675,7 @@ def add_settings(**kwargs):
         #     global_pixray_settings.pop(k, None)
         # else:
 
+
 def get_settings():
     global global_pixray_settings
     return global_pixray_settings.copy()
@@ -2023,34 +2683,35 @@ def get_settings():
 
 def parse_known_args_with_optional_yaml(parser, namespace=None):
     parser.add_argument(
-        '--config_file',
-        dest='config_file',
-        type=argparse.FileType(mode='r'))
-    
+        "--config_file", dest="config_file", type=argparse.FileType(mode="r")
+    )
+
     arguments, unknown = parser.parse_known_args(namespace=namespace)
     if arguments.config_file:
         data = yaml.load(arguments.config_file, Loader=yaml.SafeLoader)
-        delattr(arguments, 'config_file')
+        delattr(arguments, "config_file")
         arg_dict = arguments.__dict__
         for key, value in data.items():
             if isinstance(value, list):
-                if(key not in arg_dict or arg_dict[key] is None):
+                if key not in arg_dict or arg_dict[key] is None:
                     arg_dict[key] = []
                 for v in value:
                     arg_dict[key].append(v)
             else:
                 arg_dict[key] = value
-    
+
     return arguments, unknown
 
+
 def initialize_logging(settings_core, settings_dict):
-    if settings_core.outdir is not None and settings_core.outdir.strip() != '':
-        logfile = get_file_path(settings_core.outdir, settings_core.output, '.log')
-        logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w+')
+    if settings_core.outdir is not None and settings_core.outdir.strip() != "":
+        logfile = get_file_path(settings_core.outdir, settings_core.output, ".log")
+        logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode="w+")
 
         yaml_output = os.path.join(settings_core.outdir, "settings.yaml")
-        ff = open(yaml_output, 'w+')
+        ff = open(yaml_output, "w+")
         yaml.dump(settings_dict, ff, allow_unicode=True, default_flow_style=False)
+
 
 def apply_settings():
     global global_pixray_settings
@@ -2058,13 +2719,30 @@ def apply_settings():
 
     # first pass - only add things here that can trigger other parser additions (drawers, filters, losses)
     # Create the parser
-    vq_parser = argparse.ArgumentParser(description='Image generation using VQGAN+CLIP')
-    vq_parser.add_argument("--drawer",  type=str, help="clipdraw, pixel, etc", default="vqgan", dest='drawer')
-    vq_parser.add_argument("--filters", type=str, help="Image Filtering", default=None, dest='filters')
-    vq_parser.add_argument("--losses", "--custom_loss", type=str, help="implement a custom loss type through LossInterface. example: edge", default=None, dest='custom_loss')
-    
+    vq_parser = argparse.ArgumentParser(description="Image generation using VQGAN+CLIP")
+    vq_parser.add_argument(
+        "--drawer",
+        type=str,
+        help="clipdraw, pixel, etc",
+        default="vqgan",
+        dest="drawer",
+    )
+    vq_parser.add_argument(
+        "--filters", type=str, help="Image Filtering", default=None, dest="filters"
+    )
+    vq_parser.add_argument(
+        "--losses",
+        "--custom_loss",
+        type=str,
+        help="implement a custom loss type through LossInterface. example: edge",
+        default=None,
+        dest="custom_loss",
+    )
+
     settingsDict = SimpleNamespace(**global_pixray_settings)
-    settings_core, unknown = parse_known_args_with_optional_yaml(vq_parser, namespace=settingsDict)
+    settings_core, unknown = parse_known_args_with_optional_yaml(
+        vq_parser, namespace=settingsDict
+    )
 
     vq_parser = setup_parser(vq_parser)
     class_table[settings_core.drawer].add_settings(vq_parser)
@@ -2074,7 +2752,7 @@ def apply_settings():
         filts = settings_core.filters.split(",")
         filts = [f.strip() for f in filts]
         for f in filts:
-            f = f.split(':')[0]
+            f = f.split(":")[0]
             filters_class_table[f].add_settings(vq_parser)
 
     if settings_core.custom_loss is not None:
@@ -2082,15 +2760,17 @@ def apply_settings():
         custom_losses = settings_core.custom_loss.split(",")
         custom_losses = [loss.strip() for loss in custom_losses]
         for l in custom_losses:
-            l = l.split(':')[0]
+            l = l.split(":")[0]
             loss_class_table[l].add_settings(vq_parser)
 
     if len(global_pixray_settings) > 0:
         # check for any bogus entries in the settings
         dests = [d.dest for d in vq_parser._actions]
         for k in global_pixray_settings:
-            if not k in dests and k != "skip_args":
-                raise ValueError(f"Requested setting not found, aborting: {k}={global_pixray_settings[k]}")
+            if k not in dests and k != "skip_args":
+                raise ValueError(
+                    f"Requested setting not found, aborting: {k}={global_pixray_settings[k]}"
+                )
 
         # convert dictionary to easyDict
         # which can be used as an argparse namespace instead
@@ -2098,24 +2778,32 @@ def apply_settings():
         settingsDict = SimpleNamespace(**global_pixray_settings)
 
     settings = process_args(vq_parser, settingsDict)
-    logging.debug(json.dumps(settings, default=lambda o: o.__dict__, sort_keys=True, indent=4))
+    logging.debug(
+        json.dumps(settings, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+    )
     return settings
 
+
 def add_custom_loss(name, customloss):
-    # unfortunately this way it cannot access globals when initializing 
-    assert issubclass(customloss,LossInterface)
-    loss_class_table.update({
-        name: customloss,
-    })
+    # unfortunately this way it cannot access globals when initializing
+    assert issubclass(customloss, LossInterface)
+    loss_class_table.update(
+        {
+            name: customloss,
+        }
+    )
+
 
 def command_line_override():
     global global_pixray_settings
-    settingsDict = None
     vq_parser = setup_parser()
     settings = process_args(vq_parser)
     return settings
 
+
 # super-userful one stop shopping from notebooks or other python code
+
+
 def run(prompts=None, drawer="vqgan", **kwargs):
     reset_settings()
     add_settings(prompts=prompts, drawer=drawer, **kwargs)
@@ -2123,13 +2811,17 @@ def run(prompts=None, drawer="vqgan", **kwargs):
     do_init(settings)
     do_run(settings)
 
+
 def main():
     settings = apply_settings()
-    print(f"Running with {settings.num_cuts}x{settings.batches} = {settings.num_cuts*settings.batches} cuts")
+    print(
+        f"Running with {settings.num_cuts}x{settings.batches} = {settings.num_cuts*settings.batches} cuts"
+    )
     do_init(settings)
     do_run(settings)
     # global drawer
     # drawer.to_svg()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

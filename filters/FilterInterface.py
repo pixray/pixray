@@ -1,10 +1,10 @@
-import argparse
 from torch import nn
+
 
 class FilterInterface(nn.Module):
     @staticmethod
     def add_settings(parser):
-        #add parser.add_argument() here
+        # add parser.add_argument() here
         return parser
 
     def __init__(self, settings, device=None):
