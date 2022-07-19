@@ -4,5 +4,6 @@ ignore = E203,
 	 E501,
 	 E741,
 	 # TODO: we should re-enable the following after some refactoring
-	 E402
+	 E402,
+         F821
 exclude = ./src/*,./env/*,./SLIP/*,./v-diffusion-pytorch/*,./diffvg/*
