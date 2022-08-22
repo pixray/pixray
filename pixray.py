@@ -29,7 +29,7 @@ torch.backends.cudnn.benchmark = False		# NR: True is a bit faster, but can lead
 #torch.use_deterministic_algorithms(True)		# NR: grid_sampler_2d_backward_cuda does not have a deterministic implementation
 
 from torch_optimizer import DiffGrad, AdamP
-from perlin_numpy import generate_fractal_noise_2d
+from perlin_cupy import generate_fractal_noise_2d
 from util import str2bool, get_file_path, emit_filename, split_pipes, parse_unit
 
 from slip import get_clip_perceptor
