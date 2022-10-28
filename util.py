@@ -263,7 +263,7 @@ def palette_from_string(s):
 def wget_file(url, out):
     try:
         print(f"Downloading {out} from {url}, please wait")
-        output = subprocess.check_output(['wget', '-O', out, url])
+        output = subprocess.check_output(['wget', '-q', '-O', out, url])
     except subprocess.CalledProcessError as cpe:
         output = cpe.output
         print("Ignoring non-zero exit: ", output)

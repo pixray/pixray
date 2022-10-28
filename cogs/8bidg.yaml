@@ -1,0 +1,5 @@
+display_every: 10
+#output: outputs/8bidg.png
+scale: 2.5
+drawer: pixel
+quality: better

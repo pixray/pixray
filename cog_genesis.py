@@ -1,32 +1,34 @@
-import cog
-from pathlib import Path
+from cog import Path, BasePredictor, Input
 import torch
 import pixray
 import yaml
 import pathlib
 import os
 import yaml
+from typing import Iterator
 
 from cogrun import create_temporary_copy
 
-class GenesisPredictor(cog.Predictor):
+class GenesisPredictor(BasePredictor):
     def setup(self):
         print("---> GenesisPredictor Setup")
 
     # Define the input types for a prediction
-    @cog.input("title", type=str, default="")
-    @cog.input("quality", type=str, options=["draft", "mintable"], default="draft")
-    @cog.input("optional_settings", type=str, default="\n")
-    def predict(self, title, quality, optional_settings):
+    def predict(
+            self,
+            title: str = Input(default=""),
+            quality: str =Input(choices=["draft", "mintable"], default="draft"),
+            optional_settings: str = Input(default="\n")
+    ) -> Iterator[Path]:
         """Run a single prediction on the model"""
         print("---> Pixray Genesis Init")
 
         pixray.reset_settings()
 
         if(quality=="draft"):
-            pixray.add_settings(output="outputs/genesis_draft.png", quality="draft", scale=2.5, iterations=100)
+            pixray.add_settings(quality="draft", scale=2.5, iterations=100)
         else:
-            pixray.add_settings(output="outputs/genesis.png", quality="best", scale=4, iterations=350)
+            pixray.add_settings(quality="best", scale=4, iterations=350)
 
         # apply settings in order
         title = title.strip()
@@ -54,5 +56,6 @@ class GenesisPredictor(cog.Predictor):
         run_complete = False
         while run_complete == False:
             run_complete = pixray.do_run(settings, return_display=True)
-            temp_copy = create_temporary_copy(settings.output)
-            yield pathlib.Path(os.path.realpath(temp_copy))
+            output_file = os.path.join(settings.outdir, settings.output)
+            temp_copy = create_temporary_copy(output_file)
+            yield Path(os.path.realpath(temp_copy))
