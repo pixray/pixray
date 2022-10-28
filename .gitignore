@@ -26,3 +26,6 @@ com.txt
 
 # Cog
 .cog
+
+# We use cog.yaml.in for templating
+cog.yaml

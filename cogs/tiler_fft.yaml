@@ -1,6 +1,6 @@
 drawer: vqgan
 display_every: 10
-output: outputs/tiler_fft.png
+#output: outputs/tiler_fft.png
 quality: better
 filters: wallpaper
 wallpaper_edge_match: 4

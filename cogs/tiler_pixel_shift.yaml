@@ -1,6 +1,6 @@
 drawer: pixel
 display_every: 10
-output: outputs/tiler_pixel.png
+#output: outputs/tiler_pixel.png
 quality: better
 filters: wallpaper
 pixel_size: [64, 32]

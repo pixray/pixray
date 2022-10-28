@@ -1,5 +1,5 @@
 display_every: 10
-output: outputs/pixray_pixel.png
+#output: outputs/pixray_pixel.png
 quality: better
 scale: 2.5
 vector_prompts: textoff

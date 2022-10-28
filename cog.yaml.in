@@ -3,17 +3,15 @@ build:
   cuda: "10.2"
   python_version: "3.8"
   python_requirements: "requirements.txt"
+  system_packages:
+    - "libgl1-mesa-glx"
+    - "ffmpeg"
   run:
-    - "apt-get update && apt install -y libgl1-mesa-glx"
     # CMAKE_PREFIX_PATH fix is from https://github.com/readthedocs/readthedocs.org/issues/5867
     - "git clone https://github.com/pixray/diffvg && cd diffvg && git submodule update --init --recursive && CMAKE_PREFIX_PATH=$(pyenv prefix) DIFFVG_CUDA=1 python setup.py install && pip install basicsr"
 
-# image: "r8.im/pixray/api"
-# predict: "cogrun.py:PixrayApi"
-
-image: "r8.im/pixray/text2image"
-# image: "r8.im/pixray/text2image-future"
-predict: "cogrun.py:Text2Image"
+image: "r8.im/__NAME__"
+predict: "__CLASS__"
 
 # image: "r8.im/dribnet/8bidoug"
 # predict: "cogrun.py:EightBidG"
